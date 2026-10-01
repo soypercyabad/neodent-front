@@ -1,0 +1,7 @@
+export * from './model/patients.types'
+export * from './model/patients.mock'
+export * from './api/patientsApi'
+export * from './pages/NewPatientPage'
+export * from './pages/EditPatientPage'
+export * from './pages/PatientDetailPage'
+export * from './pages/PatientsPage'

@@ -1,0 +1,1 @@
+export const citaReferencia = (id: number) => `ND-${String(id).padStart(6, '0')}`
