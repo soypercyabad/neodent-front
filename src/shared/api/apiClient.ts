@@ -17,7 +17,6 @@ export class ApiError extends Error {
     fieldErrors?: Record<string, string>,
   ) {
     super(message)
-
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = fieldErrors
@@ -26,6 +25,45 @@ export class ApiError extends Error {
 
 interface ApiRequestOptions extends RequestInit {
   accessToken?: string | null
+  _retry?: boolean
+}
+
+type TokenRefresher = () => Promise<string | null>
+type SessionExpiredHandler = () => void
+
+let tokenRefresher: TokenRefresher | null = null
+let sessionExpiredHandler: SessionExpiredHandler | null = null
+let refreshPromise: Promise<string | null> | null = null
+
+export function setTokenRefresher(refresher: TokenRefresher | null) {
+  tokenRefresher = refresher
+}
+
+export function setSessionExpiredHandler(handler: SessionExpiredHandler | null) {
+  sessionExpiredHandler = handler
+}
+
+async function renovarAccessToken(): Promise<string | null> {
+  if (!tokenRefresher) return null
+
+  if (!refreshPromise) {
+    refreshPromise = tokenRefresher()
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
+
+function esRutaDeAutenticacion(path: string): boolean {
+  return (
+    path.includes('/auth/login') ||
+    path.includes('/auth/refresh') ||
+    path.includes('/auth/verify') ||
+    path.includes('/auth/2fa')
+  )
 }
 
 export async function apiRequest<T>(
@@ -35,6 +73,7 @@ export async function apiRequest<T>(
   const {
     accessToken,
     headers: customHeaders,
+    _retry = false,
     ...requestOptions
   } = options
 
@@ -42,28 +81,31 @@ export async function apiRequest<T>(
   const headers = new Headers(customHeaders)
 
   if (requestOptions.body && !esFormData) {
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
-    }
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   }
 
   if (esFormData) headers.delete('Content-Type')
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
 
-  if (accessToken) {
-    headers.set(
-      'Authorization',
-      `Bearer ${accessToken}`,
-    )
+  const response = await fetch(`${API_URL}${path}`, {
+    ...requestOptions,
+    credentials: 'include',
+    headers,
+  })
+
+  if (response.status === 401 && !_retry && !esRutaDeAutenticacion(path) && tokenRefresher) {
+    const nuevoAccessToken = await renovarAccessToken()
+
+    if (nuevoAccessToken) {
+      return apiRequest<T>(path, {
+        ...options,
+        accessToken: nuevoAccessToken,
+        _retry: true,
+      })
+    }
+
+    sessionExpiredHandler?.()
   }
-
-  const response = await fetch(
-    `${API_URL}${path}`,
-    {
-      ...requestOptions,
-      credentials: 'include',
-      headers,
-    },
-  )
 
   if (!response.ok) {
     let body: ApiErrorBody | null = null
@@ -76,29 +118,58 @@ export async function apiRequest<T>(
 
     throw new ApiError(
       body?.message ??
-        'Ocurrió un error al procesar la solicitud.',
+        (response.status === 401
+          ? 'Tu sesión ha expirado.'
+          : 'Ocurrió un error al procesar la solicitud.'),
       response.status,
       body?.fieldErrors,
     )
   }
 
-  if (response.status === 204) return undefined as T
+  if (response.status === 204) {
+    return undefined as T
+  }
 
   return response.json() as Promise<T>
 }
 
-export async function apiBlob(path: string, accessToken: string): Promise<Blob> {
+export async function apiBlob(
+  path: string,
+  accessToken: string,
+  retry = false,
+): Promise<Blob> {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'GET',
     credentials: 'include',
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   })
+
+  if (response.status === 401 && !retry && !esRutaDeAutenticacion(path) && tokenRefresher) {
+    const nuevoAccessToken = await renovarAccessToken()
+
+    if (nuevoAccessToken) {
+      return apiBlob(path, nuevoAccessToken, true)
+    }
+
+    sessionExpiredHandler?.()
+  }
 
   if (!response.ok) {
     let body: ApiErrorBody | null = null
-    try { body = await response.json() } catch {}
+
+    try {
+      body = await response.json()
+    } catch {
+      // Puede no venir JSON.
+    }
+
     throw new ApiError(
-      body?.message ?? 'No se pudo obtener el archivo.',
+      body?.message ??
+        (response.status === 401
+          ? 'Tu sesión ha expirado.'
+          : 'No se pudo obtener el archivo.'),
       response.status,
       body?.fieldErrors,
     )

@@ -4,6 +4,7 @@ import type { User, Role } from '@/domain/identity'
 import { AuthContext, type AuthStore, type PendingTwoFactor, } from './AuthContext'
 import type { Credentials, RegisterInput } from './auth.types'
 import { restoreSession } from './sessionService'
+import { setTokenRefresher, setSessionExpiredHandler } from '@/shared/api/apiClient'
 
 function mapBackendRole(roles: string[]): Role {
   if (roles.includes('ADMIN')) return 'Administrador'
@@ -69,6 +70,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(token)
     setUser(authenticatedUser)
   }, [])
+
+  /**
+   * Establece el refrescador de token y el manejador de sesión expirada.
+   */
+  useEffect(() => {
+    setTokenRefresher(async () => {
+      try {
+        const response = await authApi.refresh()
+        setAccessToken(response.accessToken)
+        return response.accessToken
+      } catch {
+        return null
+      }
+    })
+
+    setSessionExpiredHandler(() => {limpiarSesion()})
+
+    return () => {
+      setTokenRefresher(null)
+      setSessionExpiredHandler(null)
+    }
+  }, [limpiarSesion])
 
   /**
    * Restaura la sesión al recargar la página.
