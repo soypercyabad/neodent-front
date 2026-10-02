@@ -56,6 +56,7 @@ export function PaymentForm({ appointment, onSubmit }: PaymentFormProps) {
         </Field>
         <Field label="Precio" hint="Monto en soles (S/)." error={error}>
           <Input
+            icon="creditCard"
             type="number"
             min={0}
             step="0.01"
@@ -84,6 +85,7 @@ export function PaymentForm({ appointment, onSubmit }: PaymentFormProps) {
       <div className="mt-5">
         <Field label="Código de transacción">
           <Input
+            icon="file"
             placeholder="Ingresa el código de transacción"
             value={codigo}
             onChange={(e) => setCodigo(e.target.value)}

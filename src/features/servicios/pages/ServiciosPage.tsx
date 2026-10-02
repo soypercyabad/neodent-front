@@ -134,6 +134,37 @@ export function ServiciosPage() {
     setFormError('')
   }
 
+  const handlePrecioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(',', '.')
+    if (val.startsWith('.')) val = '0' + val
+    if (val === '' || /^\d+(\.\d{0,2})?$/.test(val)) {
+      setForm(actual => ({ ...actual, precioReferencial: val }))
+    }
+  }
+
+  const handlePrecioKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      [
+        'Backspace',
+        'Delete',
+        'Tab',
+        'Escape',
+        'Enter',
+        'ArrowLeft',
+        'ArrowRight',
+        'Home',
+        'End',
+      ].includes(e.key) ||
+      e.ctrlKey ||
+      e.metaKey
+    ) {
+      return
+    }
+    if (!/[\d.,]/.test(e.key)) {
+      e.preventDefault()
+    }
+  }
+
   // REGISTRAR O EDITAR SERVICIO.
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -323,15 +354,20 @@ export function ServiciosPage() {
                   <span className="mb-1.5 block text-sm font-semibold text-ink">
                     Nombre del servicio <span className="text-danger">*</span>
                   </span>
-                  <input
-                    type="text"
-                    required
-                    maxLength={120}
-                    value={form.nombre}
-                    onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
-                    placeholder="Ej. Limpieza dental"
-                    className="w-full rounded-control border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                      <Icon name="tooth" size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      maxLength={120}
+                      value={form.nombre}
+                      onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                      placeholder="Ej. Limpieza dental"
+                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                    />
+                  </div>
                 </label>
 
                 <div>
@@ -371,33 +407,44 @@ export function ServiciosPage() {
                 </label>
 
                 <label>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
+                  <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
                     Duración (minutos) <span className="text-danger">*</span>
                   </span>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    max={1440}
-                    step={1}
-                    value={form.duracionMinutos}
-                    onChange={e => setForm(actual => ({ ...actual, duracionMinutos: e.target.value }))}
-                    className="w-full rounded-control border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                      <Icon name="clock" size={16} />
+                    </span>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={1440}
+                      step={1}
+                      value={form.duracionMinutos}
+                      onChange={e => setForm(actual => ({ ...actual, duracionMinutos: e.target.value }))}
+                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                    />
+                  </div>
                 </label>
 
                 <label>
                   <span className="mb-1.5 block text-sm font-semibold text-ink">Precio referencial (S/)</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={form.precioReferencial}
-                    onChange={e => setForm(actual => ({ ...actual, precioReferencial: e.target.value }))}
-                    placeholder="Ej. 80.00"
-                    className="w-full rounded-control border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-muted">
+                      S/
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.precioReferencial}
+                      onChange={handlePrecioChange}
+                      onKeyDown={handlePrecioKeyDown}
+                      placeholder="0.00"
+                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                    />
+                  </div>
                   <span className="mt-1 block text-xs text-muted">
-                    Opcional. No representa un pago realizado.
+                    Opcional. Valor decimal numérico (máx. 2 decimales).
                   </span>
                 </label>
 
@@ -745,7 +792,8 @@ export function ServiciosPage() {
 
                     {/* DURACIÓN Y PRECIO */}
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-lg bg-alt px-2 py-1 text-xs font-semibold text-ink">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-alt px-2.5 py-1 text-xs font-semibold text-ink">
+                        <Icon name="clock" size={13} className="shrink-0 text-muted" />
                         {servicio.duracionMinutos} min
                       </span>
 

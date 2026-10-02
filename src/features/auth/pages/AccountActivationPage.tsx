@@ -450,6 +450,7 @@ export function AccountActivationPage({ type }: Props) {
               error={fieldErrors.numeroDocumento}
             >
               <Input
+                icon="idCard"
                 value={numeroDocumento}
                 placeholder={
                   esDni

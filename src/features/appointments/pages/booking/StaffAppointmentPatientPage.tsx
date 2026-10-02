@@ -312,6 +312,7 @@ export function StaffAppointmentPatientPage() {
 
             <Field label="Número de documento">
               <Input
+                icon="idCard"
                 value={numeroDocumento}
                 inputMode={esDni ? 'numeric' : 'text'}
                 maxLength={maxDocumento}

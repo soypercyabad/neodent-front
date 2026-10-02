@@ -235,15 +235,20 @@ export function EspecialidadesPage() {
                     Nombre de la especialidad <span className="text-danger">*</span>
                   </span>
 
-                  <input
-                    type="text"
-                    required
-                    maxLength={100}
-                    value={form.nombre}
-                    onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
-                    placeholder="Ej. Ortodoncia"
-                    className="w-full rounded-control border border-line bg-surface px-4 py-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                      <Icon name="tooth" size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      maxLength={100}
+                      value={form.nombre}
+                      onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                      placeholder="Ej. Ortodoncia"
+                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                    />
+                  </div>
                 </label>
 
                 <label>

@@ -368,6 +368,7 @@ export function PatientForm({
           <div>
             <Field label="Número de documento *" error={errors.numeroDocumento}>
               <Input
+                icon="idCard"
                 placeholder={
                   esDni
                     ? 'Ej. 12345678'
@@ -465,6 +466,7 @@ export function PatientForm({
 
         <Field label="Nombres *" error={errors.nombres}>
           <Input
+            icon="user"
             placeholder="Ej. María"
             value={values.nombres}
             onChange={e => set('nombres', e.target.value)}
@@ -476,6 +478,7 @@ export function PatientForm({
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
             <Input
+              icon="user"
               placeholder="Ej. Rojas"
               value={values.apellidoPaterno}
               onChange={e => set('apellidoPaterno', e.target.value)}
@@ -486,6 +489,7 @@ export function PatientForm({
 
           <Field label="Apellido materno" error={errors.apellidoMaterno}>
             <Input
+              icon="user"
               placeholder="Opcional"
               value={values.apellidoMaterno}
               onChange={e => set('apellidoMaterno', e.target.value)}
@@ -509,6 +513,7 @@ export function PatientForm({
 
           <Field label="Teléfono" error={errors.telefono}>
             <Input
+              icon="phone"
               placeholder="Ej. +51987654321"
               value={values.telefono}
               inputMode="tel"
@@ -528,6 +533,7 @@ export function PatientForm({
         <Field label="Correo electrónico" error={errors.email}>
           <Input
             type="email"
+            icon="mail"
             placeholder="paciente@correo.com"
             value={values.email}
             onChange={e => set('email', e.target.value)}
@@ -538,6 +544,7 @@ export function PatientForm({
 
         <Field label="Dirección">
           <Input
+            icon="location"
             placeholder="Ej. Av. Larco 123, Miraflores"
             value={values.direccion}
             onChange={e => set('direccion', e.target.value)}

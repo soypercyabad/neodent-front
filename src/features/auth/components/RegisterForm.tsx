@@ -366,6 +366,7 @@ export function RegisterForm({ onSubmit }: RegisterFormProps) {
         <div className="w-full min-w-0">
           <Field label="Número de Documento" error={errors.numeroDocumento}>
             <Input
+              icon="idCard"
               placeholder={esDni ? 'Ej. 87654321' : values.tipoDocumento === 'CE' ? 'Ej. 001234567' : 'Ej. AB123456'}
               inputMode={esDni ? 'numeric' : 'text'}
               maxLength={maxDocumento}
@@ -494,7 +495,7 @@ export function RegisterForm({ onSubmit }: RegisterFormProps) {
         </Field>
 
         <Field label="Teléfono" error={errors.telefono}>
-          <Input icon="user" placeholder="Ej. +51987654321" inputMode="tel"
+          <Input icon="phone" placeholder="Ej. +51987654321" inputMode="tel"
             maxLength={16} autoComplete="tel" value={values.telefono}
             disabled={submitting}
             trailing={indicador('telefono', telefonoConfirmado)}

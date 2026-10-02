@@ -11,6 +11,7 @@ import {
   Input,
   PageHead,
   Pagination,
+  RolesTableSkeleton,
   RowActions,
   SearchInput,
   Table,
@@ -232,6 +233,7 @@ export function RolesPage() {
               >
                 <Field label="Nombre del rol *">
                   <Input
+                    icon="lock"
                     value={nombre}
                     onChange={e =>
                       setNombre(
@@ -247,6 +249,7 @@ export function RolesPage() {
 
                 <Field label="Descripción">
                   <Input
+                    icon="file"
                     value={descripcion}
                     onChange={e => setDescripcion(e.target.value)}
                     disabled={guardando}
@@ -337,15 +340,18 @@ export function RolesPage() {
         </Toolbar>
 
         <Table columns={COLUMNS}>
-          <TableState
-            colSpan={COLUMNS.length}
-            loading={loading}
-            error={error && !mostrarForm ? error : null}
-            empty={!loading && !error && filtrados.length === 0}
-            emptyLabel="No hay roles registrados."
-          />
+          {loading ? (
+            <RolesTableSkeleton rows={POR_PAGINA} />
+          ) : (
+            <>
+              <TableState
+                colSpan={COLUMNS.length}
+                error={error && !mostrarForm ? error : null}
+                empty={!error && filtrados.length === 0}
+                emptyLabel="No hay roles registrados."
+              />
 
-          {!loading && visibles.map(rol => (
+              {visibles.map(rol => (
             <tr key={rol.id}>
               <td>
                 <span className="font-bold text-ink">
@@ -393,6 +399,8 @@ export function RolesPage() {
               </ActionsCell>
             </tr>
           ))}
+            </>
+          )}
         </Table>
 
         {filtrados.length > 0 && (

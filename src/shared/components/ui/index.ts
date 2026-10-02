@@ -30,9 +30,19 @@ export { ErrorPage } from './ErrorPage'
 export { MultiSelectChips, type ChipOption } from './MultiSelectChips'
 export { FieldCheck } from './FieldCheck'
 export { FieldError } from './FieldError'
-export { Skeleton, TableSkeletonRows, AppointmentsTableSkeleton,
-  ServicesCardsSkeleton, EspecialidadesSkeleton,
-  SedesCardsSkeleton, UsersTableSkeleton,} from './Skeleton'
+export {
+  Skeleton,
+  TableSkeletonRows,
+  AppointmentsTableSkeleton,
+  ServicesCardsSkeleton,
+  EspecialidadesSkeleton,
+  SedesCardsSkeleton,
+  UsersTableSkeleton,
+  PatientsTableSkeleton,
+  RolesTableSkeleton,
+  BlockTypesSkeleton,
+  ScheduleBlocksSkeleton,
+} from './Skeleton'
 export * from './ProtectedImage'
 export { Toast, type ToastAviso, type ToastVariant } from './Toast'
 export { AnimatedTimePicker } from './AnimatedTimePicker'

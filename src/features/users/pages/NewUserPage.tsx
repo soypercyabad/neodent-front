@@ -662,6 +662,7 @@ export function NewUserPage() {
             <div className="w-full min-w-0 max-w-full">
                 <Field label="Número de documento *" error={errors.numeroDocumento}>
                 <Input
+                    icon="idCard"
                     placeholder={
                     esDni
                         ? 'Ej. 12345678'
@@ -760,6 +761,7 @@ export function NewUserPage() {
 
           <Field label="Nombres *" error={errors.nombres}>
             <Input
+              icon="user"
               placeholder="Ej. María"
               value={form.nombres}
               onChange={e => update('nombres', e.target.value)}
@@ -772,6 +774,7 @@ export function NewUserPage() {
           <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
               <Input
+                icon="user"
                 placeholder="Ej. Rojas"
                 value={form.apellidoPaterno}
                 onChange={e => update('apellidoPaterno', e.target.value)}
@@ -783,6 +786,7 @@ export function NewUserPage() {
 
             <Field label="Apellido materno" error={errors.apellidoMaterno}>
               <Input
+                icon="user"
                 placeholder="Opcional"
                 value={form.apellidoMaterno}
                 onChange={e => update('apellidoMaterno', e.target.value)}
@@ -794,6 +798,7 @@ export function NewUserPage() {
 
             <Field label="Teléfono" error={errors.telefono}>
               <Input
+                icon="phone"
                 placeholder="Ej. +51987654321"
                 value={form.telefono}
                 onChange={e =>
@@ -816,6 +821,7 @@ export function NewUserPage() {
             <Field label="Correo electrónico *" error={errors.correo}>
               <Input
                 type="email"
+                icon="mail"
                 placeholder="usuario@correo.com"
                 value={form.correo}
                 onChange={e => update('correo', e.target.value)}
@@ -930,6 +936,7 @@ export function NewUserPage() {
                     error={errors.numeroColegiatura}
                   >
                     <Input
+                      icon="tooth"
                       placeholder="Ej. COP 12345"
                       value={form.numeroColegiatura}
                       onChange={e =>

@@ -5,6 +5,7 @@ import {
   ActionsCell,
   AnimatedDatePicker,
   AnimatedSelect,
+  AppointmentsTableSkeleton,
   Badge,
   Button,
   Card,
@@ -268,65 +269,70 @@ export function AppointmentsPage() {
         ) : (
           <>
             <Table columns={COLUMNS}>
-              <TableState
-                colSpan={COLUMNS.length}
-                loading={loading}
-                empty={!loading && rows.length === 0}
-                emptyLabel="No se encontraron citas con los filtros seleccionados."
-              />
+              {loading ? (
+                <AppointmentsTableSkeleton rows={POR_PAGINA} />
+              ) : (
+                <>
+                  <TableState
+                    colSpan={COLUMNS.length}
+                    empty={rows.length === 0}
+                    emptyLabel="No se encontraron citas con los filtros seleccionados."
+                  />
 
-              {!loading && rowsPaginadas.map((cita, index) => (
-                <motion.tr
-                  key={cita.idCita}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.15) }}
-                  className="hover:bg-alt/60"
-                >
-                  <td className="font-semibold text-brand">{citaReferencia(cita.idCita)}</td>
+                  {rowsPaginadas.map((cita, index) => (
+                    <motion.tr
+                      key={cita.idCita}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.15) }}
+                      className="hover:bg-alt/60"
+                    >
+                      <td className="font-semibold text-brand">{citaReferencia(cita.idCita)}</td>
 
-                  <td>
-                    <p className="font-semibold text-ink">{cita.pacienteNombre}</p>
-                    <p className="mt-1 text-xs text-muted">{cita.servicioNombre}</p>
-                  </td>
+                      <td>
+                        <p className="font-semibold text-ink">{cita.pacienteNombre}</p>
+                        <p className="mt-1 text-xs text-muted">{cita.servicioNombre}</p>
+                      </td>
 
-                  <td>
-                    <p className="font-semibold text-ink">
-                      {cita.odontologoNombre
-                        ? cita.odontologoNombre.startsWith('Dr')
-                          ? cita.odontologoNombre
-                          : `Dr(a). ${cita.odontologoNombre}`
-                        : 'Por asignar'}
-                    </p>
-                    {cita.especialidadNombre && (
-                      <p className="mt-1 text-xs text-muted">{cita.especialidadNombre}</p>
-                    )}
-                  </td>
+                      <td>
+                        <p className="font-semibold text-ink">
+                          {cita.odontologoNombre
+                            ? cita.odontologoNombre.startsWith('Dr')
+                              ? cita.odontologoNombre
+                              : `Dr(a). ${cita.odontologoNombre}`
+                            : 'Por asignar'}
+                        </p>
+                        {cita.especialidadNombre && (
+                          <p className="mt-1 text-xs text-muted">{cita.especialidadNombre}</p>
+                        )}
+                      </td>
 
-                  <td className="text-ink">
-                    {fechaFormato(cita.fechaHoraInicio)}
-                    <p className="mt-1 text-xs text-muted">{horaFormato(cita.fechaHoraInicio)}</p>
-                  </td>
+                      <td className="text-ink">
+                        {fechaFormato(cita.fechaHoraInicio)}
+                        <p className="mt-1 text-xs text-muted">{horaFormato(cita.fechaHoraInicio)}</p>
+                      </td>
 
-                  <td className="text-center">
-                    <div className="flex justify-center">
-                      <Badge tone={tonoEstado(cita.estado)}>{cita.estado.replaceAll('_', ' ')}</Badge>
-                    </div>
-                  </td>
+                      <td className="text-center">
+                        <div className="flex justify-center">
+                          <Badge tone={tonoEstado(cita.estado)}>{cita.estado.replaceAll('_', ' ')}</Badge>
+                        </div>
+                      </td>
 
-                  <ActionsCell align="center">
-                    <RowActions
-                      actions={[
-                        {
-                          label: 'Ver detalle',
-                          icon: 'eye',
-                          onClick: () => navigate(`/citas/${cita.idCita}`),
-                        },
-                      ]}
-                    />
-                  </ActionsCell>
-                </motion.tr>
-              ))}
+                      <ActionsCell align="center">
+                        <RowActions
+                          actions={[
+                            {
+                              label: 'Ver detalle',
+                              icon: 'eye',
+                              onClick: () => navigate(`/citas/${cita.idCita}`),
+                            },
+                          ]}
+                        />
+                      </ActionsCell>
+                    </motion.tr>
+                  ))}
+                </>
+              )}
             </Table>
 
             {rows.length > 0 && (

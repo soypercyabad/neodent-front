@@ -746,6 +746,7 @@ export function EditUserPage() {
               error={errors.numeroDocumento}
             >
               <Input
+                icon="idCard"
                 value={form.numeroDocumento}
                 inputMode={
                   esDni
@@ -785,6 +786,7 @@ export function EditUserPage() {
             error={errors.nombres}
           >
             <Input
+              icon="user"
               value={form.nombres}
               disabled={saving}
               onBlur={() =>
@@ -811,6 +813,7 @@ export function EditUserPage() {
               error={errors.apellidoPaterno}
             >
               <Input
+                icon="user"
                 value={form.apellidoPaterno}
                 disabled={saving}
                 onBlur={() =>
@@ -836,6 +839,7 @@ export function EditUserPage() {
               error={errors.apellidoMaterno}
             >
               <Input
+                icon="user"
                 value={form.apellidoMaterno}
                 disabled={saving}
                 onBlur={() =>
@@ -855,6 +859,7 @@ export function EditUserPage() {
               error={errors.telefono}
             >
               <Input
+                icon="phone"
                 value={form.telefono}
                 disabled={saving}
                 inputMode="tel"
@@ -892,6 +897,7 @@ export function EditUserPage() {
             >
               <Input
                 type="email"
+                icon="mail"
                 value={form.correo}
                 disabled={saving}
                 onBlur={() =>
@@ -919,6 +925,7 @@ export function EditUserPage() {
           >
             <Input
               type="password"
+              icon="lock"
               value={form.nuevaContrasena}
               disabled={saving}
               autoComplete="new-password"
@@ -1046,6 +1053,7 @@ export function EditUserPage() {
                   error={errors.numeroColegiatura}
                 >
                   <Input
+                    icon="tooth"
                     value={form.numeroColegiatura}
                     disabled={saving}
                     onBlur={() =>

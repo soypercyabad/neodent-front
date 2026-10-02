@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AnimatedSelect,
+  BlockTypesSkeleton,
   Button,
   Card,
   Checkbox,
@@ -269,8 +270,8 @@ export function BlockTypesPage() {
         title="Tipos de bloqueo"
         description="Administra los tipos de excepción disponibles para feriados, vacaciones, permisos, capacitaciones y cierres."
         actions={
-          <Button icon="plus" onClick={abrirNuevo} disabled={loading}>
-            Nuevo tipo
+          <Button icon="plus" onClick={abrirNuevo} disabled={guardando || procesando}>
+            Nuevo tipo de bloqueo
           </Button>
         }
       />
@@ -311,14 +312,19 @@ export function BlockTypesPage() {
               <form onSubmit={event => void guardar(event)} className="grid gap-4 lg:grid-cols-2">
                 <label className="min-w-0 lg:col-span-2">
                   <span className="mb-1.5 block text-sm font-semibold text-ink">Nombre</span>
-                  <input
-                    value={form.nombre}
-                    onChange={event => setForm(actual => ({ ...actual, nombre: event.target.value }))}
-                    maxLength={80}
-                    disabled={guardando}
-                    placeholder="Ej. Licencia médica"
-                    className="w-full rounded-control border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                      <Icon name="calendarEdit" size={16} />
+                    </span>
+                    <input
+                      value={form.nombre}
+                      onChange={event => setForm(actual => ({ ...actual, nombre: event.target.value }))}
+                      maxLength={80}
+                      disabled={guardando}
+                      placeholder="Ej. Licencia médica"
+                      className="w-full rounded-control border border-line bg-surface py-2.5 pr-3 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
                 </label>
 
                 <label className="min-w-0 lg:col-span-2">
@@ -510,10 +516,7 @@ export function BlockTypesPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-3 p-12 text-sm text-muted">
-            <Icon name="spinner" size={22} className="animate-spin text-brand" />
-            Cargando tipos de bloqueo…
-          </div>
+          <BlockTypesSkeleton count={4} />
         ) : error ? (
           <div className="p-10 text-center">
             <p role="alert" className="text-sm text-danger">{error}</p>
@@ -525,6 +528,10 @@ export function BlockTypesPage() {
           <div className="p-10 text-center">
             <Icon name="calendarEdit" size={36} className="mx-auto text-muted" />
             <p className="mt-3 font-semibold text-ink">No hay tipos de bloqueo registrados.</p>
+            <p className="mt-1 text-sm text-muted">Comienza registrando el primer tipo de excepción de agenda.</p>
+            <Button icon="plus" className="mt-4" onClick={abrirNuevo} disabled={guardando || procesando}>
+              Nuevo tipo de bloqueo
+            </Button>
           </div>
         ) : (
           <>
@@ -543,45 +550,45 @@ export function BlockTypesPage() {
                   )}
                 >
                   <div>
-                    {/* NOMBRE Y ESTADO */}
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <span
-                          className={cn(
-                            'grid h-10 w-10 shrink-0 place-items-center rounded-lg',
-                            tipo.activo ? 'bg-brand-soft text-brand' : 'bg-alt text-muted',
-                          )}
-                        >
-                          <Icon name="calendarEdit" size={20} />
-                        </span>
-
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-ink">{tipo.nombre}</h3>
-                        </div>
-                      </div>
-
+                    {/* ENCABEZADO CON ICONO, TÍTULO, ESTADO Y DESCRIPCIÓN */}
+                    <div className="flex items-start gap-3">
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
-                          tipo.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+                          'grid h-10 w-10 shrink-0 place-items-center rounded-lg',
+                          tipo.activo ? 'bg-brand-soft text-brand' : 'bg-alt text-muted',
                         )}
                       >
-                        <span
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full',
-                            tipo.activo ? 'bg-emerald-500' : 'bg-slate-400',
-                          )}
-                        />
-                        {tipo.activo ? 'Activo' : 'Inactivo'}
+                        <Icon name="calendarEdit" size={20} />
                       </span>
-                    </div>
 
-                    {/* DESCRIPCIÓN */}
-                    {tipo.descripcion && (
-                      <p className="mt-3 text-xs leading-relaxed text-muted line-clamp-2">
-                        {tipo.descripcion}
-                      </p>
-                    )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-bold text-ink">{tipo.nombre}</h3>
+
+                          <span
+                            className={cn(
+                              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+                              tipo.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'h-1.5 w-1.5 rounded-full',
+                                tipo.activo ? 'bg-emerald-500' : 'bg-slate-400',
+                              )}
+                            />
+                            {tipo.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </div>
+
+                        {/* DESCRIPCIÓN: Debajo del título, a la derecha del icono */}
+                        {tipo.descripcion && (
+                          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
+                            {tipo.descripcion}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
                     {/* ALCANCE: ODONTÓLOGO Y SEDE */}
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -645,6 +652,9 @@ export function BlockTypesPage() {
                       ? 'No se encontraron tipos de bloqueo con los filtros seleccionados.'
                       : 'No hay tipos de bloqueo registrados.'}
                   </p>
+                  <Button icon="plus" className="mt-4" onClick={abrirNuevo} disabled={guardando || procesando}>
+                    Nuevo tipo de bloqueo
+                  </Button>
                 </div>
               )}
             </div>

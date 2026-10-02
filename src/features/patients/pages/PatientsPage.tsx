@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ActionsCell, AnimatedSelect, Avatar, Badge, Button, Card, ConfirmDialog,
-  Icon, PageHead, Pagination, RowActions, SearchInput, Table, TableFoot,
+  Icon, PageHead, Pagination, PatientsTableSkeleton, RowActions, SearchInput, Table, TableFoot,
   TableState, Toast, Toolbar, type Column,
 } from '@/shared/components/ui'
 import { ApiError } from '@/shared/api/apiClient'
@@ -238,16 +238,18 @@ export function PatientsPage() {
         </Toolbar>
 
         <Table columns={COLUMNS}>
-          <TableState
-            colSpan={COLUMNS.length}
-            loading={loading}
-            error={error || null}
-            empty={!loading && !error && rows.length === 0}
-            loadingLabel="Cargando pacientes…"
-            emptyLabel="No hay pacientes que coincidan con los filtros."
-          />
+          {loading ? (
+            <PatientsTableSkeleton rows={PAGE_SIZE} />
+          ) : (
+            <>
+              <TableState
+                colSpan={COLUMNS.length}
+                error={error || null}
+                empty={rows.length === 0}
+                emptyLabel="No hay pacientes que coincidan con los filtros."
+              />
 
-          {!loading && !error && rows.map(p => (
+              {!error && rows.map(p => (
             <tr key={p.id}>
               <td>
                 <div className="flex items-center gap-3">
@@ -344,6 +346,8 @@ export function PatientsPage() {
               </ActionsCell>
             </tr>
           ))}
+            </>
+          )}
         </Table>
 
         <TableFoot

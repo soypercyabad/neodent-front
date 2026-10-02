@@ -75,7 +75,7 @@ export function ForgotPasswordPage() {
                 <Input
                   type="email"
                   name="correo"
-                  icon="user"
+                  icon="mail"
                   placeholder="Ingresa tu correo"
                   autoComplete="email"
                   value={correo}

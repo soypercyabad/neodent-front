@@ -1,31 +1,47 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, SedesCardsSkeleton, TableFoot, Toast } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { sedesApi, type Sede, type SedeInput } from '../api/sedesApi'
+import ubigeoDataRaw from '@/shared/data/ubigeoPeru.json'
 
 type Formulario = { [K in keyof SedeInput]: string }
 type Filtro = 'todas' | 'activas' | 'inactivas'
 type Aviso = { tipo: 'success' | 'error'; texto: string }
+
+type UbigeoDistrito = {
+  ubigeo: string
+  id: number
+  inei?: string
+}
+
+type UbigeoData = Record<string, Record<string, Record<string, UbigeoDistrito>>>
+const ubigeoData = ubigeoDataRaw as unknown as UbigeoData
 
 const VACIO: Formulario = {
   nombre: '', direccion: '', distrito: '', provincia: '',
   departamento: '', telefono: '', email: '',
 }
 
-const CAMPOS: { key: keyof Formulario; label: string; max: number; required?: boolean }[] = [
-  { key: 'nombre', label: 'Nombre de la sede', max: 80, required: true },
-  { key: 'direccion', label: 'Dirección', max: 200, required: true },
-  { key: 'distrito', label: 'Distrito', max: 80 },
-  { key: 'provincia', label: 'Provincia', max: 80 },
-  { key: 'departamento', label: 'Departamento', max: 80 },
-  { key: 'telefono', label: 'Teléfono', max: 20 },
-  { key: 'email', label: 'Correo electrónico', max: 120 },
-]
+function capitalizar(texto: string): string {
+  if (!texto) return ''
+  const minusculas = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'en'])
+  return texto
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((palabra, index) => {
+      if (index > 0 && minusculas.has(palabra)) {
+        return palabra
+      }
+      return palabra.charAt(0).toUpperCase() + palabra.slice(1)
+    })
+    .join(' ')
+}
 
 const POR_PAGINA = 6
 const normalizar = (texto: string) =>
-  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
 export function SedesPage() {
   const { accessToken } = useAuth()
@@ -47,6 +63,82 @@ export function SedesPage() {
   const [formError, setFormError] = useState('')
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [actualizacion, setActualizacion] = useState(0)
+
+  // OPCIONES DE UBIGEO Y CASCADA DE DEPARTAMENTO -> PROVINCIA -> DISTRITO
+  const opcionesDepartamentos = useMemo(() => [
+    { value: '', label: 'Seleccionar departamento' },
+    ...Object.keys(ubigeoData)
+      .sort((a, b) => a.localeCompare(b, 'es'))
+      .map(dep => ({
+        value: capitalizar(dep),
+        label: capitalizar(dep),
+      })),
+  ], [])
+
+  const deptoKey = useMemo(() => {
+    if (!form.departamento) return null
+    const depNorm = normalizar(form.departamento)
+    return Object.keys(ubigeoData).find(k => normalizar(k) === depNorm) ?? null
+  }, [form.departamento])
+
+  const opcionesProvincias = useMemo(() => {
+    if (!deptoKey) return [{ value: '', label: 'Seleccionar provincia' }]
+    const provincias = Object.keys(ubigeoData[deptoKey] ?? {})
+    return [
+      { value: '', label: 'Seleccionar provincia' },
+      ...provincias
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .map(prov => ({
+          value: capitalizar(prov),
+          label: capitalizar(prov),
+        })),
+    ]
+  }, [deptoKey])
+
+  const provKey = useMemo(() => {
+    if (!deptoKey || !form.provincia) return null
+    const provNorm = normalizar(form.provincia)
+    const provincias = ubigeoData[deptoKey] ?? {}
+    return Object.keys(provincias).find(k => normalizar(k) === provNorm) ?? null
+  }, [deptoKey, form.provincia])
+
+  const opcionesDistritos = useMemo(() => {
+    if (!deptoKey || !provKey) return [{ value: '', label: 'Seleccionar distrito' }]
+    const distritos = Object.keys(ubigeoData[deptoKey]?.[provKey] ?? {})
+    return [
+      { value: '', label: 'Seleccionar distrito' },
+      ...distritos
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .map(dist => ({
+          value: capitalizar(dist),
+          label: capitalizar(dist),
+        })),
+    ]
+  }, [deptoKey, provKey])
+
+  const cambiarDepartamento = (depto: string) => {
+    setForm(actual => ({
+      ...actual,
+      departamento: depto,
+      provincia: '',
+      distrito: '',
+    }))
+  }
+
+  const cambiarProvincia = (prov: string) => {
+    setForm(actual => ({
+      ...actual,
+      provincia: prov,
+      distrito: '',
+    }))
+  }
+
+  const cambiarDistrito = (dist: string) => {
+    setForm(actual => ({
+      ...actual,
+      distrito: dist,
+    }))
+  }
 
   // CONSULTAR SEDES.
   useEffect(() => {
@@ -87,10 +179,25 @@ export function SedesPage() {
   }
 
   const abrirEditar = (sede: Sede) => {
+    const depKey = sede.departamento
+      ? Object.keys(ubigeoData).find(k => normalizar(k) === normalizar(sede.departamento!))
+      : null
+
+    const provKey = depKey && sede.provincia
+      ? Object.keys(ubigeoData[depKey] ?? {}).find(k => normalizar(k) === normalizar(sede.provincia!))
+      : null
+
+    const distKey = depKey && provKey && sede.distrito
+      ? Object.keys(ubigeoData[depKey]?.[provKey] ?? {}).find(k => normalizar(k) === normalizar(sede.distrito!))
+      : null
+
     setForm({
-      nombre: sede.nombre, direccion: sede.direccion,
-      distrito: sede.distrito ?? '', provincia: sede.provincia ?? '',
-      departamento: sede.departamento ?? '', telefono: sede.telefono ?? '',
+      nombre: sede.nombre,
+      direccion: sede.direccion,
+      departamento: depKey ? capitalizar(depKey) : (sede.departamento ? capitalizar(sede.departamento) : ''),
+      provincia: provKey ? capitalizar(provKey) : (sede.provincia ? capitalizar(sede.provincia) : ''),
+      distrito: distKey ? capitalizar(distKey) : (sede.distrito ? capitalizar(sede.distrito) : ''),
+      telefono: sede.telefono ?? '',
       email: sede.email ?? '',
     })
 
@@ -248,32 +355,151 @@ export function SedesPage() {
                 </button>
               </div>
 
-              <form onSubmit={e => void guardar(e)} className="grid gap-4 sm:grid-cols-2">
-                {CAMPOS.map(campo => (
-                  <label key={campo.key} className={campo.key === 'direccion' ? 'sm:col-span-2' : ''}>
-                    <span className="mb-1.5 block text-sm font-semibold text-ink">
-                      {campo.label}{campo.required && <span className="ml-1 text-danger">*</span>}
+              <form onSubmit={e => void guardar(e)} className="space-y-4">
+                {/* 1. NOMBRE DE LA SEDE (EXPANDIDO EN TODO EL ANCHO) */}
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
+                      Nombre de la sede <span className="text-danger">*</span>
                     </span>
-
-                    <input
-                      type={campo.key === 'email' ? 'email' : campo.key === 'telefono' ? 'tel' : 'text'}
-                      required={campo.required}
-                      maxLength={campo.max}
-                      value={form[campo.key]}
-                      onChange={e => setForm(actual => ({ ...actual, [campo.key]: e.target.value }))}
-                      placeholder={`Ingresa ${campo.label.toLowerCase()}`}
-                      className="w-full rounded-control border border-line bg-surface px-4 py-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                        <Icon name="mapPin" size={15} />
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        maxLength={80}
+                        value={form.nombre}
+                        onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                        placeholder="Ej. Sede San Isidro - Principal"
+                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
                   </label>
-                ))}
+                </div>
+
+                {/* 2. UBICACIÓN: DEPARTAMENTO, PROVINCIA Y DISTRITO EN 3 COMBOS RELACIONADOS */}
+                <div className="rounded-xl border border-line/70 bg-alt/30 p-3.5 sm:p-4">
+                  <div className="mb-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+                      Ubicación geográfica
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      Selecciona el departamento para filtrar las provincias y distritos correspondientes.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">Departamento</span>
+                      <AnimatedSelect
+                        label="Departamento"
+                        value={form.departamento}
+                        options={opcionesDepartamentos}
+                        onChange={cambiarDepartamento}
+                        disabled={guardando}
+                        placeholder="Seleccionar departamento"
+                      />
+                    </div>
+
+                    <div>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">Provincia</span>
+                      <AnimatedSelect
+                        label="Provincia"
+                        value={form.provincia}
+                        options={opcionesProvincias}
+                        onChange={cambiarProvincia}
+                        disabled={guardando || !deptoKey || opcionesProvincias.length <= 1}
+                        placeholder={!deptoKey ? 'Elige departamento' : 'Seleccionar provincia'}
+                      />
+                    </div>
+
+                    <div>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">Distrito</span>
+                      <AnimatedSelect
+                        label="Distrito"
+                        value={form.distrito}
+                        options={opcionesDistritos}
+                        onChange={cambiarDistrito}
+                        disabled={guardando || !provKey || opcionesDistritos.length <= 1}
+                        placeholder={!provKey ? 'Elige provincia' : 'Seleccionar distrito'}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. DIRECCIÓN EXACTA */}
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
+                      Dirección exacta <span className="text-danger">*</span>
+                    </span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                        <Icon name="location" size={15} />
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        maxLength={200}
+                        value={form.direccion}
+                        onChange={e => setForm(actual => ({ ...actual, direccion: e.target.value }))}
+                        placeholder="Ej. Av. Javier Prado Este 1234, Urb. Corpac, Oficina 502"
+                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                {/* 4. TELÉFONO Y CORREO ELECTRÓNICO */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
+                      Teléfono de contacto
+                    </span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                        <Icon name="phone" size={15} />
+                      </span>
+                      <input
+                        type="tel"
+                        maxLength={20}
+                        value={form.telefono}
+                        onChange={e => setForm(actual => ({ ...actual, telefono: e.target.value }))}
+                        placeholder="Ej. (01) 440-2020 / 999 888 777"
+                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
+                      Correo electrónico
+                    </span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                        <Icon name="mail" size={15} />
+                      </span>
+                      <input
+                        type="email"
+                        maxLength={120}
+                        value={form.email}
+                        onChange={e => setForm(actual => ({ ...actual, email: e.target.value }))}
+                        placeholder="Ej. contacto.sede@neodents.pe"
+                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
+                  </label>
+                </div>
 
                 {formError && (
-                  <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger sm:col-span-2">
+                  <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger">
                     {formError}
                   </p>
                 )}
 
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-5 sm:col-span-2">
+                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
                   <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>Cancelar</Button>
                   <Button type="submit" disabled={guardando}>
                     {guardando ? 'Guardando…' : editando === null ? 'Registrar sede' : 'Guardar cambios'}

@@ -12,6 +12,7 @@ import {
   Icon,
   PageHead,
   Pagination,
+  ScheduleBlocksSkeleton,
   TableFoot,
   Toast,
   type ToastAviso,
@@ -692,10 +693,7 @@ export function ScheduleBlocksPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-3 p-12 text-sm text-muted">
-            <Icon name="spinner" size={22} className="animate-spin text-brand" />
-            Cargando bloqueos de agenda…
-          </div>
+          <ScheduleBlocksSkeleton count={4} />
         ) : error ? (
           <div className="p-10 text-center">
             <p role="alert" className="text-sm text-danger">

@@ -83,7 +83,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
       )}
 
       <Field label="Correo electrónico" error={errors.correo}>
-        <Input type="email" name="correo" icon="user" placeholder="Ingresa tu correo"
+        <Input type="email" name="correo" icon="mail" placeholder="Ingresa tu correo"
           autoComplete="email" value={values.correo} disabled={submitting}
           onChange={e => update('correo', e.target.value)} />
       </Field>
