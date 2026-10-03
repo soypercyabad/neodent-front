@@ -294,9 +294,17 @@ export function PatientsPage() {
 
               <td className="text-center">
                 <div className="flex justify-center">
-                  <Badge tone={p.tieneCuenta ? 'blue' : 'amber'}>
-                    {p.tieneCuenta ? 'Con cuenta' : 'Sin cuenta'}
-                  </Badge>
+                  {!p.tieneCuenta ? (
+                    <Badge tone="gray">Sin cuenta</Badge>
+                  ) : p.estadoCuenta === 'ACTIVO' || p.correoVerificado === true ? (
+                    <Badge tone="blue">Activa</Badge>
+                  ) : p.estadoCuenta === 'PENDIENTE' || p.correoVerificado === false ? (
+                    <Badge tone="amber">Pendiente</Badge>
+                  ) : p.estadoCuenta === 'BLOQUEADO' ? (
+                    <Badge tone="red">Bloqueada</Badge>
+                  ) : (
+                    <Badge tone="gray">Inactiva</Badge>
+                  )}
                 </div>
               </td>
 

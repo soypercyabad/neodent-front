@@ -14,6 +14,8 @@ export interface PacienteResponse {
   activo: boolean
   usuarioId: number | null
   tieneCuenta: boolean
+  estadoCuenta: string | null
+  correoVerificado: boolean | null
   fechaCreacion: string | null
   fechaActualizacion: string | null
 }

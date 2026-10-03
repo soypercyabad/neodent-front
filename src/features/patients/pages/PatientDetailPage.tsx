@@ -360,18 +360,28 @@ export function PatientDetailPage() {
               <InfoRow
                 label="Cuenta de portal"
                 value={
-                  <Badge tone={paciente.tieneCuenta ? 'blue' : 'amber'}>
-                    {paciente.tieneCuenta ? 'Cuenta creada' : 'Sin cuenta'}
-                  </Badge>
+                  !paciente.tieneCuenta ? (
+                    <Badge tone="gray">Sin cuenta</Badge>
+                  ) : paciente.estadoCuenta === 'ACTIVO' || paciente.correoVerificado === true ? (
+                    <Badge tone="blue">Activa</Badge>
+                  ) : paciente.estadoCuenta === 'PENDIENTE' || paciente.correoVerificado === false ? (
+                    <Badge tone="amber">Pendiente de verificación</Badge>
+                  ) : paciente.estadoCuenta === 'BLOQUEADO' ? (
+                    <Badge tone="red">Bloqueada</Badge>
+                  ) : (
+                    <Badge tone="gray">{paciente.estadoCuenta || 'Inactiva'}</Badge>
+                  )
                 }
               />
 
               <InfoRow
-                label="Usuario vinculado"
+                label="Verificación de correo"
                 value={
-                  paciente.tieneCuenta
-                    ? 'Cuenta vinculada activa'
-                    : 'No vinculado a usuario'
+                  !paciente.tieneCuenta
+                    ? 'No aplica'
+                    : paciente.correoVerificado
+                      ? '✓ Correo verificado'
+                      : 'Pendiente de confirmación OTP'
                 }
               />
 
