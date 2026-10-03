@@ -11,6 +11,9 @@ import type {
   PatientRegistrationCheckResponse,
   PatientRegistrationRequest,
   PatientRegistrationResponse,
+  PatientRegistrationInitRequest,
+  PatientRegistrationInitResponse,
+  PatientRegistrationConfirmRequest,
   VerifyRegistrationEmailResponse,
   StaffInvitationResponse,
   StaffActivationStartResponse,
@@ -123,6 +126,26 @@ export const authApi = {
           numeroDocumento,
           turnstileToken,
         }),
+      },
+    )
+  },
+
+  initPatientRegistration(data: PatientRegistrationInitRequest) {
+    return apiRequest<PatientRegistrationInitResponse>(
+      '/api/auth/patient-registration/init',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    )
+  },
+
+  confirmPatientRegistration(data: PatientRegistrationConfirmRequest) {
+    return apiRequest<PatientRegistrationResponse>(
+      '/api/auth/patient-registration/confirm',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
       },
     )
   },

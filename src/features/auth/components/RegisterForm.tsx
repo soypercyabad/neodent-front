@@ -51,10 +51,11 @@ function PasswordToggle({ show, onToggle }: { show: boolean; onToggle: () => voi
 
 interface RegisterFormProps {
   onSubmit: (input: RegisterInput, turnstileToken: string) => Promise<void>
+  initialValues?: Partial<RegisterInput>
 }
 
-export function RegisterForm({ onSubmit }: RegisterFormProps) {
-  const [values, setValues] = useState<RegisterInput>(INITIAL_VALUES)
+export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
+  const [values, setValues] = useState<RegisterInput>(() => ({ ...INITIAL_VALUES, ...initialValues }))
   const [tiposDocumento, setTiposDocumento] = useState<TipoDocumentoOption[]>([])
   const [errors, setErrors] = useState<Errors>({})
   const [serverError, setServerError] = useState<string | null>(null)

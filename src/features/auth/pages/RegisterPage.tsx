@@ -1,4 +1,4 @@
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Card } from '@/shared/components/ui'
 import { authApi } from '../api/authApi'
@@ -9,25 +9,24 @@ import type { RegisterInput } from '../model/auth.types'
 export function RegisterPage() {
   const { user, isLoading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const initialValues = (location.state as { initialValues?: Partial<RegisterInput> } | null)?.initialValues
 
   const handleSubmit = async (input: RegisterInput, turnstileToken: string) => {
-    const response = await authApi.registerPatient({
+    const response = await authApi.initPatientRegistration({
       tipoDocumento: input.tipoDocumento,
       numeroDocumento: input.numeroDocumento.trim(),
-      nombres: input.nombres.trim(),
-      apellidoPaterno: input.apellidoPaterno.trim(),
-      apellidoMaterno: input.apellidoMaterno.trim() || null,
-      fechaNacimiento: input.fechaNacimiento || null,
-      telefono: input.telefono.trim(),
       email: input.correo.trim().toLowerCase(),
-      direccion: null,
-      password: input.password,
       turnstileToken,
     })
 
     navigate('/verificar-correo', {
       replace: true,
-      state: { challengeId: response.challengeId, correo: input.correo.trim().toLowerCase() },
+      state: {
+        challengeId: response.challengeId,
+        correo: input.correo.trim().toLowerCase(),
+        registrationData: input,
+      },
     })
   }
 
@@ -41,7 +40,7 @@ export function RegisterPage() {
           <h2 className="text-2xl font-bold text-ink">Crear cuenta</h2>
           <p className="mt-2 text-sm text-muted">Completa tus datos para registrarte como paciente.</p>
         </header>
-        <RegisterForm onSubmit={handleSubmit} />
+        <RegisterForm onSubmit={handleSubmit} initialValues={initialValues} />
         <p className="mt-7 text-center text-sm text-ink-soft">
           ¿Ya tienes cuenta?{' '}
           <Link to="/login" className="font-bold text-brand hover:underline">Inicia sesión</Link>

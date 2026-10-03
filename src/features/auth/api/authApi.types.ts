@@ -109,3 +109,30 @@ export interface StaffActivationCompleteResponse {
   pacienteId: number | null
   message: string
 }
+
+export interface PatientRegistrationInitRequest {
+  tipoDocumento: string
+  numeroDocumento: string
+  email: string
+  turnstileToken: string
+}
+
+export interface PatientRegistrationInitResponse {
+  challengeId: number
+  message: string
+}
+
+export interface PatientRegistrationConfirmRequest {
+  challengeId: number
+  codigo: string
+  tipoDocumento: string
+  numeroDocumento: string
+  nombres: string
+  apellidoPaterno: string
+  apellidoMaterno: string | null
+  fechaNacimiento: string | null
+  telefono: string
+  email: string
+  direccion: string | null
+  password: string
+}

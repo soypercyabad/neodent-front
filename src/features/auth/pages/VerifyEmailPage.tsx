@@ -1,20 +1,23 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Alert, Button, Card, Icon, OtpInput } from '@/shared/components/ui'
 import { authApi } from '../api/authApi'
 import { useAuth } from '../model/useAuth'
+import type { RegisterInput } from '../model/auth.types'
 
 const INITIAL_COOLDOWN_SECONDS = 45
 
 interface RegistrationState {
   challengeId: number
   correo: string
+  registrationData?: RegisterInput
 }
 
 export function VerifyEmailPage() {
   const { user, isLoading } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const registration = location.state as RegistrationState | null
 
   const [challengeId, setChallengeId] = useState(registration?.challengeId ?? 0)
@@ -48,9 +51,26 @@ export function VerifyEmailPage() {
     setMessage(null)
 
     try {
-      const response = await authApi.verifyRegistrationEmail(challengeId, codigo)
-
-      if (!response.verified) throw new Error(response.message)
+      if (registration?.registrationData) {
+        const d = registration.registrationData
+        await authApi.confirmPatientRegistration({
+          challengeId,
+          codigo,
+          tipoDocumento: d.tipoDocumento,
+          numeroDocumento: d.numeroDocumento.trim(),
+          nombres: d.nombres.trim(),
+          apellidoPaterno: d.apellidoPaterno.trim(),
+          apellidoMaterno: d.apellidoMaterno.trim() || null,
+          fechaNacimiento: d.fechaNacimiento || null,
+          telefono: d.telefono.trim(),
+          email: d.correo.trim().toLowerCase(),
+          direccion: null,
+          password: d.password,
+        })
+      } else {
+        const response = await authApi.verifyRegistrationEmail(challengeId, codigo)
+        if (!response.verified) throw new Error(response.message)
+      }
 
       setVerified(true)
     } catch (err) {
@@ -175,6 +195,22 @@ export function VerifyEmailPage() {
                   </span>
                 )}
               </div>
+
+              {registration?.registrationData && (
+                <div className="pt-2 text-center border-t border-line/60">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate('/registro', {
+                        state: { initialValues: registration.registrationData },
+                      })
+                    }
+                    className="cursor-pointer text-xs font-medium text-ink-soft hover:text-brand hover:underline"
+                  >
+                    ¿Datos incorrectos? Volver al registro
+                  </button>
+                </div>
+              )}
             </form>
           </Card>
         </motion.div>
