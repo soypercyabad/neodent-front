@@ -82,15 +82,26 @@ export function NewAppointmentPage() {
         setSedes(branches)
         setEspecialidades(specs)
 
-        setServicioId(actual => {
-          if (actual && services.some(s => s.id === actual)) return actual
-          if (draftState?.servicioId && services.some(s => s.id === draftState.servicioId)) return draftState.servicioId
-          return services[0]?.id ?? null
-        })
+        setServicios(services)
+        setSedes(branches)
+        setEspecialidades(specs)
+
+        const defaultSede = draftState?.sedeId && branches.some(s => s.id === draftState.sedeId)
+          ? draftState.sedeId
+          : (branches[0]?.id ?? null)
+
         setSedeId(actual => {
           if (actual && branches.some(s => s.id === actual)) return actual
-          if (draftState?.sedeId && branches.some(s => s.id === draftState.sedeId)) return draftState.sedeId
-          return branches[0]?.id ?? null
+          return defaultSede
+        })
+
+        const activeSedeId = defaultSede
+        const servicesForSede = activeSedeId ? services.filter(s => s.sedeIds.includes(activeSedeId)) : services
+
+        setServicioId(actual => {
+          if (actual && servicesForSede.some(s => s.id === actual)) return actual
+          if (draftState?.servicioId && servicesForSede.some(s => s.id === draftState.servicioId)) return draftState.servicioId
+          return servicesForSede[0]?.id ?? null
         })
 
       } catch (err) {
@@ -109,29 +120,33 @@ export function NewAppointmentPage() {
 
   }, [accessToken, actualizacion])
 
-  const servicioSeleccionado = servicios.find(s => s.id === servicioId)
-  const sedesCompatibles = sedes.filter(s => servicioSeleccionado?.sedeIds.includes(s.id))
-  const sedeSeleccionada = sedesCompatibles.find(s => s.id === sedeId)
+  const sedeSeleccionada = sedes.find(s => s.id === sedeId)
 
+  // SERVICIOS DISPONIBLES EN LA SEDE SELECCIONADA
+  const serviciosEnSede = useMemo(() => {
+    if (!sedeId) return []
+    return servicios.filter(s => s.sedeIds.includes(sedeId))
+  }, [servicios, sedeId])
+
+  // Deseleccionar o ajustar servicio si cambia la sede y ya no está disponible
   useEffect(() => {
-    if (!sedesCompatibles.length) return
-    setSedeId(actual =>
-      actual && sedesCompatibles.some(s => s.id === actual)
-        ? actual
-        : sedesCompatibles[0]?.id ?? null
-    )
-  }, [servicioId, servicios, sedes])
+    if (servicioId && !serviciosEnSede.some(s => s.id === servicioId)) {
+      setServicioId(serviciosEnSede[0]?.id ?? null)
+    }
+  }, [serviciosEnSede, servicioId])
 
-  // SERVICIOS DESTACADOS
+  const servicioSeleccionado = serviciosEnSede.find(s => s.id === servicioId)
+
+  // SERVICIOS DESTACADOS DE LA SEDE
   const serviciosDestacados = useMemo(
-    () => servicios.filter(s => Boolean(s.destacado)),
-    [servicios],
+    () => serviciosEnSede.filter(s => Boolean(s.destacado)),
+    [serviciosEnSede],
   )
 
-  // CATEGORÍAS/ESPECIALIDADES QUE TIENEN SERVICIOS REGISTRADOS
+  // CATEGORÍAS/ESPECIALIDADES QUE TIENEN SERVICIOS REGISTRADOS EN ESTA SEDE
   const categorias = useMemo(() => {
     const counts: Record<number, number> = {}
-    servicios.forEach(s => {
+    serviciosEnSede.forEach(s => {
       counts[s.especialidadId] = (counts[s.especialidadId] || 0) + 1
     })
 
@@ -142,13 +157,13 @@ export function NewAppointmentPage() {
         nombre: e.nombre,
         conteo: counts[e.id] || 0,
       }))
-  }, [servicios, especialidades])
+  }, [serviciosEnSede, especialidades])
 
   // SERVICIOS FILTRADOS POR CATEGORÍA Y BÚSQUEDA
   const serviciosVisibles = useMemo(() => {
     const q = normalizar(busqueda.trim())
 
-    return servicios.filter(s => {
+    return serviciosEnSede.filter(s => {
       if (q) {
         return normalizar(`${s.nombre} ${s.descripcion ?? ''}`).includes(q)
       }
@@ -157,7 +172,7 @@ export function NewAppointmentPage() {
       }
       return s.especialidadId === filtroTab
     })
-  }, [servicios, busqueda, filtroTab])
+  }, [serviciosEnSede, busqueda, filtroTab])
 
   // CONTINUAR CON EL SERVICIO Y LA SEDE SELECCIONADOS.
   const goNext = () => {
@@ -275,278 +290,34 @@ export function NewAppointmentPage() {
 
         {!loading && !error && (
           <>
-            {/* ENCABEZADO DE SERVICIOS Y BÚSQUEDA */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-[1.05rem] font-bold text-ink">Selecciona un servicio</h2>
-                <p className="mt-0.5 text-sm text-muted">¿Qué tratamiento deseas realizarte?</p>
-              </div>
-
-              {servicios.length > 4 && (
-                <div className="w-full sm:w-64">
-                  <SearchInput
-                    aria-label="Buscar servicio odontológico"
-                    placeholder="Buscar servicio…"
-                    value={busqueda}
-                    onChange={e => setBusqueda(e.target.value)}
-                    onClear={() => setBusqueda('')}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* FILTROS RÁPIDOS POR CATEGORÍA (DESTACADOS + ESPECIALIDADES) */}
-            {(categorias.length > 0 || serviciosDestacados.length > 0) && (
-              <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setFiltroTab('destacados')}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
-                    filtroTab === 'destacados'
-                      ? 'bg-brand text-white shadow-xs'
-                      : 'bg-alt text-ink-soft hover:bg-hover hover:text-ink',
-                  )}
-                >
-                  <Icon
-                    name={filtroTab === 'destacados' ? 'starFilled' : 'star'}
-                    size={12}
-                    className={filtroTab === 'destacados' ? 'text-amber-300' : 'text-amber-500'}
-                  />
-                  <span>Destacados</span>
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
-                      filtroTab === 'destacados' ? 'bg-white/20 text-white' : 'bg-surface text-muted',
-                    )}
-                  >
-                    {serviciosDestacados.length}
-                  </span>
-                </button>
-
-                {categorias.map(cat => {
-                  const activo = filtroTab === cat.id
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setFiltroTab(cat.id)}
-                      className={cn(
-                        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
-                        activo
-                          ? 'bg-brand text-white shadow-xs'
-                          : 'bg-alt text-ink-soft hover:bg-hover hover:text-ink',
-                      )}
-                    >
-                      <span>{cat.nombre}</span>
-                      <span
-                        className={cn(
-                          'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
-                          activo ? 'bg-white/20 text-white' : 'bg-surface text-muted',
-                        )}
-                      >
-                        {cat.conteo}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* CONTADOR DE RESULTADOS */}
-            {servicios.length > 0 && (
-              <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                <span>
-                  Mostrando <strong className="text-ink">{serviciosVisibles.length}</strong> de{' '}
-                  {servicios.length} tratamientos
-                </span>
-
-                {(busqueda.trim() || filtroTab !== 'destacados') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBusqueda('')
-                      setFiltroTab('destacados')
-                    }}
-                    className="font-medium text-brand hover:underline"
-                  >
-                    Limpiar filtros
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* SERVICIOS NO DISPONIBLES EN EL SISTEMA */}
-            {servicios.length === 0 && (
-              <div className="mt-5 rounded-card bg-alt p-5">
-                <p className="text-sm text-muted">Todavía no hay servicios disponibles para reservar.</p>
-              </div>
-            )}
-
-            {/* SIN RESULTADOS DE BÚSQUEDA O FILTRO */}
-            {servicios.length > 0 && serviciosVisibles.length === 0 && (
-              <div className="mt-4 rounded-xl border border-line bg-alt/40 p-8 text-center">
-                {filtroTab === 'destacados' && !busqueda.trim() ? (
-                  <>
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-500 shadow-xs">
-                      <Icon name="star" size={20} />
-                    </div>
-                    <h3 className="mt-3 text-sm font-bold text-ink">Sin servicios destacados</h3>
-                    <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
-                      Aún no hay servicios marcados como destacados. Selecciona una de las especialidades arriba para ver los tratamientos disponibles.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface text-muted shadow-xs">
-                      <Icon name="search" size={20} />
-                    </div>
-                    <h3 className="mt-3 text-sm font-bold text-ink">No se encontraron servicios</h3>
-                    <p className="mt-1 text-xs text-muted">
-                      No hay tratamientos que coincidan con los filtros aplicados.
-                    </p>
-                    <Button
-                      variant="ghost"
-                      className="mt-3 text-xs"
-                      onClick={() => {
-                        setBusqueda('')
-                        setFiltroTab('destacados')
-                      }}
-                    >
-                      Restablecer filtros
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* TARJETAS DE SERVICIOS HORIZONTALES COMPACTAS */}
-            {serviciosVisibles.length > 0 && (
-              <div
-                role="group"
-                aria-label="Seleccionar servicio"
-                className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              >
-                {serviciosVisibles.map(service => {
-                  const active = service.id === servicioId
-
-                  return (
-                    <motion.button
-                      key={service.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setServicioId(service.id)}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.99 }}
-                      transition={{ duration: 0.16 }}
-                      className={cn(
-                        'group relative flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1',
-                        active
-                          ? 'border-brand bg-brand-soft/60 shadow-xs ring-1 ring-brand'
-                          : 'border-line bg-surface hover:border-brand/40 hover:bg-alt/40 hover:shadow-xs',
-                      )}
-                    >
-                      {/* Icono a la izquierda */}
-                      <span
-                        className={cn(
-                          'grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors',
-                          active ? 'bg-brand text-white shadow-xs' : 'bg-brand-soft text-brand group-hover:bg-brand/15',
-                        )}
-                      >
-                        <Icon name={iconForService(service.nombre)} size={20} strokeWidth={1.75} />
-                      </span>
-
-                      {/* Contenido al costado del icono */}
-                      <div className="flex min-w-0 flex-1 flex-col justify-between self-stretch">
-                        <div>
-                          {/* Fila superior: Nombre e indicador de selección */}
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <h3
-                                className={cn(
-                                  'flex items-center gap-1.5 text-sm font-bold leading-snug transition-colors',
-                                  active ? 'text-brand' : 'text-ink group-hover:text-brand',
-                                )}
-                                title={service.nombre}
-                              >
-                                <span className="truncate">{service.nombre}</span>
-                                {service.destacado && (
-                                  <span title="Servicio destacado" className="inline-flex shrink-0 text-amber-500">
-                                    <Icon name="starFilled" size={13} />
-                                  </span>
-                                )}
-                              </h3>
-                            </div>
-
-                            <div
-                              className={cn(
-                                'flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition-all',
-                                active
-                                  ? 'border-brand bg-brand text-white'
-                                  : 'border-line bg-surface text-transparent group-hover:border-brand/40',
-                              )}
-                              aria-hidden="true"
-                            >
-                              <Icon name="check" size={11} strokeWidth={2.5} />
-                            </div>
-                          </div>
-
-                          {/* Descripción a 2 o 3 líneas */}
-                          {service.descripcion && (
-                            <p
-                              className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
-                              title={service.descripcion}
-                            >
-                              {service.descripcion}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Footer: Tiempo con icono de reloj + Precio referencial */}
-                        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line/50 pt-2">
-                          <div className="flex items-center gap-1.5 text-xs text-muted">
-                            <Icon name="clock" size={13} className="shrink-0 text-muted" />
-                            <span className="font-medium">
-                              {service.duracionMinutos !== null ? `${service.duracionMinutos} min` : 'Variable'}
-                            </span>
-                          </div>
-
-                          <span className={cn('text-xs font-bold tabular-nums', active ? 'text-brand' : 'text-ink')}>
-                            {service.precioReferencial === null
-                              ? 'Por definir'
-                              : `S/ ${service.precioReferencial.toFixed(2)}`}
-                          </span>
-                        </div>
-                      </div>
-                    </motion.button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* SELECCIÓN DE SEDE */}
-            <div className="mt-8 border-t border-line pt-7">
-
-              <h2 className="text-[1.05rem] font-bold text-ink">¿Dónde quieres atenderte?</h2>
-              <p className="mt-1 text-sm text-muted">Selecciona la sede donde deseas realizar tu cita.</p>
-
-              {sedesCompatibles.length === 0 ? (
-                <div className="mt-4 rounded-card bg-alt p-5">
-                  <p className="text-sm text-muted">
-                    Este servicio no está disponible en ninguna sede habilitada.
-                    Selecciona otro tratamiento.
+            {/* 1. SELECCIÓN DE SEDE */}
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-[1.05rem] font-bold text-ink">1. ¿Dónde deseas atenderte?</h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    Selecciona el establecimiento para ver los tratamientos y horarios disponibles.
                   </p>
                 </div>
-              ) : (
 
+                {sedes.length > 0 && (
+                  <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
+                    {sedes.length} {sedes.length === 1 ? 'sede disponible' : 'sedes disponibles'}
+                  </span>
+                )}
+              </div>
+
+              {sedes.length === 0 ? (
+                <div className="mt-4 rounded-xl bg-alt p-5 text-sm text-muted">
+                  No hay sedes habilitadas en este momento.
+                </div>
+              ) : (
                 <div
                   role="group"
                   aria-label="Seleccionar sede"
                   className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                 >
-                  {sedesCompatibles.map(branch => {
+                  {sedes.map(branch => {
                     const active = branch.id === sedeId
 
                     return (
@@ -554,7 +325,10 @@ export function NewAppointmentPage() {
                         key={branch.id}
                         type="button"
                         aria-pressed={active}
-                        onClick={() => setSedeId(branch.id)}
+                        onClick={() => {
+                          setSedeId(branch.id)
+                          setBusqueda('')
+                        }}
                         whileHover={{ y: -2 }}
                         whileTap={{ scale: 0.99 }}
                         transition={{ duration: 0.16 }}
@@ -566,7 +340,6 @@ export function NewAppointmentPage() {
                             : 'border-line bg-surface hover:border-brand/40 hover:bg-alt/40 hover:shadow-xs',
                         )}
                       >
-                        {/* Icono a la izquierda */}
                         <span
                           className={cn(
                             'grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors',
@@ -576,10 +349,8 @@ export function NewAppointmentPage() {
                           <Icon name="mapPin" size={20} strokeWidth={1.75} />
                         </span>
 
-                        {/* Contenido al costado del icono */}
                         <div className="flex min-w-0 flex-1 flex-col justify-between self-stretch">
                           <div>
-                            {/* Fila superior: Nombre e indicador de selección */}
                             <div className="flex items-start justify-between gap-2">
                               <h3
                                 className={cn(
@@ -604,15 +375,12 @@ export function NewAppointmentPage() {
                               </div>
                             </div>
 
-                            {/* Dirección a 2 o 3 líneas */}
-                            {branch.direccion && (
-                              <p
-                                className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
-                                title={branch.direccion}
-                              >
-                                {branch.direccion}
-                              </p>
-                            )}
+                            <p
+                              className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
+                              title={branch.direccion}
+                            >
+                              {branch.direccion}
+                            </p>
                           </div>
                         </div>
                       </motion.button>
@@ -620,9 +388,270 @@ export function NewAppointmentPage() {
                   })}
                 </div>
               )}
-
             </div>
 
+            {/* 2. SELECCIÓN DE SERVICIO */}
+            <div className="mt-8 border-t border-line pt-7">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-[1.05rem] font-bold text-ink">2. Selecciona un servicio</h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {sedeSeleccionada
+                      ? `Tratamientos con doctores y horarios disponibles en ${sedeSeleccionada.nombre}`
+                      : 'Elige una sede arriba para ver los tratamientos disponibles.'}
+                  </p>
+                </div>
+
+                {serviciosEnSede.length > 4 && (
+                  <div className="w-full sm:w-64">
+                    <SearchInput
+                      aria-label="Buscar servicio odontológico"
+                      placeholder="Buscar servicio…"
+                      value={busqueda}
+                      onChange={e => setBusqueda(e.target.value)}
+                      onClear={() => setBusqueda('')}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* FILTROS RÁPIDOS POR CATEGORÍA (DESTACADOS + ESPECIALIDADES DE ESTA SEDE) */}
+              {sedeId && (categorias.length > 0 || serviciosDestacados.length > 0) && (
+                <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroTab('destacados')}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
+                      filtroTab === 'destacados'
+                        ? 'bg-brand text-white shadow-xs'
+                        : 'bg-alt text-ink-soft hover:bg-hover hover:text-ink',
+                    )}
+                  >
+                    <Icon
+                      name={filtroTab === 'destacados' ? 'starFilled' : 'star'}
+                      size={12}
+                      className={filtroTab === 'destacados' ? 'text-amber-300' : 'text-amber-500'}
+                    />
+                    <span>Destacados</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
+                        filtroTab === 'destacados' ? 'bg-white/20 text-white' : 'bg-surface text-muted',
+                      )}
+                    >
+                      {serviciosDestacados.length}
+                    </span>
+                  </button>
+
+                  {categorias.map(cat => {
+                    const activo = filtroTab === cat.id
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFiltroTab(cat.id)}
+                        className={cn(
+                          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
+                          activo
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'bg-alt text-ink-soft hover:bg-hover hover:text-ink',
+                        )}
+                      >
+                        <span>{cat.nombre}</span>
+                        <span
+                          className={cn(
+                            'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
+                            activo ? 'bg-white/20 text-white' : 'bg-surface text-muted',
+                          )}
+                        >
+                          {cat.conteo}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* CONTADOR DE RESULTADOS */}
+              {serviciosEnSede.length > 0 && (
+                <div className="mt-3 flex items-center justify-between text-xs text-muted">
+                  <span>
+                    Mostrando <strong className="text-ink">{serviciosVisibles.length}</strong> de{' '}
+                    {serviciosEnSede.length} tratamientos en esta sede
+                  </span>
+
+                  {(busqueda.trim() || filtroTab !== 'destacados') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBusqueda('')
+                        setFiltroTab('destacados')
+                      }}
+                      className="font-medium text-brand hover:underline"
+                    >
+                      Limpiar filtros
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* SIN SERVICIOS EN ESTA SEDE */}
+              {sedeId && serviciosEnSede.length === 0 && (
+                <div className="mt-5 rounded-xl border border-line bg-alt/40 p-8 text-center">
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface text-muted shadow-xs">
+                    <Icon name="tooth" size={20} />
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-ink">Sin servicios disponibles en esta sede</h3>
+                  <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
+                    Actualmente no hay tratamientos con doctores y horarios configurados en {sedeSeleccionada?.nombre ?? 'esta sede'}. Prueba seleccionando otra sede arriba.
+                  </p>
+                </div>
+              )}
+
+              {/* SIN RESULTADOS DE BÚSQUEDA O TAB */}
+              {serviciosEnSede.length > 0 && serviciosVisibles.length === 0 && (
+                <div className="mt-4 rounded-xl border border-line bg-alt/40 p-8 text-center">
+                  {filtroTab === 'destacados' && !busqueda.trim() ? (
+                    <>
+                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-500 shadow-xs">
+                        <Icon name="star" size={20} />
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-ink">Sin servicios destacados en esta sede</h3>
+                      <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
+                        No hay tratamientos marcados como destacados en esta sede. Selecciona una de las especialidades arriba para ver todos los disponibles.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface text-muted shadow-xs">
+                        <Icon name="search" size={20} />
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-ink">No se encontraron servicios</h3>
+                      <p className="mt-1 text-xs text-muted">
+                        No hay tratamientos que coincidan con los filtros aplicados.
+                      </p>
+                      <Button
+                        variant="ghost"
+                        className="mt-3 text-xs"
+                        onClick={() => {
+                          setBusqueda('')
+                          setFiltroTab('destacados')
+                        }}
+                      >
+                        Restablecer filtros
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* TARJETAS DE SERVICIOS HORIZONTALES COMPACTAS */}
+              {serviciosVisibles.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Seleccionar servicio"
+                  className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                >
+                  {serviciosVisibles.map(service => {
+                    const active = service.id === servicioId
+
+                    return (
+                      <motion.button
+                        key={service.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setServicioId(service.id)}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.99 }}
+                        transition={{ duration: 0.16 }}
+                        className={cn(
+                          'group relative flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1',
+                          active
+                            ? 'border-brand bg-brand-soft/60 shadow-xs ring-1 ring-brand'
+                            : 'border-line bg-surface hover:border-brand/40 hover:bg-alt/40 hover:shadow-xs',
+                        )}
+                      >
+                        {/* Icono a la izquierda */}
+                        <span
+                          className={cn(
+                            'grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors',
+                            active ? 'bg-brand text-white shadow-xs' : 'bg-brand-soft text-brand group-hover:bg-brand/15',
+                          )}
+                        >
+                          <Icon name={iconForService(service.nombre)} size={20} strokeWidth={1.75} />
+                        </span>
+
+                        {/* Contenido al costado del icono */}
+                        <div className="flex min-w-0 flex-1 flex-col justify-between self-stretch">
+                          <div>
+                            {/* Fila superior: Nombre e indicador de selección */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h3
+                                  className={cn(
+                                    'flex items-center gap-1.5 text-sm font-bold leading-snug transition-colors',
+                                    active ? 'text-brand' : 'text-ink group-hover:text-brand',
+                                  )}
+                                  title={service.nombre}
+                                >
+                                  <span className="truncate">{service.nombre}</span>
+                                  {service.destacado && (
+                                    <span title="Servicio destacado" className="inline-flex shrink-0 text-amber-500">
+                                      <Icon name="starFilled" size={13} />
+                                    </span>
+                                  )}
+                                </h3>
+                              </div>
+
+                              <div
+                                className={cn(
+                                  'flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition-all',
+                                  active
+                                    ? 'border-brand bg-brand text-white'
+                                    : 'border-line bg-surface text-transparent group-hover:border-brand/40',
+                                )}
+                                aria-hidden="true"
+                              >
+                                <Icon name="check" size={11} strokeWidth={2.5} />
+                              </div>
+                            </div>
+
+                            {/* Descripción */}
+                            {service.descripcion && (
+                              <p
+                                className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
+                                title={service.descripcion}
+                              >
+                                {service.descripcion}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Footer: Tiempo + Precio */}
+                          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line/50 pt-2">
+                            <div className="flex items-center gap-1.5 text-xs text-muted">
+                              <Icon name="clock" size={13} className="shrink-0 text-muted" />
+                              <span className="font-medium">
+                                {service.duracionMinutos !== null ? `${service.duracionMinutos} min` : 'Variable'}
+                              </span>
+                            </div>
+
+                            <span className={cn('text-xs font-bold tabular-nums', active ? 'text-brand' : 'text-ink')}>
+                              {service.precioReferencial === null
+                                ? 'Por definir'
+                                : `S/ ${service.precioReferencial.toFixed(2)}`}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
 

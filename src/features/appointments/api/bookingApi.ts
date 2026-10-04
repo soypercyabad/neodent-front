@@ -74,18 +74,20 @@ export interface AppointmentPage {
 }
 
 export const bookingApi = {
-  servicios(accessToken: string) {
-    return apiRequest<BookingService[]>('/api/citas/catalogo/servicios', { accessToken })
+  servicios(accessToken: string, sedeId?: number) {
+    const url = sedeId ? `/api/citas/catalogo/servicios?sedeId=${sedeId}` : '/api/citas/catalogo/servicios'
+    return apiRequest<BookingService[]>(url, { accessToken })
   },
 
   sedes(accessToken: string) {
     return apiRequest<BookingBranch[]>('/api/citas/catalogo/sedes', { accessToken })
   },
 
-  especialistas(accessToken: string, especialidadId: number) {
-    return apiRequest<BookingSpecialist[]>(
-      `/api/citas/catalogo/especialistas?especialidadId=${especialidadId}`, { accessToken }
-    )
+  especialistas(accessToken: string, especialidadId: number, sedeId?: number) {
+    const url = sedeId
+      ? `/api/citas/catalogo/especialistas?especialidadId=${especialidadId}&sedeId=${sedeId}`
+      : `/api/citas/catalogo/especialistas?especialidadId=${especialidadId}`
+    return apiRequest<BookingSpecialist[]>(url, { accessToken })
   },
 
   disponibilidad(accessToken: string, odontologoEspecialidadId: number, sedeId: number, servicioId: number, fecha: string) {

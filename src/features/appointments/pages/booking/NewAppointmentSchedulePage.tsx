@@ -155,7 +155,7 @@ export function NewAppointmentSchedulePage() {
     let activo = true
     setCargandoDoctores(true)
 
-    bookingApi.especialistas(accessToken, draft.especialidadId)
+    bookingApi.especialistas(accessToken, draft.especialidadId, draft.sedeId)
       .then(data => {
         if (!activo) return
         setDoctores(data)
@@ -169,7 +169,7 @@ export function NewAppointmentSchedulePage() {
       })
 
     return () => { activo = false }
-  }, [accessToken, draft?.especialidadId])
+  }, [accessToken, draft?.especialidadId, draft?.sedeId])
 
   // CONSULTAR DISPONIBILIDAD REAL DEL ESPECIALISTA.
   useEffect(() => {
