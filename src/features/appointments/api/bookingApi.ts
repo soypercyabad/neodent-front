@@ -7,6 +7,7 @@ export interface BookingService {
   especialidadId: number
   duracionMinutos: number | null
   precioReferencial: number | null
+  destacado?: boolean
   sedeIds: number[]
 }
 

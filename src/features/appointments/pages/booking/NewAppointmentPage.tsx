@@ -47,7 +47,7 @@ export function NewAppointmentPage() {
   const [sedeId, setSedeId] = useState<number | null>(draftState?.sedeId ?? null)
 
   const [busqueda, setBusqueda] = useState('')
-  const [filtroEspecialidad, setFiltroEspecialidad] = useState<number | null>(null)
+  const [filtroTab, setFiltroTab] = useState<'destacados' | number>('destacados')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<ToastAviso | null>(() => {
@@ -122,6 +122,12 @@ export function NewAppointmentPage() {
     )
   }, [servicioId, servicios, sedes])
 
+  // SERVICIOS DESTACADOS
+  const serviciosDestacados = useMemo(
+    () => servicios.filter(s => Boolean(s.destacado)),
+    [servicios],
+  )
+
   // CATEGORÍAS/ESPECIALIDADES QUE TIENEN SERVICIOS REGISTRADOS
   const categorias = useMemo(() => {
     const counts: Record<number, number> = {}
@@ -143,15 +149,15 @@ export function NewAppointmentPage() {
     const q = normalizar(busqueda.trim())
 
     return servicios.filter(s => {
-      if (filtroEspecialidad !== null && s.especialidadId !== filtroEspecialidad) {
-        return false
+      if (q) {
+        return normalizar(`${s.nombre} ${s.descripcion ?? ''}`).includes(q)
       }
-      if (q && !normalizar(`${s.nombre} ${s.descripcion ?? ''}`).includes(q)) {
-        return false
+      if (filtroTab === 'destacados') {
+        return Boolean(s.destacado)
       }
-      return true
+      return s.especialidadId === filtroTab
     })
-  }, [servicios, busqueda, filtroEspecialidad])
+  }, [servicios, busqueda, filtroTab])
 
   // CONTINUAR CON EL SERVICIO Y LA SEDE SELECCIONADOS.
   const goNext = () => {
@@ -290,37 +296,42 @@ export function NewAppointmentPage() {
               )}
             </div>
 
-            {/* FILTROS RÁPIDOS POR ESPECIALIDAD (PILLS) */}
-            {categorias.length > 1 && (
+            {/* FILTROS RÁPIDOS POR CATEGORÍA (DESTACADOS + ESPECIALIDADES) */}
+            {(categorias.length > 0 || serviciosDestacados.length > 0) && (
               <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <button
                   type="button"
-                  onClick={() => setFiltroEspecialidad(null)}
+                  onClick={() => setFiltroTab('destacados')}
                   className={cn(
                     'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
-                    filtroEspecialidad === null
+                    filtroTab === 'destacados'
                       ? 'bg-brand text-white shadow-xs'
                       : 'bg-alt text-ink-soft hover:bg-hover hover:text-ink',
                   )}
                 >
-                  <span>Todos</span>
+                  <Icon
+                    name={filtroTab === 'destacados' ? 'starFilled' : 'star'}
+                    size={12}
+                    className={filtroTab === 'destacados' ? 'text-amber-300' : 'text-amber-500'}
+                  />
+                  <span>Destacados</span>
                   <span
                     className={cn(
                       'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
-                      filtroEspecialidad === null ? 'bg-white/20 text-white' : 'bg-surface text-muted',
+                      filtroTab === 'destacados' ? 'bg-white/20 text-white' : 'bg-surface text-muted',
                     )}
                   >
-                    {servicios.length}
+                    {serviciosDestacados.length}
                   </span>
                 </button>
 
                 {categorias.map(cat => {
-                  const activo = filtroEspecialidad === cat.id
+                  const activo = filtroTab === cat.id
                   return (
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setFiltroEspecialidad(activo ? null : cat.id)}
+                      onClick={() => setFiltroTab(cat.id)}
                       className={cn(
                         'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all',
                         activo
@@ -351,12 +362,12 @@ export function NewAppointmentPage() {
                   {servicios.length} tratamientos
                 </span>
 
-                {(busqueda.trim() || filtroEspecialidad !== null) && (
+                {(busqueda.trim() || filtroTab !== 'destacados') && (
                   <button
                     type="button"
                     onClick={() => {
                       setBusqueda('')
-                      setFiltroEspecialidad(null)
+                      setFiltroTab('destacados')
                     }}
                     className="font-medium text-brand hover:underline"
                   >
@@ -376,23 +387,37 @@ export function NewAppointmentPage() {
             {/* SIN RESULTADOS DE BÚSQUEDA O FILTRO */}
             {servicios.length > 0 && serviciosVisibles.length === 0 && (
               <div className="mt-4 rounded-xl border border-line bg-alt/40 p-8 text-center">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface text-muted shadow-xs">
-                  <Icon name="search" size={20} />
-                </div>
-                <h3 className="mt-3 text-sm font-bold text-ink">No se encontraron servicios</h3>
-                <p className="mt-1 text-xs text-muted">
-                  No hay tratamientos que coincidan con los filtros aplicados.
-                </p>
-                <Button
-                  variant="ghost"
-                  className="mt-3 text-xs"
-                  onClick={() => {
-                    setBusqueda('')
-                    setFiltroEspecialidad(null)
-                  }}
-                >
-                  Restablecer filtros
-                </Button>
+                {filtroTab === 'destacados' && !busqueda.trim() ? (
+                  <>
+                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-500 shadow-xs">
+                      <Icon name="star" size={20} />
+                    </div>
+                    <h3 className="mt-3 text-sm font-bold text-ink">Sin servicios destacados</h3>
+                    <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
+                      Aún no hay servicios marcados como destacados. Selecciona una de las especialidades arriba para ver los tratamientos disponibles.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-surface text-muted shadow-xs">
+                      <Icon name="search" size={20} />
+                    </div>
+                    <h3 className="mt-3 text-sm font-bold text-ink">No se encontraron servicios</h3>
+                    <p className="mt-1 text-xs text-muted">
+                      No hay tratamientos que coincidan con los filtros aplicados.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      className="mt-3 text-xs"
+                      onClick={() => {
+                        setBusqueda('')
+                        setFiltroTab('destacados')
+                      }}
+                    >
+                      Restablecer filtros
+                    </Button>
+                  </>
+                )}
               </div>
             )}
 
@@ -438,15 +463,22 @@ export function NewAppointmentPage() {
                         <div>
                           {/* Fila superior: Nombre e indicador de selección */}
                           <div className="flex items-start justify-between gap-2">
-                            <h3
-                              className={cn(
-                                'text-sm font-bold leading-snug transition-colors line-clamp-1',
-                                active ? 'text-brand' : 'text-ink group-hover:text-brand',
-                              )}
-                              title={service.nombre}
-                            >
-                              {service.nombre}
-                            </h3>
+                            <div className="min-w-0 flex-1">
+                              <h3
+                                className={cn(
+                                  'flex items-center gap-1.5 text-sm font-bold leading-snug transition-colors',
+                                  active ? 'text-brand' : 'text-ink group-hover:text-brand',
+                                )}
+                                title={service.nombre}
+                              >
+                                <span className="truncate">{service.nombre}</span>
+                                {service.destacado && (
+                                  <span title="Servicio destacado" className="inline-flex shrink-0 text-amber-500">
+                                    <Icon name="starFilled" size={13} />
+                                  </span>
+                                )}
+                              </h3>
+                            </div>
 
                             <div
                               className={cn(

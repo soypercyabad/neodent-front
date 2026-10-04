@@ -6,7 +6,7 @@ import { serviciosApi, type Servicio, type ServicioInput, type EspecialidadOptio
 import { sedesApi, type Sede } from '@/features/sedes/api/sedesApi'
 import { cn } from '@/shared/lib/cn'
 
-type Filtro = 'todos' | 'activos' | 'inactivos'
+type Filtro = 'todos' | 'destacados' | 'activos' | 'inactivos'
 type Aviso = { tipo: 'success' | 'error'; texto: string }
 type Formulario = {
   especialidadId: string
@@ -15,6 +15,7 @@ type Formulario = {
   duracionMinutos: string
   precioReferencial: string
   sedeIds: number[]
+  destacado: boolean
 }
 
 const VACIO: Formulario = {
@@ -24,6 +25,7 @@ const VACIO: Formulario = {
   duracionMinutos: '30',
   precioReferencial: '',
   sedeIds: [],
+  destacado: false,
 }
 
 const POR_PAGINA = 10
@@ -117,6 +119,7 @@ export function ServiciosPage() {
       duracionMinutos: String(servicio.duracionMinutos),
       precioReferencial: servicio.precioReferencial === null ? '' : servicio.precioReferencial.toFixed(2),
       sedeIds: [...servicio.sedeIds],
+      destacado: Boolean(servicio.destacado),
     })
 
     setEditando(servicio.id)
@@ -205,6 +208,7 @@ export function ServiciosPage() {
         duracionMinutos: duracion,
         precioReferencial: precio,
         sedeIds: [...form.sedeIds],
+        destacado: form.destacado,
       }
 
       const esNuevo = editando === null
@@ -265,6 +269,30 @@ export function ServiciosPage() {
     }
   }
 
+  // MARCAR O DESMARCAR COMO DESTACADO
+  const toggleDestacado = async (servicio: Servicio) => {
+    if (!accessToken || procesando || guardando) return
+
+    setProcesando(true)
+    setAviso(null)
+
+    try {
+      const resultado = await serviciosApi.alternarDestacado(accessToken, servicio.id)
+      setServicios(actual => actual.map(s => (s.id === resultado.id ? resultado : s)))
+      setAviso({
+        tipo: 'success',
+        texto: resultado.destacado
+          ? `"${servicio.nombre}" marcado como destacado.`
+          : `"${servicio.nombre}" retirado de destacados.`,
+      })
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : 'No se pudo cambiar el estado destacado.'
+      setAviso({ tipo: 'error', texto: mensaje })
+    } finally {
+      setProcesando(false)
+    }
+  }
+
   // OPCIONES PARA LOS SELECTORES DE FILTRO
   const opcionesEspecialidades = useMemo(() => [
     { value: '', label: 'Todas las especialidades' },
@@ -284,6 +312,7 @@ export function ServiciosPage() {
       const texto = normalizar(`${s.nombre} ${s.especialidadNombre} ${s.descripcion ?? ''}`)
       if (q && !texto.includes(q)) return false
 
+      if (filtro === 'destacados' && !s.destacado) return false
       if (filtro === 'activos' && !s.activo) return false
       if (filtro === 'inactivos' && s.activo) return false
 
@@ -447,6 +476,26 @@ export function ServiciosPage() {
                     Opcional. Valor decimal numérico (máx. 2 decimales).
                   </span>
                 </label>
+
+                {/* MARCAR COMO DESTACADO */}
+                <div className="rounded-xl border border-line bg-surface/60 p-4 sm:col-span-2">
+                  <Checkbox
+                    id="chk-destacado"
+                    checked={form.destacado}
+                    onChange={e => setForm(actual => ({ ...actual, destacado: e.target.checked }))}
+                    label={
+                      <div>
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                          <Icon name="starFilled" size={15} className="text-amber-500" />
+                          <span>Marcar como servicio destacado</span>
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted">
+                          Aparecerá priorizado en la pestaña principal &ldquo;Destacados&rdquo; durante la reserva de citas.
+                        </span>
+                      </div>
+                    }
+                  />
+                </div>
 
                 {/* SEDES DONDE SE OFRECE EL SERVICIO */}
                 <div className="sm:col-span-2">
@@ -703,6 +752,7 @@ export function ServiciosPage() {
               value={filtro}
               options={[
                 { value: 'todos', label: 'Todos los estados' },
+                { value: 'destacados', label: '⭐ Destacados' },
                 { value: 'activos', label: 'Activos' },
                 { value: 'inactivos', label: 'Inactivos' },
               ]}
@@ -710,7 +760,7 @@ export function ServiciosPage() {
                 setFiltro(valor as Filtro)
                 setPagina(1)
               }}
-              className="w-full sm:w-40"
+              className="w-full sm:w-44"
             />
           </Toolbar>
         </div>
@@ -770,16 +820,28 @@ export function ServiciosPage() {
                         </p>
                       </div>
 
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-semibold',
-                          servicio.activo
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600',
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {servicio.destacado && (
+                          <span
+                            title="Servicio destacado"
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-0.5 text-[0.7rem] font-semibold text-amber-800"
+                          >
+                            <Icon name="starFilled" size={11} className="text-amber-500" />
+                            Destacado
+                          </span>
                         )}
-                      >
-                        {servicio.activo ? 'Activo' : 'Inactivo'}
-                      </span>
+
+                        <span
+                          className={cn(
+                            'rounded-full px-2.5 py-1 text-[0.7rem] font-semibold',
+                            servicio.activo
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600',
+                          )}
+                        >
+                          {servicio.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* DESCRIPCIÓN */}
@@ -845,6 +907,26 @@ export function ServiciosPage() {
 
                     {/* ACCIONES */}
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+                      <button
+                        type="button"
+                        onClick={() => void toggleDestacado(servicio)}
+                        disabled={guardando || procesando}
+                        title={servicio.destacado ? 'Quitar de destacados' : 'Marcar como destacado'}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50',
+                          servicio.destacado
+                            ? 'border-amber-300/80 bg-surface text-amber-900 shadow-2xs hover:bg-amber-50/50 hover:border-amber-400'
+                            : 'border-line bg-surface text-ink-soft hover:border-line-hover hover:text-ink',
+                        )}
+                      >
+                        <Icon
+                          name={servicio.destacado ? 'starFilled' : 'star'}
+                          size={13}
+                          className={servicio.destacado ? 'text-amber-500' : 'text-muted'}
+                        />
+                        <span>{servicio.destacado ? 'Destacado' : 'Destacar'}</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => abrirEditar(servicio)}
