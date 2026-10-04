@@ -256,7 +256,7 @@ export function PatientsPage() {
                     nombre={p.nombres}
                     apellido={p.apellidoPaterno}
                     seed={p.id}
-                    size={44}
+                    size={36}
                     animate="hover"
                     trackCursor={false}
                   />

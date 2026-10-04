@@ -6,6 +6,7 @@ import {
   AnimatedDatePicker,
   AnimatedSelect,
   AppointmentsTableSkeleton,
+  Avatar,
   Badge,
   Button,
   Card,
@@ -284,18 +285,40 @@ export function AppointmentsPage() {
                       key={cita.idCita}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.15) }}
-                      className="hover:bg-alt/60"
+                      transition={{ duration: 0.15, delay: Math.min(index * 0.015, 0.1) }}
+                      className="transition-colors hover:bg-alt/60"
                     >
-                      <td className="font-semibold text-brand">{citaReferencia(cita.idCita)}</td>
-
+                      {/* REFERENCIA */}
                       <td>
-                        <p className="font-semibold text-ink">{cita.pacienteNombre}</p>
-                        <p className="mt-1 text-xs text-muted">{cita.servicioNombre}</p>
+                        <span className="font-semibold text-brand">
+                          {citaReferencia(cita.idCita)}
+                        </span>
                       </td>
 
+                      {/* PACIENTE */}
                       <td>
-                        <p className="font-semibold text-ink">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            nombre={cita.pacienteNombre}
+                            seed={cita.pacienteId}
+                            size={36}
+                            animate="hover"
+                            trackCursor={false}
+                          />
+                          <div className="min-w-0">
+                            <p className="font-bold leading-tight text-ink">
+                              {cita.pacienteNombre}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted">
+                              {cita.servicioNombre}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* ESPECIALISTA */}
+                      <td>
+                        <p className="font-semibold leading-tight text-ink">
                           {cita.odontologoNombre
                             ? cita.odontologoNombre.startsWith('Dr')
                               ? cita.odontologoNombre
@@ -303,21 +326,34 @@ export function AppointmentsPage() {
                             : 'Por asignar'}
                         </p>
                         {cita.especialidadNombre && (
-                          <p className="mt-1 text-xs text-muted">{cita.especialidadNombre}</p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {cita.especialidadNombre}
+                          </p>
                         )}
                       </td>
 
-                      <td className="text-ink">
-                        {fechaFormato(cita.fechaHoraInicio)}
-                        <p className="mt-1 text-xs text-muted">{horaFormato(cita.fechaHoraInicio)}</p>
-                      </td>
-
-                      <td className="text-center">
-                        <div className="flex justify-center">
-                          <Badge tone={tonoEstado(cita.estado)}>{cita.estado.replaceAll('_', ' ')}</Badge>
+                      {/* FECHA Y HORA */}
+                      <td>
+                        <div className="flex flex-col gap-0.5 text-xs">
+                          <span className="font-semibold text-ink">
+                            {fechaFormato(cita.fechaHoraInicio)}
+                          </span>
+                          <span className="text-muted">
+                            {horaFormato(cita.fechaHoraInicio)}
+                          </span>
                         </div>
                       </td>
 
+                      {/* ESTADO */}
+                      <td className="text-center">
+                        <div className="flex justify-center">
+                          <Badge tone={tonoEstado(cita.estado)}>
+                            {cita.estado.replaceAll('_', ' ')}
+                          </Badge>
+                        </div>
+                      </td>
+
+                      {/* ACCIONES */}
                       <ActionsCell align="center">
                         <RowActions
                           actions={[

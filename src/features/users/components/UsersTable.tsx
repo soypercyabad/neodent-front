@@ -140,7 +140,7 @@ export function UsersTable({
                         nombre={usuario.nombres}
                         apellido={usuario.apellidoPaterno}
                         seed={usuario.usuarioId}
-                        size={40}
+                        size={36}
                         animate="hover"
                         trackCursor={false}
                       />

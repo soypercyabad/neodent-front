@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  ActionsCell,
   AnimatedDatePicker,
   AnimatedSelect,
   Avatar,
@@ -14,6 +15,7 @@ import {
   PageHead,
   Pagination,
   ProtectedImage,
+  RowActions,
   TableFoot,
   Toast,
   type ToastAviso,
@@ -35,7 +37,6 @@ import {
   fechaCorta,
   hora12,
   hoyIso,
-  pad,
 } from '../model/scheduleUtils'
 
 type EstadoFiltro = 'todos' | 'vigentes' | 'proximos' | 'expirados'
@@ -841,7 +842,6 @@ export function ScheduleHistoryPage() {
                     const diaInfo = DIAS.find(d => Number(d.value) === horario.diaSemana)
                     const expirado = Boolean(horario.fechaFinVigencia && horario.fechaFinVigencia < hoy)
                     const proximo = Boolean(horario.fechaInicioVigencia > hoy)
-                    const vigente = !expirado && !proximo
 
                     return (
                       <tr
@@ -868,7 +868,7 @@ export function ScheduleHistoryPage() {
                                         apellido={matchDoc.apellidoPaterno}
                                         seed={matchDoc.odontologoId}
                                         size={36}
-                                        animate="none"
+                                        animate="hover"
                                         trackCursor={false}
                                       />
                                     }
@@ -880,7 +880,7 @@ export function ScheduleHistoryPage() {
                                   apellido={matchDoc.apellidoPaterno}
                                   seed={matchDoc.odontologoId}
                                   size={36}
-                                  animate="none"
+                                  animate="hover"
                                   trackCursor={false}
                                 />
                               )
@@ -956,28 +956,23 @@ export function ScheduleHistoryPage() {
                         </td>
 
                         {/* ACCIONES */}
-                        <td className="py-3.5 pl-4 pr-5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              title="Editar horario"
-                              aria-label="Editar horario"
-                              onClick={() => abrirEditar(horario)}
-                              className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand hover:text-brand hover:shadow-2xs"
-                            >
-                              <Icon name="edit" size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              title="Eliminar horario"
-                              aria-label="Eliminar horario"
-                              onClick={() => setConfirmar(horario)}
-                              className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger hover:bg-danger-soft hover:text-danger hover:shadow-2xs"
-                            >
-                              <Icon name="trash" size={13} />
-                            </button>
-                          </div>
-                        </td>
+                        <ActionsCell align="right" className="py-3.5 pl-4 pr-5">
+                          <RowActions
+                            actions={[
+                              {
+                                label: 'Editar horario',
+                                icon: 'edit',
+                                onClick: () => abrirEditar(horario),
+                              },
+                              {
+                                label: 'Eliminar horario',
+                                icon: 'trash',
+                                onClick: () => setConfirmar(horario),
+                                variant: 'danger',
+                              },
+                            ]}
+                          />
+                        </ActionsCell>
                       </tr>
                     )
                   })}

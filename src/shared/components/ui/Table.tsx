@@ -11,13 +11,22 @@ export interface Column {
  * Tabla de datos. El estilo de celdas se aplica desde aquí con selectores
  * descendentes, así las filas de cada feature sólo aportan contenido.
  */
-export function Table({ columns, children }: { columns: Column[]; children: ReactNode }) {
+export function Table({
+  columns,
+  children,
+  className,
+}: {
+  columns: Column[]
+  children: ReactNode
+  className?: string
+}) {
   return (
     <div className="overflow-x-auto">
       <table
         className={cn(
           'w-full border-collapse text-[0.95rem]',
-          '[&_td]:border-t [&_td]:border-line [&_td]:px-4 [&_td]:py-4 [&_td]:align-middle [&_td]:whitespace-nowrap',
+          '[&_td]:border-t [&_td]:border-line [&_td]:px-4 [&_td]:py-3.5 [&_td]:align-middle [&_td]:whitespace-nowrap',
+          className,
         )}
       >
         <thead>
@@ -64,12 +73,19 @@ export function SeparatorRow({ colSpan, children }: { colSpan: number; children:
 export function ActionsCell({
   children,
   align = 'center',
+  className,
 }: {
   children: ReactNode
   align?: 'left' | 'center' | 'right'
+  className?: string
 }) {
   return (
-    <td className={cn(align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left')}>
+    <td
+      className={cn(
+        align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left',
+        className,
+      )}
+    >
       <div
         className={cn(
           'flex items-center gap-1.5',

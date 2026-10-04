@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Card, Icon, PageHead } from '@/shared/components/ui'
+import { Badge, Card, Icon, PageHead } from '@/shared/components/ui'
 import type { IconName } from '@/shared/components/ui/Icon'
 import { useAuth } from '@/features/auth'
 import { DEMO_APPOINTMENTS, DEMO_ATTENDED, DEMO_METRICS, DEMO_PATIENTS, DEMO_SERVICES, } from '../model/demoData'
@@ -418,13 +418,13 @@ function AppointmentsTable({
           <table className="w-full min-w-[620px] text-left text-sm">
             <thead className="border-y border-line bg-[#F8FAFD]">
               <tr className="text-xs text-muted">
-                <th className="px-5 py-3 font-semibold">Paciente</th>
-                <th className="px-5 py-3 font-semibold">Servicio</th>
+                <th className="px-4 py-3.5 font-bold uppercase tracking-wider text-[0.78rem]">Paciente</th>
+                <th className="px-4 py-3.5 font-bold uppercase tracking-wider text-[0.78rem]">Servicio</th>
                 {!isDentist && (
-                  <th className="px-5 py-3 font-semibold">Odontólogo</th>
+                  <th className="px-4 py-3.5 font-bold uppercase tracking-wider text-[0.78rem]">Odontólogo</th>
                 )}
-                <th className="px-5 py-3 font-semibold">Hora</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
+                <th className="px-4 py-3.5 font-bold uppercase tracking-wider text-[0.78rem]">Hora</th>
+                <th className="px-4 py-3.5 font-bold uppercase tracking-wider text-[0.78rem]">Estado</th>
               </tr>
             </thead>
 
@@ -434,36 +434,36 @@ function AppointmentsTable({
                   key={appointment.id}
                   className="border-b border-line last:border-b-0 hover:bg-[#F8FAFD]"
                 >
-                  <td className="px-5 py-4 font-semibold text-ink">
+                  <td className="px-4 py-3.5 font-semibold text-ink">
                     {appointment.paciente}
                   </td>
 
-                  <td className="px-5 py-4 text-ink-soft">
+                  <td className="px-4 py-3.5 text-ink-soft">
                     {appointment.servicio}
                   </td>
 
                   {!isDentist && (
-                    <td className="px-5 py-4 text-ink-soft">
+                    <td className="px-4 py-3.5 text-ink-soft">
                       {appointment.odontologo}
                     </td>
                   )}
 
-                  <td className="px-5 py-4 text-ink-soft">
+                  <td className="px-4 py-3.5 text-ink-soft">
                     {appointment.hora}
                   </td>
 
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  <td className="px-4 py-3.5">
+                    <Badge
+                      tone={
                         appointment.estado === 'Confirmada'
-                          ? 'bg-[#E5F7EF] text-[#229A68]'
+                          ? 'green'
                           : appointment.estado === 'En atención'
-                            ? 'bg-[#EAF2FF] text-[#2878F0]'
-                            : 'bg-[#FFF3E5] text-[#BC7E22]'
-                      }`}
+                            ? 'blue'
+                            : 'amber'
+                      }
                     >
                       {appointment.estado}
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               ))}

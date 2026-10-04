@@ -78,7 +78,7 @@ export function TableSkeletonRows({
 }
 
 /**
- * Skeleton especializado para tablas de citas (simula códigos, nombres con subtítulo, fecha, badge y botón).
+ * Skeleton especializado para tablas de citas (simula código, paciente con avatar, especialista, fecha, badge y acción).
  */
 export function AppointmentsTableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
@@ -86,35 +86,43 @@ export function AppointmentsTableSkeleton({ rows = 5 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, rIdx) => (
         <tr key={rIdx} className="hover:bg-transparent">
           {/* Referencia */}
-          <td className="px-5 py-4">
-            <Skeleton className="h-4 w-20 rounded-md" />
+          <td className="px-4 py-3.5">
+            <Skeleton className="h-6 w-16 rounded-md" />
           </td>
 
-          {/* Paciente y Servicio */}
-          <td className="px-5 py-4">
-            <Skeleton className="h-3.5 w-36 rounded-full" />
-            <Skeleton className="mt-1.5 h-2.5 w-24 rounded-full opacity-70" />
+          {/* Paciente con Avatar y Servicio */}
+          <td className="px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <Skeleton variant="circular" className="size-9 shrink-0" />
+              <div className="min-w-0">
+                <Skeleton className="h-4 w-32 rounded-full" />
+                <Skeleton className="mt-1 h-3 w-24 rounded-full opacity-70" />
+              </div>
+            </div>
           </td>
 
           {/* Especialista */}
-          <td className="px-5 py-4">
-            <Skeleton className="h-3.5 w-28 rounded-full" />
+          <td className="px-4 py-3.5">
+            <Skeleton className="h-4 w-28 rounded-full" />
+            <Skeleton className="mt-1 h-3 w-20 rounded-full opacity-70" />
           </td>
 
           {/* Fecha y hora */}
-          <td className="px-5 py-4">
-            <Skeleton className="h-3.5 w-24 rounded-full" />
-            <Skeleton className="mt-1.5 h-2.5 w-16 rounded-full opacity-70" />
+          <td className="px-4 py-3.5">
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-3.5 w-20 rounded-full" />
+              <Skeleton className="h-3 w-14 rounded-full opacity-70" />
+            </div>
           </td>
 
           {/* Estado (badge) */}
-          <td className="px-5 py-4">
-            <Skeleton className="h-5 w-24 rounded-full" />
+          <td className="px-4 py-3.5 text-center">
+            <Skeleton className="mx-auto h-5 w-20 rounded-full" />
           </td>
 
-          {/* Acción (botón) */}
-          <td className="px-5 py-4 text-right">
-            <Skeleton className="ml-auto h-8 w-24 rounded-xl" />
+          {/* Acción (RowActions / Kebab) */}
+          <td className="px-4 py-3.5 text-center">
+            <Skeleton className="mx-auto size-7 rounded-lg" />
           </td>
         </tr>
       ))}
@@ -306,12 +314,12 @@ export function PatientsTableSkeleton({ rows = 6 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, rIdx) => (
         <tr key={rIdx} className="hover:bg-transparent">
           {/* Avatar + Nombre y Documento */}
-          <td className="px-4 py-4">
+          <td className="px-4 py-3.5">
             <div className="flex items-center gap-3">
-              <Skeleton variant="circular" className="size-11 shrink-0" />
+              <Skeleton variant="circular" className="size-9 shrink-0" />
               <div className="min-w-0">
                 <Skeleton className="h-4 w-36 rounded-full" />
-                <Skeleton className="mt-1.5 h-3 w-28 rounded-full opacity-70" />
+                <Skeleton className="mt-1 h-3 w-28 rounded-full opacity-70" />
               </div>
             </div>
           </td>

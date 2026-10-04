@@ -23,12 +23,12 @@ interface RowActionsProps {
 
 /**
  * Acciones por fila de tabla:
- * - Si hay hasta 2 acciones visibles: muestra botones directos sólo con iconos y Tooltip personalizado.
- * - Si hay más de 2 acciones (> 2): muestra el menú de 3 puntos (kebab) con icono + nombre.
+ * - Si hay 1 sola acción: muestra el botón directo con su icono y Tooltip.
+ * - Si hay 2 o más acciones (>= 2): muestra el menú de 3 puntos (kebab) con icono + nombre.
  */
 export function RowActions({
   actions,
-  maxDirectIcons = 2,
+  maxDirectIcons = 1,
   className,
 }: RowActionsProps) {
   const visible = actions.filter(a => a.show !== false)
