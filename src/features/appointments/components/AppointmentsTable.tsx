@@ -6,6 +6,7 @@ import {
   SeparatorRow,
   Table,
   TableState,
+  useTableSort,
   type Column,
 } from '@/shared/components/ui'
 import type { Id } from '@/shared/lib/id'
@@ -14,13 +15,13 @@ import { canActOn, type Appointment } from '../model/appointments.types'
 import { paymentTone, statusTone } from '../model/appointments.utils'
 
 const COLUMNS: Column[] = [
-  { label: 'Fecha' },
-  { label: 'Hora' },
-  { label: 'Paciente' },
-  { label: 'Odontólogo' },
-  { label: 'Lugar' },
-  { label: 'Estado', align: 'center' },
-  { label: 'Pago', align: 'center' },
+  { key: 'fecha', label: 'Fecha', sortable: true },
+  { key: 'hora', label: 'Hora', sortable: true },
+  { key: 'pacId', label: 'Paciente', sortable: true },
+  { key: 'docId', label: 'Odontólogo', sortable: true },
+  { key: 'lugar', label: 'Lugar', sortable: true },
+  { key: 'estado', label: 'Estado', align: 'center', sortable: true },
+  { key: 'pago', label: 'Pago', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
@@ -34,7 +35,7 @@ interface AppointmentsTableProps {
   onCancel: (a: Appointment) => void
 }
 
-/** Tabla de citas agrupada por día: una fila separadora por cada fecha. */
+/** Tabla de citas agrupada por día: una fila separadora por cada fecha con cabeceras ordenables. */
 export function AppointmentsTable({
   appointments,
   pacName,
@@ -44,15 +45,29 @@ export function AppointmentsTable({
   onReschedule,
   onCancel,
 }: AppointmentsTableProps) {
+  const { sortColumn, sortDirection, handleSort, sortedItems } = useTableSort(appointments, {
+    initialColumn: 'fecha',
+    initialDirection: 'asc',
+    customComparators: {
+      pacId: (a, b) => pacName(a.pacId).localeCompare(pacName(b.pacId), 'es'),
+      docId: (a, b) => docName(a.docId).localeCompare(docName(b.docId), 'es'),
+    },
+  })
+
   return (
-    <Table columns={COLUMNS}>
+    <Table
+      columns={COLUMNS}
+      sortColumn={sortColumn}
+      sortDirection={sortDirection}
+      onSort={handleSort}
+    >
       <TableState
         colSpan={COLUMNS.length}
-        empty={appointments.length === 0}
+        empty={sortedItems.length === 0}
         emptyLabel="No hay citas que coincidan con los filtros."
       />
-      {appointments.map((a, i) => {
-        const newDay = i === 0 || a.fecha !== appointments[i - 1].fecha
+      {sortedItems.map((a, i) => {
+        const newDay = i === 0 || a.fecha !== sortedItems[i - 1].fecha
         const actionable = canActOn(a)
         return (
           <Fragment key={a.id}>

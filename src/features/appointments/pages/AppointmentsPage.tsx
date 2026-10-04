@@ -34,11 +34,11 @@ interface PaginaCitas {
 }
 
 const COLUMNS: Column[] = [
-  { label: 'Referencia' },
-  { label: 'Paciente' },
-  { label: 'Especialista' },
-  { label: 'Fecha y hora' },
-  { label: 'Estado', align: 'center' },
+  { key: 'idCita', label: 'Referencia', sortable: true },
+  { key: 'pacienteNombre', label: 'Paciente', sortable: true },
+  { key: 'odontologoNombre', label: 'Especialista', sortable: true },
+  { key: 'fechaHoraInicio', label: 'Fecha y hora', sortable: true },
+  { key: 'estado', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
@@ -81,9 +81,21 @@ export function AppointmentsPage() {
   const [estado, setEstado] = useState('')
   const [vista, setVista] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [sortColumn, setSortColumn] = useState<string>('fechaHoraInicio')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actualizacion, setActualizacion] = useState(0)
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(columnKey)
+      setSortDirection('asc')
+    }
+    setPagina(1)
+  }
 
   useEffect(() => {
     if (!accessToken) {
@@ -163,13 +175,27 @@ export function AppointmentsPage() {
           .includes(buscar)
       })
       .sort((a, b) => {
-        const aFecha = a.fechaHoraInicio
-        const bFecha = b.fechaHoraInicio
+        const dir = sortDirection === 'asc' ? 1 : -1
+        if (sortColumn === 'idCita') {
+          return (a.idCita - b.idCita) * dir
+        }
+        if (sortColumn === 'pacienteNombre') {
+          return a.pacienteNombre.localeCompare(b.pacienteNombre, 'es') * dir
+        }
+        if (sortColumn === 'odontologoNombre') {
+          return a.odontologoNombre.localeCompare(b.odontologoNombre, 'es') * dir
+        }
+        if (sortColumn === 'fechaHoraInicio') {
+          return a.fechaHoraInicio.localeCompare(b.fechaHoraInicio) * dir
+        }
+        if (sortColumn === 'estado') {
+          return a.estado.localeCompare(b.estado, 'es') * dir
+        }
 
-        if (vista === 'HISTORIAL') return bFecha.localeCompare(aFecha)
-        return aFecha.localeCompare(bFecha)
+        if (vista === 'HISTORIAL') return b.fechaHoraInicio.localeCompare(a.fechaHoraInicio)
+        return a.fechaHoraInicio.localeCompare(b.fechaHoraInicio)
       })
-  }, [citas, query, day, estado, vista])
+  }, [citas, query, day, estado, vista, sortColumn, sortDirection])
 
   const totalPaginas = Math.max(1, Math.ceil(rows.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
@@ -269,7 +295,12 @@ export function AppointmentsPage() {
           </div>
         ) : (
           <>
-            <Table columns={COLUMNS}>
+            <Table
+              columns={COLUMNS}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+            >
               {loading ? (
                 <AppointmentsTableSkeleton rows={POR_PAGINA} />
               ) : (

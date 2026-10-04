@@ -19,6 +19,7 @@ import {
   TableState,
   Toast,
   Toolbar,
+  useTableSort,
   type Column,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
@@ -27,10 +28,10 @@ import { ApiError } from '@/shared/api/apiClient'
 import { rolesApi, type RolResponse } from '../api/rolesApi'
 
 const COLUMNS: Column[] = [
-  { label: 'Rol' },
-  { label: 'Descripción' },
-  { label: 'Tipo', align: 'center' },
-  { label: 'Estado', align: 'center' },
+  { key: 'nombre', label: 'Rol', sortable: true },
+  { key: 'descripcion', label: 'Descripción', sortable: true },
+  { key: 'sistema', label: 'Tipo', align: 'center', sortable: true },
+  { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
@@ -107,10 +108,15 @@ export function RolesPage() {
     })
   }, [roles, query, tipo, estado])
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
+  const { sortColumn, sortDirection, handleSort, sortedItems } = useTableSort(filtrados, {
+    initialColumn: 'nombre',
+    initialDirection: 'asc',
+  })
+
+  const totalPaginas = Math.max(1, Math.ceil(sortedItems.length / POR_PAGINA))
   const paginaActual = Math.min(pagina, totalPaginas)
   const inicio = (paginaActual - 1) * POR_PAGINA
-  const visibles = useMemo(() => filtrados.slice(inicio, inicio + POR_PAGINA), [filtrados, inicio])
+  const visibles = useMemo(() => sortedItems.slice(inicio, inicio + POR_PAGINA), [sortedItems, inicio])
 
   const abrirNuevo = () => {
     setEditando(null)
@@ -342,7 +348,12 @@ export function RolesPage() {
           />
         </Toolbar>
 
-        <Table columns={COLUMNS}>
+        <Table
+          columns={COLUMNS}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+        >
           {loading ? (
             <RolesTableSkeleton rows={POR_PAGINA} />
           ) : (

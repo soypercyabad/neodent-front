@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ActionsCell, AnimatedSelect, Avatar, Badge, Button, Card, ConfirmDialog,
@@ -12,10 +12,10 @@ import { patientsApi, type PacienteResponse, type PaginaResponse } from '../api/
 const PAGE_SIZE = 10
 
 const COLUMNS: Column[] = [
-  { label: 'Paciente' },
-  { label: 'Contacto' },
-  { label: 'Cuenta', align: 'center' },
-  { label: 'Estado', align: 'center' },
+  { key: 'nombres', label: 'Paciente', sortable: true },
+  { key: 'email', label: 'Contacto', sortable: true },
+  { key: 'tieneCuenta', label: 'Cuenta', align: 'center', sortable: true },
+  { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
@@ -45,6 +45,8 @@ export function PatientsPage() {
   const [estado, setEstado] = useState('')
   const [cuenta, setCuenta] = useState('')
   const [page, setPage] = useState(1)
+  const [sortColumn, setSortColumn] = useState<string>('id')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [resultado, setResultado] = useState<PaginaResponse<PacienteResponse> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,6 +55,16 @@ export function PatientsPage() {
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [actualizacion, setActualizacion] = useState(0)
   const procesandoRef = useRef(false)
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(columnKey)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
 
   useEffect(() => {
     const state = location.state as { aviso?: Aviso } | null
@@ -97,6 +109,8 @@ export function PatientsPage() {
           : cuenta === 'SIN_CUENTA'
             ? false
             : undefined,
+      sortBy: sortColumn,
+      direction: sortDirection,
       page: page - 1,
       size: PAGE_SIZE,
     })
@@ -119,14 +133,35 @@ export function PatientsPage() {
     return () => {
       activo = false
     }
-  }, [accessToken, query, estado, cuenta, page, actualizacion])
+  }, [accessToken, query, estado, cuenta, page, sortColumn, sortDirection, actualizacion])
 
   const applyFilter = (fn: () => void) => {
     fn()
     setPage(1)
   }
 
-  const rows = resultado?.contenido ?? []
+  const rows = useMemo(() => {
+    const list = [...(resultado?.contenido ?? [])]
+    if (!sortColumn) return list
+    const dir = sortDirection === 'asc' ? 1 : -1
+    return list.sort((a, b) => {
+      if (sortColumn === 'nombres') {
+        const nomA = `${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno ?? ''}`.trim()
+        const nomB = `${b.nombres} ${b.apellidoPaterno} ${b.apellidoMaterno ?? ''}`.trim()
+        return nomA.localeCompare(nomB, 'es', { numeric: true, sensitivity: 'base' }) * dir
+      }
+      if (sortColumn === 'email') {
+        return (a.email || '').localeCompare(b.email || '', 'es') * dir
+      }
+      if (sortColumn === 'tieneCuenta') {
+        return (Number(a.tieneCuenta) - Number(b.tieneCuenta)) * dir
+      }
+      if (sortColumn === 'activo') {
+        return (Number(a.activo) - Number(b.activo)) * dir
+      }
+      return 0
+    })
+  }, [resultado?.contenido, sortColumn, sortDirection])
   const totalPages = Math.max(1, resultado?.totalPaginas ?? 1)
 
   const ejecutarAccion = async () => {
@@ -236,7 +271,12 @@ export function PatientsPage() {
           />
         </Toolbar>
 
-        <Table columns={COLUMNS}>
+        <Table
+          columns={COLUMNS}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+        >
           {loading ? (
             <PatientsTableSkeleton rows={PAGE_SIZE} />
           ) : (
@@ -248,7 +288,7 @@ export function PatientsPage() {
                 emptyLabel="No hay pacientes que coincidan con los filtros."
               />
 
-              {!error && rows.map(p => (
+              {!error && rows.map((p: PacienteResponse) => (
             <tr key={p.id}>
               <td>
                 <div className="flex items-center gap-3">

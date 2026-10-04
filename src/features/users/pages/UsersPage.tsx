@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AnimatedSelect,
@@ -34,6 +34,8 @@ export function UsersPage() {
   const [rol, setRol] = useState('')
   const [estado, setEstado] = useState('')
   const [page, setPage] = useState(1)
+  const [sortColumn, setSortColumn] = useState<string>('id')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   const [rolesDisponibles, setRolesDisponibles] = useState<RolResponse[]>([])
   const [resultado, setResultado] = useState<PaginaResponse<UsuarioInternoResponse> | null>(null)
@@ -45,6 +47,16 @@ export function UsersPage() {
   const [actualizacion, setActualizacion] = useState(0)
 
   const procesandoRef = useRef(false)
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(columnKey)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
 
   useEffect(() => {
     const state = location.state as { aviso?: Aviso } | null
@@ -79,6 +91,8 @@ export function UsersPage() {
         buscar: query,
         rol: rol || undefined,
         estado: estado || undefined,
+        sortBy: sortColumn,
+        direction: sortDirection,
         page: page - 1,
         size: PAGE_SIZE,
       })
@@ -99,7 +113,7 @@ export function UsersPage() {
     return () => {
       active = false
     }
-  }, [accessToken, query, rol, estado, page, actualizacion])
+  }, [accessToken, query, rol, estado, page, sortColumn, sortDirection, actualizacion])
 
   useEffect(() => {
     if (!aviso) return
@@ -110,7 +124,28 @@ export function UsersPage() {
     return () => window.clearTimeout(timer)
   }, [aviso])
 
-  const rows = resultado?.contenido ?? []
+  const rows = useMemo(() => {
+    const list = [...(resultado?.contenido ?? [])]
+    if (!sortColumn) return list
+    const dir = sortDirection === 'asc' ? 1 : -1
+    return list.sort((a, b) => {
+      if (sortColumn === 'nombres') {
+        const nomA = `${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno ?? ''}`.trim()
+        const nomB = `${b.nombres} ${b.apellidoPaterno} ${b.apellidoMaterno ?? ''}`.trim()
+        return nomA.localeCompare(nomB, 'es', { numeric: true, sensitivity: 'base' }) * dir
+      }
+      if (sortColumn === 'email' || sortColumn === 'correo') {
+        return (a.correo || '').localeCompare(b.correo || '', 'es') * dir
+      }
+      if (sortColumn === 'roles') {
+        return a.roles.join(', ').localeCompare(b.roles.join(', '), 'es') * dir
+      }
+      if (sortColumn === 'estado') {
+        return a.estado.localeCompare(b.estado, 'es') * dir
+      }
+      return 0
+    })
+  }, [resultado?.contenido, sortColumn, sortDirection])
   const totalPages = Math.max(1, resultado?.totalPaginas ?? 1)
 
   const applyFilter = (fn: () => void) => {
@@ -225,6 +260,9 @@ export function UsersPage() {
               loading={loading}
               accessToken={accessToken}
               usuarioActualId={usuarioActualId}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              onSort={handleSort}
               onDetail={u => navigate(`/usuarios/${u.usuarioId}`)}
               onEdit={u => navigate(`/usuarios/${u.usuarioId}/editar`)}
               onToggle={u => {

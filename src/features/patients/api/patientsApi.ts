@@ -64,14 +64,16 @@ export const patientsApi = {
     buscar?: string
     activo?: boolean
     conCuenta?: boolean
+    sortBy?: string
+    direction?: string
     page: number
     size: number
   }) {
     const query = new URLSearchParams({
       page: String(params.page),
       size: String(params.size),
-      sortBy: 'id',
-      direction: 'desc',
+      sortBy: params.sortBy || 'id',
+      direction: params.direction || 'desc',
     })
 
     if (params.buscar?.trim()) query.set('buscar', params.buscar.trim())

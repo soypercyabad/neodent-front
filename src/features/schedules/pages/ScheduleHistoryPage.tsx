@@ -262,12 +262,63 @@ export function ScheduleHistoryPage() {
     })
   }, [horariosBase, filtroEstado, hoy])
 
+  // ORDENAMIENTO INTERACTIVO
+  const [sortColumn, setSortColumn] = useState<string>('fechaInicioVigencia')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (colKey: string) => {
+    if (sortColumn === colKey) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(colKey)
+      setSortDirection('asc')
+    }
+    setPagina(1)
+  }
+
+  const horariosOrdenados = useMemo(() => {
+    const list = [...horariosFiltrados]
+    if (!sortColumn) return list
+    const dir = sortDirection === 'asc' ? 1 : -1
+
+    return list.sort((a, b) => {
+      const docA = catalogo.find(c => c.odontologoEspecialidadId === a.odontologoEspecialidadId)
+      const docB = catalogo.find(c => c.odontologoEspecialidadId === b.odontologoEspecialidadId)
+
+      if (sortColumn === 'odontologo') {
+        const nomA = docA ? `${docA.nombres} ${docA.apellidoPaterno}` : ''
+        const nomB = docB ? `${docB.nombres} ${docB.apellidoPaterno}` : ''
+        return nomA.localeCompare(nomB, 'es') * dir
+      }
+      if (sortColumn === 'especialidad') {
+        const espA = docA?.especialidadNombre || ''
+        const espB = docB?.especialidadNombre || ''
+        return espA.localeCompare(espB, 'es') * dir
+      }
+      if (sortColumn === 'sede') {
+        const sedeA = sedes.find(s => s.id === a.sedeId)?.nombre || ''
+        const sedeB = sedes.find(s => s.id === b.sedeId)?.nombre || ''
+        return sedeA.localeCompare(sedeB, 'es') * dir
+      }
+      if (sortColumn === 'diaSemana') {
+        return (a.diaSemana - b.diaSemana) * dir
+      }
+      if (sortColumn === 'horaInicio') {
+        return a.horaInicio.localeCompare(b.horaInicio) * dir
+      }
+      if (sortColumn === 'fechaInicioVigencia') {
+        return a.fechaInicioVigencia.localeCompare(b.fechaInicioVigencia) * dir
+      }
+      return 0
+    })
+  }, [horariosFiltrados, sortColumn, sortDirection, catalogo, sedes])
+
   // PAGINACIÓN
-  const totalPaginas = Math.max(1, Math.ceil(horariosFiltrados.length / PAGE_SIZE))
+  const totalPaginas = Math.max(1, Math.ceil(horariosOrdenados.length / PAGE_SIZE))
   const horariosPaginados = useMemo(() => {
     const start = (pagina - 1) * PAGE_SIZE
-    return horariosFiltrados.slice(start, start + PAGE_SIZE)
-  }, [horariosFiltrados, pagina])
+    return horariosOrdenados.slice(start, start + PAGE_SIZE)
+  }, [horariosOrdenados, pagina])
 
   // RESUMEN INTELIGENTE DE VIGENCIA EN FORMULARIO
   const resumenVigencia = useMemo(() => {
@@ -824,12 +875,39 @@ export function ScheduleHistoryPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-line bg-alt/40 text-[11px] font-bold uppercase tracking-wider text-muted">
-                    <th className="py-3.5 pl-5 pr-4">Odontólogo</th>
-                    <th className="px-4 py-3.5">Especialidad</th>
-                    <th className="px-4 py-3.5">Sede</th>
-                    <th className="px-4 py-3.5">Día</th>
-                    <th className="px-4 py-3.5">Horario</th>
-                    <th className="px-4 py-3.5">Vigencia</th>
+                    {[
+                      { key: 'odontologo', label: 'Odontólogo', className: 'pl-5' },
+                      { key: 'especialidad', label: 'Especialidad' },
+                      { key: 'sede', label: 'Sede' },
+                      { key: 'diaSemana', label: 'Día' },
+                      { key: 'horaInicio', label: 'Horario' },
+                      { key: 'fechaInicioVigencia', label: 'Vigencia' },
+                    ].map(col => {
+                      const isSorted = sortColumn === col.key
+                      return (
+                        <th
+                          key={col.key}
+                          onClick={() => handleSort(col.key)}
+                          className={cn(
+                            'py-3.5 px-4 cursor-pointer select-none transition-colors hover:bg-alt/80 group',
+                            isSorted ? 'text-brand font-extrabold bg-brand-soft/20' : 'text-muted',
+                            col.className,
+                          )}
+                          title={`Ordenar por ${col.label}`}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>{col.label}</span>
+                            <span className={cn('inline-flex items-center transition-colors', isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted')}>
+                              {isSorted ? (
+                                sortDirection === 'asc' ? <Icon name="chevronUp" size={13} strokeWidth={2.5} /> : <Icon name="chevronDown" size={13} strokeWidth={2.5} />
+                              ) : (
+                                <Icon name="chevronsUpDown" size={12} strokeWidth={1.8} />
+                              )}
+                            </span>
+                          </div>
+                        </th>
+                      )
+                    })}
                     <th className="px-4 py-3.5">Estado</th>
                     <th className="py-3.5 pl-4 pr-5 text-right">Acciones</th>
                   </tr>

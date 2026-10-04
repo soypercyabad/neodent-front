@@ -11,15 +11,16 @@ import {
   UsersTableSkeleton,
   type BadgeTone,
   type Column,
+  type SortDirection,
 } from '@/shared/components/ui'
 import { documentTypesApi } from '@/shared/api/documentTypesApi'
 import type { UsuarioInternoResponse } from '../api/usersApi'
 
 const COLUMNS: Column[] = [
-  { label: 'Colaborador' },
-  { label: 'Contacto' },
-  { label: 'Roles' },
-  { label: 'Estado', align: 'center' },
+  { key: 'nombres', label: 'Colaborador', sortable: true },
+  { key: 'email', label: 'Contacto', sortable: true },
+  { key: 'roles', label: 'Roles', sortable: true },
+  { key: 'estado', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
@@ -47,6 +48,9 @@ interface UsersTableProps {
   loading?: boolean
   accessToken?: string | null
   usuarioActualId?: number | null
+  sortColumn?: string | null
+  sortDirection?: SortDirection
+  onSort?: (columnKey: string) => void
   onDetail: (usuario: UsuarioInternoResponse) => void
   onEdit: (usuario: UsuarioInternoResponse) => void
   onToggle: (usuario: UsuarioInternoResponse) => void
@@ -57,6 +61,9 @@ export function UsersTable({
   loading = false,
   accessToken,
   usuarioActualId,
+  sortColumn,
+  sortDirection,
+  onSort,
   onDetail,
   onEdit,
   onToggle,
@@ -77,7 +84,12 @@ export function UsersTable({
   }, [])
 
   return (
-    <Table columns={COLUMNS}>
+    <Table
+      columns={COLUMNS}
+      sortColumn={sortColumn}
+      sortDirection={sortDirection}
+      onSort={onSort}
+    >
       {loading ? (
         <UsersTableSkeleton rows={5} />
       ) : (

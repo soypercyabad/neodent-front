@@ -2,24 +2,36 @@ import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Icon } from './Icon'
 
-export interface Column {
+export type SortDirection = 'asc' | 'desc' | null
+
+export interface Column<T = string> {
+  key?: T
   label: string
   align?: 'left' | 'center' | 'right'
+  sortable?: boolean
+  className?: string
+}
+
+export interface TableProps<T = string> {
+  columns: Column<T>[]
+  children: ReactNode
+  className?: string
+  sortColumn?: T | null
+  sortDirection?: SortDirection
+  onSort?: (columnKey: T) => void
 }
 
 /**
- * Tabla de datos. El estilo de celdas se aplica desde aquí con selectores
- * descendentes, así las filas de cada feature sólo aportan contenido.
+ * Tabla de datos con soporte para ordenamiento por cabecera y estilos unificados.
  */
-export function Table({
+export function Table<T = string>({
   columns,
   children,
   className,
-}: {
-  columns: Column[]
-  children: ReactNode
-  className?: string
-}) {
+  sortColumn,
+  sortDirection,
+  onSort,
+}: TableProps<T>) {
   return (
     <div className="overflow-x-auto">
       <table
@@ -31,22 +43,60 @@ export function Table({
       >
         <thead>
           <tr className="border-y border-line bg-[#F8FAFD]">
-            {columns.map((c) => (
-              <th
-                key={c.label}
-                scope="col"
-                className={cn(
-                  'border-y border-line bg-[#F8FAFD] px-4 py-3.5 text-[0.78rem] font-bold tracking-wider text-muted uppercase',
-                  c.align === 'center'
-                    ? 'text-center'
-                    : c.align === 'right'
-                      ? 'text-right'
-                      : 'text-left',
-                )}
-              >
-                {c.label}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const isSortable = Boolean(onSort && (c.sortable || c.key))
+              const isSorted = Boolean(c.key && sortColumn === c.key)
+              const currentDir = isSorted ? sortDirection : null
+
+              return (
+                <th
+                  key={String(c.key ?? c.label)}
+                  scope="col"
+                  onClick={isSortable && c.key ? () => onSort?.(c.key as T) : undefined}
+                  className={cn(
+                    'border-y border-line bg-[#F8FAFD] px-4 py-3.5 text-[0.78rem] font-bold tracking-wider uppercase transition-colors',
+                    isSortable ? 'cursor-pointer select-none hover:bg-alt/80 group' : '',
+                    isSorted ? 'text-brand font-extrabold bg-brand-soft/20' : 'text-muted',
+                    c.align === 'center'
+                      ? 'text-center'
+                      : c.align === 'right'
+                        ? 'text-right'
+                        : 'text-left',
+                    c.className,
+                  )}
+                  title={isSortable ? `Ordenar por ${c.label}` : undefined}
+                >
+                  <div
+                    className={cn(
+                      'inline-flex items-center gap-1.5',
+                      c.align === 'center'
+                        ? 'justify-center w-full'
+                        : c.align === 'right'
+                          ? 'justify-end w-full'
+                          : 'justify-start',
+                    )}
+                  >
+                    <span>{c.label}</span>
+                    {isSortable && (
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center transition-colors',
+                          isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted',
+                        )}
+                      >
+                        {currentDir === 'asc' ? (
+                          <Icon name="chevronUp" size={14} strokeWidth={2.5} />
+                        ) : currentDir === 'desc' ? (
+                          <Icon name="chevronDown" size={14} strokeWidth={2.5} />
+                        ) : (
+                          <Icon name="chevronsUpDown" size={13} strokeWidth={1.8} />
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>{children}</tbody>
