@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, SedesCardsSkeleton, TableFoot, Toast } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { sedesApi, type Sede, type SedeInput } from '../api/sedesApi'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import ubigeoDataRaw from '@/shared/data/ubigeoPeru.json'
 
 type Formulario = { [K in keyof SedeInput]: string }
@@ -175,7 +176,7 @@ export function SedesPage() {
     setEditando(null)
     setFormError('')
     setMostrarForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (sede: Sede) => {
@@ -204,7 +205,7 @@ export function SedesPage() {
     setEditando(sede.id)
     setFormError('')
     setMostrarForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {

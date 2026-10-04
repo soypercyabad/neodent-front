@@ -223,6 +223,7 @@ export function UsersPage() {
             <UsersTable
               users={rows}
               loading={loading}
+              accessToken={accessToken}
               usuarioActualId={usuarioActualId}
               onDetail={u => navigate(`/usuarios/${u.usuarioId}`)}
               onEdit={u => navigate(`/usuarios/${u.usuarioId}/editar`)}

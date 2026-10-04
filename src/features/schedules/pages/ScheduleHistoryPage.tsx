@@ -19,6 +19,7 @@ import {
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { bookingApi, type BookingBranch } from '@/features/appointments/api/bookingApi'
 import {
@@ -309,6 +310,7 @@ export function ScheduleHistoryPage() {
     })
     setEditando(null)
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   // ABRIR FORMULARIO EDITAR
@@ -330,6 +332,7 @@ export function ScheduleHistoryPage() {
     })
     setEditando(horario.id)
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {
@@ -888,7 +891,7 @@ export function ScheduleHistoryPage() {
                                 Dr(a). {matchDoc ? nombreCompleto(matchDoc) : `ID #${horario.odontologoEspecialidadId}`}
                               </p>
                               {matchDoc?.numeroColegiatura && (
-                                <p className="font-mono text-[10px] text-muted">
+                                <p className="mt-0.5 text-xs text-muted">
                                   COP: {matchDoc.numeroColegiatura}
                                 </p>
                               )}

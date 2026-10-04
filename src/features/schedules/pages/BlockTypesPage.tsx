@@ -16,6 +16,7 @@ import {
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import {
   blockTypesApi,
@@ -142,7 +143,7 @@ export function BlockTypesPage() {
     setEditando(null)
     setMostrarForm(true)
     setAviso(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (tipo: BlockType) => {
@@ -158,7 +159,7 @@ export function BlockTypesPage() {
     setEditando(tipo.id)
     setMostrarForm(true)
     setAviso(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {

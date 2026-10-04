@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/model/useAuth'
 import { serviciosApi, type Servicio, type ServicioInput, type EspecialidadOption } from '../api/serviciosApi'
 import { sedesApi, type Sede } from '@/features/sedes/api/sedesApi'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
 type Filtro = 'todos' | 'destacados' | 'activos' | 'inactivos'
 type Aviso = { tipo: 'success' | 'error'; texto: string }
@@ -106,7 +107,7 @@ export function ServiciosPage() {
     setEditando(null)
     setFormError('')
     setMostrarForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
     setMostrarSelectorSedes(true)
     setBusquedaSede('')
   }
@@ -125,7 +126,7 @@ export function ServiciosPage() {
     setEditando(servicio.id)
     setFormError('')
     setMostrarForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
     setMostrarSelectorSedes(true)
     setBusquedaSede('')
   }

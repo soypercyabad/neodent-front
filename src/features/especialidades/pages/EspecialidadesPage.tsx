@@ -4,6 +4,7 @@ import { AnimatedSelect, Button, Card, ConfirmDialog, EspecialidadesSkeleton, Ic
 import { useAuth } from '@/features/auth/model/useAuth'
 import { especialidadesApi, type Especialidad, type EspecialidadInput } from '../api/especialidadesApi'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
 type Filtro = 'todas' | 'activas' | 'inactivas'
 type Aviso = { tipo: 'success' | 'error'; texto: string }
@@ -70,6 +71,7 @@ export function EspecialidadesPage() {
     setEditando(null)
     setFormError('')
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (especialidad: Especialidad) => {
@@ -77,7 +79,7 @@ export function EspecialidadesPage() {
     setEditando(especialidad.id)
     setFormError('')
     setMostrarForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {

@@ -22,6 +22,7 @@ import {
   type Column,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { ApiError } from '@/shared/api/apiClient'
 import { rolesApi, type RolResponse } from '../api/rolesApi'
 
@@ -117,6 +118,7 @@ export function RolesPage() {
     setDescripcion('')
     setError('')
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (rol: RolResponse) => {
@@ -125,6 +127,7 @@ export function RolesPage() {
     setDescripcion(rol.descripcion ?? '')
     setError('')
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const guardar = async (e: FormEvent) => {

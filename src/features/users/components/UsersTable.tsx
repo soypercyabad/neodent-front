@@ -3,27 +3,30 @@ import {
   ActionsCell,
   Avatar,
   Badge,
+  Icon,
+  ProtectedImage,
   RowActions,
   Table,
   TableState,
   UsersTableSkeleton,
+  type BadgeTone,
   type Column,
 } from '@/shared/components/ui'
 import { documentTypesApi } from '@/shared/api/documentTypesApi'
 import type { UsuarioInternoResponse } from '../api/usersApi'
 
 const COLUMNS: Column[] = [
-  { label: 'Nombre y apellido' },
+  { label: 'Colaborador' },
+  { label: 'Contacto' },
   { label: 'Roles' },
-  { label: 'Correo' },
   { label: 'Estado', align: 'center' },
   { label: 'Acciones', align: 'center' },
 ]
 
-const NOMBRES_ROL: Record<string, string> = {
-  ADMIN: 'Administrador',
-  RECEPCIONISTA: 'Recepcionista',
-  ODONTOLOGO: 'Odontólogo',
+const ROL_CONFIG: Record<string, { label: string; tone: BadgeTone }> = {
+  ADMIN: { label: 'Administrador', tone: 'purple' },
+  ODONTOLOGO: { label: 'Odontólogo', tone: 'blue' },
+  RECEPCIONISTA: { label: 'Recepcionista', tone: 'teal' },
 }
 
 function estadoUsuario(usuario: UsuarioInternoResponse) {
@@ -42,6 +45,7 @@ function estadoUsuario(usuario: UsuarioInternoResponse) {
 interface UsersTableProps {
   users: UsuarioInternoResponse[]
   loading?: boolean
+  accessToken?: string | null
   usuarioActualId?: number | null
   onDetail: (usuario: UsuarioInternoResponse) => void
   onEdit: (usuario: UsuarioInternoResponse) => void
@@ -51,6 +55,7 @@ interface UsersTableProps {
 export function UsersTable({
   users,
   loading = false,
+  accessToken,
   usuarioActualId,
   onDetail,
   onEdit,
@@ -92,6 +97,10 @@ export function UsersTable({
               .filter(Boolean)
               .join(' ')
 
+            const esOdontologo =
+              usuario.roles.includes('ODONTOLOGO') || Boolean(usuario.odontologoId)
+            const prefijo = esOdontologo ? 'Dr(a). ' : ''
+
             const estado = estadoUsuario(usuario)
             const activo = usuario.estado === 'ACTIVO' && usuario.personalActivo
             const esCuentaPropia = usuario.usuarioId === usuarioActualId
@@ -104,26 +113,69 @@ export function UsersTable({
 
             return (
               <tr key={usuario.usuarioId}>
-                {/* NOMBRE */}
+                {/* COLABORADOR (FOTO/AVATAR + NOMBRE + COP) */}
                 <td>
                   <div className="flex items-center gap-3">
-                    <Avatar
-                      nombre={usuario.nombres}
-                      apellido={usuario.apellidoPaterno}
-                      seed={usuario.usuarioId}
-                      size={44}
-                      animate="hover"
-                      trackCursor={false}
-                    />
+                    {usuario.odontologoId && usuario.fotoNombreArchivo ? (
+                      <div className="size-10 shrink-0 overflow-hidden rounded-full border border-line bg-alt shadow-2xs">
+                        <ProtectedImage
+                          path={`/api/odontologos/${usuario.odontologoId}/foto`}
+                          accessToken={accessToken}
+                          alt={`${prefijo}${nombreCompleto}`}
+                          className="size-full object-cover"
+                          fallback={
+                            <Avatar
+                              nombre={usuario.nombres}
+                              apellido={usuario.apellidoPaterno}
+                              seed={usuario.usuarioId}
+                              size={40}
+                              animate="hover"
+                              trackCursor={false}
+                            />
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <Avatar
+                        nombre={usuario.nombres}
+                        apellido={usuario.apellidoPaterno}
+                        seed={usuario.usuarioId}
+                        size={40}
+                        animate="hover"
+                        trackCursor={false}
+                      />
+                    )}
 
                     <div className="min-w-0">
-                      <p className="font-bold text-ink">{nombreCompleto}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        <span className="font-medium text-ink-soft">
-                          {tipoDocTexto}
-                        </span>{' '}
-                        · <span className="tabular-nums">{usuario.numeroDocumento}</span>
+                      <p className="font-bold text-ink">
+                        {prefijo}{nombreCompleto}
                       </p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        <span className="font-semibold text-ink-soft">{tipoDocTexto}</span>{' '}
+                        <span className="text-muted">·</span>{' '}
+                        <span className="tabular-nums font-medium text-ink">
+                          {usuario.numeroDocumento}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </td>
+
+                {/* CONTACTO (CORREO Y TELÉFONO) */}
+                <td>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex items-center gap-1.5 text-ink-soft">
+                      <Icon name="mail" size={13} className="shrink-0 text-muted" />
+                      <span className="max-w-56 truncate" title={usuario.correo}>
+                        {usuario.correo}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-muted">
+                      <Icon name="phone" size={13} className="shrink-0 text-muted" />
+                      <span className="tabular-nums">
+                        {usuario.telefono || <span className="italic text-muted">Sin teléfono</span>}
+                      </span>
                     </div>
                   </div>
                 </td>
@@ -131,25 +183,19 @@ export function UsersTable({
                 {/* ROLES */}
                 <td>
                   <div className="flex flex-wrap gap-1.5">
-                    {usuario.roles.map(rol => (
-                      <Badge
-                        key={rol}
-                        tone={
-                          rol === 'ODONTOLOGO'
-                            ? 'green'
-                            : rol === 'ADMIN'
-                              ? 'blue'
-                              : 'gray'
-                        }
-                      >
-                        {NOMBRES_ROL[rol] ?? rol}
-                      </Badge>
-                    ))}
+                    {usuario.roles.map(rol => {
+                      const config = ROL_CONFIG[rol] ?? {
+                        label: rol,
+                        tone: 'gray' as const,
+                      }
+                      return (
+                        <Badge key={rol} tone={config.tone}>
+                          {config.label}
+                        </Badge>
+                      )
+                    })}
                   </div>
                 </td>
-
-                {/* CORREO */}
-                <td className="text-ink-soft">{usuario.correo}</td>
 
                 {/* ESTADO */}
                 <td className="text-center">

@@ -18,6 +18,7 @@ import {
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { bookingApi, type BookingBranch } from '@/features/appointments/api/bookingApi'
 import { blocksApi, type AgendaBlock, type CreateAgendaBlock } from '../api/blocksApi'
@@ -252,7 +253,7 @@ export function ScheduleBlocksPage() {
     setEditando(null)
     setMostrarForm(true)
     setAviso(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (bloqueo: AgendaBlock) => {
@@ -275,7 +276,7 @@ export function ScheduleBlocksPage() {
     setEditando(bloqueo.id)
     setMostrarForm(true)
     setAviso(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {

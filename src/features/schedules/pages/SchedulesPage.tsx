@@ -17,6 +17,7 @@ import {
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
+import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { bookingApi, type BookingBranch } from '@/features/appointments/api/bookingApi'
 import { useNavigate } from 'react-router-dom'
@@ -546,6 +547,7 @@ export function SchedulesPage() {
 
     setEditando(null)
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const abrirEditar = (horario: HorarioOdontologo) => {
@@ -567,6 +569,7 @@ export function SchedulesPage() {
 
     setEditando(horario.id)
     setMostrarForm(true)
+    scrollToTopOrElement()
   }
 
   const cerrarForm = () => {
@@ -1042,7 +1045,7 @@ export function SchedulesPage() {
                   {odontologoSeleccionado.numeroColegiatura && (
                     <div className="rounded-xl border border-line bg-surface/90 px-3.5 py-1.5 text-xs font-semibold text-ink shadow-2xs">
                       <span className="mr-1.5 font-medium text-muted">COP:</span>
-                      <span className="font-mono font-bold text-ink">
+                      <span className="font-bold text-ink">
                         {odontologoSeleccionado.numeroColegiatura}
                       </span>
                     </div>

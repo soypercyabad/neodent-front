@@ -13,7 +13,6 @@ const PAGE_SIZE = 10
 
 const COLUMNS: Column[] = [
   { label: 'Paciente' },
-  { label: 'Documento' },
   { label: 'Contacto' },
   { label: 'Cuenta', align: 'center' },
   { label: 'Estado', align: 'center' },
@@ -264,17 +263,13 @@ export function PatientsPage() {
 
                   <div className="min-w-0">
                     <p className="font-bold text-ink">{nombreCompleto(p)}</p>
-                    <p className="mt-1 text-xs text-muted">Paciente #{p.id}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      <span className="font-semibold text-ink-soft">{p.tipoDocumento}</span>{' '}
+                      <span className="text-muted">·</span>{' '}
+                      <span className="tabular-nums font-medium text-ink">{p.numeroDocumento}</span>
+                    </p>
                   </div>
                 </div>
-              </td>
-
-              <td>
-                <p className="text-sm">
-                  <span className="font-semibold text-ink">{p.tipoDocumento}</span>{' '}
-                  <span className="text-muted">·</span>{' '}
-                  <span className="tabular-nums text-ink-soft">{p.numeroDocumento}</span>
-                </p>
               </td>
 
               <td>
