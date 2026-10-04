@@ -28,6 +28,7 @@ import {
 } from '../api/schedulesApi'
 import { blocksApi, type AgendaBlock } from '../api/blocksApi'
 import { ScheduleAgendaTabs } from '../components/ScheduleAgendaTabs'
+import { calcularResumenVigencia } from '../model/scheduleUtils'
 
 const DIAS = [
   { value: '1', label: 'Lunes', short: 'LUN' },
@@ -291,6 +292,15 @@ export function SchedulesPage() {
   const [editando, setEditando] = useState<number | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [confirmar, setConfirmar] = useState<HorarioOdontologo | null>(null)
+
+  const resumenVigencia = useMemo(() => {
+    if (!form.diaSemana || !form.fechaInicioVigencia) return null
+    return calcularResumenVigencia(
+      Number(form.diaSemana),
+      form.fechaInicioVigencia,
+      form.sinFechaFin ? null : form.fechaFinVigencia || null,
+    )
+  }, [form.diaSemana, form.fechaInicioVigencia, form.fechaFinVigencia, form.sinFechaFin])
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -848,6 +858,53 @@ export function SchedulesPage() {
                   />
                 </div>
 
+                {resumenVigencia && !form.sinFechaFin && (
+                  <div className="sm:col-span-2 lg:col-span-4 rounded-xl border border-line bg-alt/50 p-3.5 text-xs">
+                    {resumenVigencia.aviso && (
+                      <div className="mb-2 flex items-start gap-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 text-amber-900">
+                        <Icon name="warning" size={17} className="mt-0.5 shrink-0 text-amber-600" />
+                        <div className="min-w-0">
+                          <p className="font-bold text-amber-950">Aviso sobre fecha de vigencia</p>
+                          <p className="mt-0.5 leading-relaxed text-amber-900">{resumenVigencia.aviso}</p>
+                          {resumenVigencia.fechaAjustadaSugerida && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm(actual => ({
+                                  ...actual,
+                                  fechaFinVigencia: resumenVigencia.fechaAjustadaSugerida!,
+                                }))
+                              }
+                              className="mt-1.5 inline-flex items-center gap-1 font-bold text-brand hover:underline"
+                            >
+                              <span>Ajustar fin de vigencia al {fechaCorta(resumenVigencia.fechaAjustadaSugerida)} →</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-muted font-medium">
+                      <Icon name="calendar" size={15} className="shrink-0 text-brand" />
+                      <span>
+                        {resumenVigencia.count === 0 ? (
+                          <strong className="text-danger">0 turnos efectivos en este periodo</strong>
+                        ) : (
+                          <>
+                            <strong className="text-ink">
+                              {resumenVigencia.count} turno{resumenVigencia.count === 1 ? '' : 's'} de atención efectivo{resumenVigencia.count === 1 ? '' : 's'}
+                            </strong>
+                            {resumenVigencia.primerDia &&
+                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${
+                                resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
+                              })`}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-5 sm:col-span-2 lg:col-span-4">
                   <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
                     Cancelar
@@ -1239,7 +1296,9 @@ export function SchedulesPage() {
                       <p className="mt-1 text-xs text-muted">
                         {bloqueosFechaSeleccionada.length > 0
                           ? 'La excepción registrada se muestra arriba y sigue afectando el calendario.'
-                          : 'No existe un turno vigente para este día.'}
+                          : horariosVisibles.length > 0
+                            ? 'No existe un turno vigente para este día. Puedes revisar y editar los turnos configurados en el listado de abajo.'
+                            : 'No existe un turno vigente para este día.'}
                       </p>
                     </div>
                     ) : (
@@ -1297,16 +1356,16 @@ export function SchedulesPage() {
                   </div>
                 </div>
               </div>
-          </div>
-        )}
-      </Card>
+            </div>
+          )}
+        </Card>
 
       <ConfirmDialog
         open={confirmar !== null}
         title="¿Eliminar horario de atención?"
         description={
           confirmar
-            ? `El turno de ${hora12(confirmar.horaInicio)} a ${hora12(confirmar.horaFin)} dejará de estar disponible en la agenda.`
+            ? `¿Estás seguro de eliminar el turno de ${hora12(confirmar.horaInicio)} a ${hora12(confirmar.horaFin)} los días ${DIAS.find(d => d.value === String(confirmar.diaSemana))?.label.toLowerCase() ?? ''}? Dejará de estar disponible en la agenda.`
             : undefined
         }
         confirmLabel={procesando ? 'Eliminando…' : 'Eliminar horario'}
