@@ -530,17 +530,24 @@ export function PatientForm({
           </Field>
         </div>
 
-        <Field label="Correo electrónico" error={errors.email}>
-          <Input
-            type="email"
-            icon="mail"
-            placeholder="paciente@correo.com"
-            value={values.email}
-            onChange={e => set('email', e.target.value)}
-            disabled={saving}
-            trailing={indicator('email', emailOk)}
-          />
-        </Field>
+        <div>
+          <Field label="Correo electrónico" error={errors.email}>
+            <Input
+              type="email"
+              icon="mail"
+              placeholder="paciente@correo.com"
+              value={values.email}
+              onChange={e => set('email', e.target.value)}
+              disabled={saving}
+              trailing={indicator('email', emailOk)}
+            />
+          </Field>
+          {editing && paciente?.tieneCuenta && (
+            <p className="mt-1.5 text-xs text-ink-soft">
+              Nota: Al modificar el correo de un paciente con cuenta, se actualizará su credencial de acceso y su cuenta pasará a <span className="font-semibold text-warning">Pendiente</span> hasta verificar el nuevo correo.
+            </p>
+          )}
+        </div>
 
         <Field label="Dirección">
           <Input
