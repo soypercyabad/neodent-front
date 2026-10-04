@@ -9,6 +9,7 @@ export interface UsuarioInternoResponse {
 
   personalId: number
   tipoDocumentoId: number
+  tipoDocumentoCodigo?: string
   numeroDocumento: string
   nombres: string
   apellidoPaterno: string

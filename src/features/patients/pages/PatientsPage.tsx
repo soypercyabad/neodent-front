@@ -270,8 +270,11 @@ export function PatientsPage() {
               </td>
 
               <td>
-                <p className="font-medium text-ink">{p.tipoDocumento}</p>
-                <p className="mt-1 text-xs tabular-nums text-muted">{p.numeroDocumento}</p>
+                <p className="text-sm">
+                  <span className="font-semibold text-ink">{p.tipoDocumento}</span>{' '}
+                  <span className="text-muted">·</span>{' '}
+                  <span className="tabular-nums text-ink-soft">{p.numeroDocumento}</span>
+                </p>
               </td>
 
               <td>

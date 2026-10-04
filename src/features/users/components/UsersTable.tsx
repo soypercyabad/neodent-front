@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   ActionsCell,
   Avatar,
@@ -8,6 +9,7 @@ import {
   UsersTableSkeleton,
   type Column,
 } from '@/shared/components/ui'
+import { documentTypesApi } from '@/shared/api/documentTypesApi'
 import type { UsuarioInternoResponse } from '../api/usersApi'
 
 const COLUMNS: Column[] = [
@@ -54,6 +56,21 @@ export function UsersTable({
   onEdit,
   onToggle,
 }: UsersTableProps) {
+  const [tiposDoc, setTiposDoc] = useState<Record<number, string>>({})
+
+  useEffect(() => {
+    documentTypesApi
+      .listar()
+      .then(lista => {
+        const mapa: Record<number, string> = {}
+        for (const t of lista) {
+          mapa[t.id] = t.codigo
+        }
+        setTiposDoc(mapa)
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <Table columns={COLUMNS}>
       {loading ? (
@@ -80,6 +97,10 @@ export function UsersTable({
             const esCuentaPropia = usuario.usuarioId === usuarioActualId
             const puedeCambiarEstado =
               usuario.estado === 'INACTIVO' || usuario.estado === 'ACTIVO'
+            const tipoDocTexto =
+              usuario.tipoDocumentoCodigo ||
+              tiposDoc[usuario.tipoDocumentoId] ||
+              'DOC'
 
             return (
               <tr key={usuario.usuarioId}>
@@ -98,8 +119,10 @@ export function UsersTable({
                     <div className="min-w-0">
                       <p className="font-bold text-ink">{nombreCompleto}</p>
                       <p className="mt-1 text-xs text-muted">
-                        <span className="font-medium">Doc. Nº:</span>{' '}
-                        <span className="tabular-nums">{usuario.numeroDocumento}</span>
+                        <span className="font-medium text-ink-soft">
+                          {tipoDocTexto}
+                        </span>{' '}
+                        · <span className="tabular-nums">{usuario.numeroDocumento}</span>
                       </p>
                     </div>
                   </div>
