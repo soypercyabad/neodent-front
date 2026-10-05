@@ -8,6 +8,7 @@ import { EMAIL_RE, MIN_PASSWORD } from '@/shared/lib/validation'
 import { authApi } from '../api/authApi'
 import type { RegisterInput } from '../model/auth.types'
 import { SecurityVerification } from './SecurityVerification'
+import { legalApi } from '@/features/legal'
 
 type Errors = Partial<Record<keyof RegisterInput, string>>
 type DocumentStatus = 'idle' | 'waiting' | 'checking' | 'valid' | 'conflict' | 'error'
@@ -548,10 +549,11 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
           label={
             <>Estoy de acuerdo con los{' '}
               <a
-                href={import.meta.env.VITE_TERMINOS_URL || `${import.meta.env.VITE_API_URL || ''}/api/terminos-condiciones`}
+                href={legalApi.getUrlDescarga()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-brand hover:underline inline-flex items-center gap-1"
+                title="Abrir Términos y Condiciones oficiales"
               >
                 Términos y condiciones
               </a>

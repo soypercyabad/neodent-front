@@ -26,69 +26,102 @@ import {
   type ToastAviso,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
-import { legalApi, type TerminosCondicionesItem } from '../api/legalApi'
+import {
+  legalApi,
+  type TerminosCondicionesItem,
+  type AceptacionTerminosItem,
+} from '../api/legalApi'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
-const COLUMNS: Column[] = [
+const COLUMNS_VERSIONES: Column[] = [
   { key: 'version', label: 'Versión', sortable: true },
-  { key: 'titulo', label: 'Título / Documento', sortable: true },
-  { key: 'claveS3', label: 'Clave S3', sortable: true },
-  { key: 'tamanoBytes', label: 'Tamaño', sortable: true },
+  { key: 'titulo', label: 'Nombre', sortable: true },
   { key: 'fechaCreacion', label: 'Fecha de Registro', sortable: true },
   { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
-const POR_PAGINA = 10
+const COLUMNS_ACEPTACIONES: Column[] = [
+  { key: 'nombreCompleto', label: 'Persona / Usuario', sortable: true },
+  { key: 'versionTerminos', label: 'Versión', align: 'center', sortable: true },
+  { key: 'aceptadoEn', label: 'Fecha de Aceptación', sortable: true },
+  { key: 'ip', label: 'IP', sortable: true },
+]
+
+const POR_PAGINA_VERSIONES = 8
+const POR_PAGINA_ACEPTACIONES = 8
 
 type FiltroEstado = '' | 'activas' | 'inactivas'
 
 export function AdminTermsPage() {
   const { accessToken } = useAuth()
-  const [versiones, setVersiones] = useState<TerminosCondicionesItem[]>([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState('')
-  const [aviso, setAviso] = useState<ToastAviso | null>(null)
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('')
-  const [pagina, setPagina] = useState(1)
 
-  // Expandable form state
+  // Versiones states
+  const [versiones, setVersiones] = useState<TerminosCondicionesItem[]>([])
+  const [cargandoVersiones, setCargandoVersiones] = useState(true)
+  const [errorVersiones, setErrorVersiones] = useState('')
+  const [busquedaVersiones, setBusquedaVersiones] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('')
+  const [paginaVersiones, setPaginaVersiones] = useState(1)
+
+  // Aceptaciones states (solo visual)
+  const [aceptaciones, setAceptaciones] = useState<AceptacionTerminosItem[]>([])
+  const [cargandoAceptaciones, setCargandoAceptaciones] = useState(true)
+  const [errorAceptaciones, setErrorAceptaciones] = useState('')
+  const [busquedaAceptaciones, setBusquedaAceptaciones] = useState('')
+  const [filtroVersionAceptacion, setFiltroVersionAceptacion] = useState('')
+  const [paginaAceptaciones, setPaginaAceptaciones] = useState(1)
+
+  // Toast aviso
+  const [aviso, setAviso] = useState<ToastAviso | null>(null)
+
+  // Expandable form state (Crear / Editar)
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [subiendo, setSubiendo] = useState(false)
+  const [editandoItem, setEditandoItem] = useState<TerminosCondicionesItem | null>(null)
+  const [guardando, setGuardando] = useState(false)
   const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null)
   const [titulo, setTitulo] = useState('')
   const [version, setVersion] = useState('')
   const [activarInmediato, setActivarInmediato] = useState(true)
 
-  // Dialog states
-  const [itemToggle, setItemToggle] = useState<TerminosCondicionesItem | null>(null)
+  // Confirm dialogs
+  const [itemActivar, setItemActivar] = useState<TerminosCondicionesItem | null>(null)
   const [itemEliminar, setItemEliminar] = useState<TerminosCondicionesItem | null>(null)
-  const [procesando, setProcesando] = useState(false)
+  const [procesandoAccion, setProcesandoAccion] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const cargarVersiones = async () => {
-    if (!accessToken) {
-      setCargando(false)
-      setError('No se encontró una sesión activa.')
-      return
-    }
-
+    if (!accessToken) return
     try {
-      setCargando(true)
-      setError('')
+      setCargandoVersiones(true)
+      setErrorVersiones('')
       const data = await legalApi.listarVersiones(accessToken)
       setVersiones(data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudieron cargar las versiones de términos.')
+      setErrorVersiones(e instanceof Error ? e.message : 'No se pudieron cargar las versiones.')
     } finally {
-      setCargando(false)
+      setCargandoVersiones(false)
+    }
+  }
+
+  const cargarAceptaciones = async () => {
+    if (!accessToken) return
+    try {
+      setCargandoAceptaciones(true)
+      setErrorAceptaciones('')
+      const data = await legalApi.listarAceptaciones(accessToken)
+      setAceptaciones(data)
+    } catch (e) {
+      setErrorAceptaciones(e instanceof Error ? e.message : 'No se pudieron cargar las aceptaciones.')
+    } finally {
+      setCargandoAceptaciones(false)
     }
   }
 
   useEffect(() => {
     cargarVersiones()
+    cargarAceptaciones()
   }, [accessToken])
 
   useEffect(() => {
@@ -101,6 +134,7 @@ export function AdminTermsPage() {
   }, [aviso])
 
   const abrirNuevo = () => {
+    setEditandoItem(null)
     setArchivoSeleccionado(null)
     setTitulo('')
     setVersion(`v${versiones.length + 1}.0`)
@@ -109,9 +143,28 @@ export function AdminTermsPage() {
     scrollToTopOrElement()
   }
 
+  const abrirEditar = (item: TerminosCondicionesItem) => {
+    setEditandoItem(item)
+    setArchivoSeleccionado(null)
+    setTitulo(item.titulo)
+    setVersion(item.version)
+    setActivarInmediato(item.activo)
+    setMostrarForm(true)
+    scrollToTopOrElement()
+  }
+
+  const handleVerDocumento = async (item: TerminosCondicionesItem) => {
+    try {
+      await legalApi.abrirDocumento(item.id, accessToken || undefined)
+    } catch {
+      setAviso({ tipo: 'error', texto: 'No se pudo abrir el documento PDF de términos y condiciones.' })
+    }
+  }
+
   const cerrarForm = () => {
-    if (subiendo) return
+    if (guardando) return
     setMostrarForm(false)
+    setEditandoItem(null)
     setArchivoSeleccionado(null)
     setTitulo('')
     setVersion('')
@@ -122,7 +175,7 @@ export function AdminTermsPage() {
     if (!file) return
 
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      setAviso({ tipo: 'error', texto: 'Solo se permiten archivos en formato PDF.' })
+      setAviso({ tipo: 'error', texto: 'Solo se admiten documentos en formato PDF.' })
       return
     }
 
@@ -139,8 +192,10 @@ export function AdminTermsPage() {
 
   const handleGuardar = async (e: FormEvent) => {
     e.preventDefault()
-    if (!archivoSeleccionado || !accessToken) {
-      setAviso({ tipo: 'error', texto: 'Selecciona un archivo PDF válido.' })
+    if (!accessToken) return
+
+    if (!editandoItem && !archivoSeleccionado) {
+      setAviso({ tipo: 'error', texto: 'Debes seleccionar un archivo PDF para la nueva versión.' })
       return
     }
 
@@ -148,65 +203,86 @@ export function AdminTermsPage() {
     const tituloLimpio = titulo.trim() || `Términos y Condiciones ${versionLimpia}`
 
     try {
-      setSubiendo(true)
-      const res = await legalApi.subirVersion(
-        archivoSeleccionado,
-        tituloLimpio,
-        versionLimpia,
-        activarInmediato,
-        accessToken,
-      )
+      setGuardando(true)
 
-      setAviso({
-        tipo: 'success',
-        texto: `Versión ${res.version} subida y almacenada en S3 exitosamente.`,
-      })
+      if (editandoItem) {
+        await legalApi.editarVersion(
+          editandoItem.id,
+          tituloLimpio,
+          versionLimpia,
+          archivoSeleccionado,
+          activarInmediato,
+          accessToken,
+        )
+        setAviso({
+          tipo: 'success',
+          texto: `Versión ${versionLimpia} actualizada exitosamente.`,
+        })
+      } else {
+        const res = await legalApi.subirVersion(
+          archivoSeleccionado!,
+          tituloLimpio,
+          versionLimpia,
+          activarInmediato,
+          accessToken,
+        )
+        setAviso({
+          tipo: 'success',
+          texto: `Versión ${res.version} subida y guardada en S3 exitosamente.`,
+        })
+      }
 
       cerrarForm()
       cargarVersiones()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error al subir la versión a S3.'
+      const msg = err instanceof Error ? err.message : 'No se pudo guardar la versión en S3.'
       setAviso({ tipo: 'error', texto: msg })
     } finally {
-      setSubiendo(false)
+      setGuardando(false)
     }
   }
 
-  const confirmarToggleEstado = async () => {
-    if (!itemToggle || !accessToken) return
-    const nuevoEstado = !itemToggle.activo
+  const confirmarActivar = async () => {
+    if (!itemActivar || !accessToken) return
 
     try {
-      setProcesando(true)
-      await legalApi.cambiarEstado(itemToggle.id, nuevoEstado, accessToken)
+      setProcesandoAccion(true)
+      await legalApi.cambiarEstado(itemActivar.id, true, accessToken)
       setAviso({
         tipo: 'success',
-        texto: nuevoEstado
-          ? `Versión ${itemToggle.version} activada como la oficial para los pacientes.`
-          : `Versión ${itemToggle.version} desactivada.`,
+        texto: `Versión ${itemActivar.version} activada como la oficial para los pacientes.`,
       })
-      setItemToggle(null)
+      setItemActivar(null)
       cargarVersiones()
     } catch (e) {
       setAviso({
         tipo: 'error',
-        texto: e instanceof Error ? e.message : 'No se pudo actualizar el estado de la versión.',
+        texto: e instanceof Error ? e.message : 'No se pudo activar la versión.',
       })
-      setItemToggle(null)
+      setItemActivar(null)
     } finally {
-      setProcesando(false)
+      setProcesandoAccion(false)
     }
   }
 
-  const confirmarEliminarVersion = async () => {
+  const confirmarEliminar = async () => {
     if (!itemEliminar || !accessToken) return
 
+    if (itemEliminar.activo) {
+      setAviso({
+        tipo: 'error',
+        texto: 'No se puede eliminar la versión oficial activa.',
+      })
+      setItemEliminar(null)
+      return
+    }
+
     try {
-      setProcesando(true)
+      setProcesandoAccion(true)
       await legalApi.eliminarVersion(itemEliminar.id, accessToken)
       setAviso({
         tipo: 'success',
-        texto: `Versión ${itemEliminar.version} eliminada de S3 y del sistema.`,
+        texto: `Versión ${itemEliminar.version} eliminada correctamente de S3 y del sistema.`,
       })
       setItemEliminar(null)
       cargarVersiones()
@@ -217,16 +293,8 @@ export function AdminTermsPage() {
       })
       setItemEliminar(null)
     } finally {
-      setProcesando(false)
+      setProcesandoAccion(false)
     }
-  }
-
-  const formatoTamano = (bytes: number) => {
-    if (!bytes || bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
   }
 
   const formatoFecha = (fechaStr: string) => {
@@ -245,51 +313,94 @@ export function AdminTermsPage() {
     }
   }
 
-  // Filtrado
-  const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
+  // Filtrado y ordenamiento de Versiones
+  const versionesFiltradas = useMemo(() => {
+    const q = busquedaVersiones.trim().toLowerCase()
     return versiones.filter(item => {
       if (q) {
-        const busqMatch =
+        const coincide =
           item.version.toLowerCase().includes(q) ||
-          item.titulo.toLowerCase().includes(q) ||
-          item.claveS3.toLowerCase().includes(q) ||
-          item.nombreArchivo.toLowerCase().includes(q)
-        if (!busqMatch) return false
+          item.titulo.toLowerCase().includes(q)
+        if (!coincide) return false
       }
       if (filtroEstado === 'activas' && !item.activo) return false
       if (filtroEstado === 'inactivas' && item.activo) return false
       return true
     })
-  }, [versiones, busqueda, filtroEstado])
+  }, [versiones, busquedaVersiones, filtroEstado])
 
-  // Ordenamiento con useTableSort
-  const { sortColumn, sortDirection, handleSort, sortedItems } = useTableSort(filtrados, {
+  const {
+    sortColumn: sortColVer,
+    sortDirection: sortDirVer,
+    handleSort: handleSortVer,
+    sortedItems: sortedVersiones,
+  } = useTableSort(versionesFiltradas, {
     initialColumn: 'version',
     initialDirection: 'desc',
   })
 
-  // Paginación
-  const totalPaginas = Math.max(1, Math.ceil(sortedItems.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const inicio = (paginaActual - 1) * POR_PAGINA
-  const visibles = sortedItems.slice(inicio, inicio + POR_PAGINA)
+  const totalPagsVer = Math.max(1, Math.ceil(sortedVersiones.length / POR_PAGINA_VERSIONES))
+  const pagActVer = Math.min(paginaVersiones, totalPagsVer)
+  const inicioVer = (pagActVer - 1) * POR_PAGINA_VERSIONES
+  const versionesVisibles = sortedVersiones.slice(inicioVer, inicioVer + POR_PAGINA_VERSIONES)
+
+  // Filtrado y ordenamiento de Aceptaciones (solo visual)
+  const aceptacionesFiltradas = useMemo(() => {
+    const q = busquedaAceptaciones.trim().toLowerCase()
+    return aceptaciones.filter(item => {
+      if (q) {
+        const coincide =
+          item.nombreCompleto.toLowerCase().includes(q) ||
+          item.correo.toLowerCase().includes(q) ||
+          (item.numeroDocumento && item.numeroDocumento.toLowerCase().includes(q))
+        if (!coincide) return false
+      }
+      if (filtroVersionAceptacion && item.versionTerminos !== filtroVersionAceptacion) {
+        return false
+      }
+      return true
+    })
+  }, [aceptaciones, busquedaAceptaciones, filtroVersionAceptacion])
+
+  const {
+    sortColumn: sortColAcep,
+    sortDirection: sortDirAcep,
+    handleSort: handleSortAcep,
+    sortedItems: sortedAceptaciones,
+  } = useTableSort(aceptacionesFiltradas, {
+    initialColumn: 'aceptadoEn',
+    initialDirection: 'desc',
+  })
+
+  const totalPagsAcep = Math.max(1, Math.ceil(sortedAceptaciones.length / POR_PAGINA_ACEPTACIONES))
+  const pagActAcep = Math.min(paginaAceptaciones, totalPagsAcep)
+  const inicioAcep = (pagActAcep - 1) * POR_PAGINA_ACEPTACIONES
+  const aceptacionesVisibles = sortedAceptaciones.slice(inicioAcep, inicioAcep + POR_PAGINA_ACEPTACIONES)
+
+  const opcionesVersionesAceptacion = useMemo(() => {
+    const setVers = new Set(versiones.map(v => v.version))
+    return [
+      { value: '', label: 'Todas las versiones' },
+      ...Array.from(setVers).map(v => ({ value: v, label: `Versión ${v}` })),
+    ]
+  }, [versiones])
 
   return (
     <>
       <PageHead
         title="Legales (S3)"
-        description="Gestiona y versiona los documentos oficiales de Términos y Condiciones en S3 / Cloudflare R2."
+        description="Gestiona los documentos oficiales de Términos y Condiciones en S3/R2 y audita las aceptaciones de pacientes."
         actions={
-          <Button icon="plus" onClick={abrirNuevo} disabled={subiendo || procesando}>
+          <Button icon="plus" onClick={abrirNuevo} disabled={guardando || procesandoAccion}>
             Subir versión
           </Button>
         }
       />
 
+      {/* Notificaciones Toast flotantes en la esquina inferior derecha */}
       <Toast aviso={aviso} onClose={() => setAviso(null)} />
 
-      {/* FORMULARIO EXPANDIBLE (PATRÓN ESTÁNDAR DEL PROYECTO) */}
+      {/* FORMULARIO EXPANDIBLE DE SUBIDA / EDICIÓN */}
       <AnimatePresence>
         {mostrarForm && (
           <motion.div
@@ -297,14 +408,18 @@ export function AdminTermsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="mb-5"
+            className="mb-6"
           >
             <Card className="border-brand/30 p-5 sm:p-6">
               <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-ink">Subir nueva versión de términos</h2>
+                  <h2 className="text-lg font-bold text-ink">
+                    {editandoItem ? `Editar versión ${editandoItem.version}` : 'Subir nueva versión de términos'}
+                  </h2>
                   <p className="mt-1 text-sm text-muted">
-                    Carga el archivo PDF directamente a tu almacenamiento en S3 y defínelo como oficial.
+                    {editandoItem
+                      ? 'Actualiza el nombre, código o reemplaza el PDF oficial en S3.'
+                      : 'Carga el documento PDF directamente a tu almacenamiento en S3.'}
                   </p>
                 </div>
 
@@ -312,7 +427,7 @@ export function AdminTermsPage() {
                   type="button"
                   aria-label="Cerrar formulario"
                   onClick={cerrarForm}
-                  disabled={subiendo}
+                  disabled={guardando}
                   className="rounded-lg p-2 text-muted transition hover:bg-alt"
                 >
                   <Icon name="x" size={20} />
@@ -322,7 +437,7 @@ export function AdminTermsPage() {
               <form onSubmit={handleGuardar} className="grid gap-4">
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Documento PDF <span className="text-danger">*</span>
+                    Documento PDF {editandoItem ? '(Opcional para reemplazar)' : <span className="text-danger">*</span>}
                   </span>
 
                   <input
@@ -336,13 +451,20 @@ export function AdminTermsPage() {
 
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line hover:border-brand/50 hover:bg-brand-soft/20 cursor-pointer p-5 transition-colors text-center"
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line hover:border-brand/50 hover:bg-brand-soft/20 cursor-pointer p-4 transition-colors text-center"
                   >
-                    <Icon name="file" size={28} className="text-brand" />
+                    <Icon name="file" size={26} className="text-brand" />
                     {archivoSeleccionado ? (
                       <div>
                         <span className="text-sm font-bold text-ink block">{archivoSeleccionado.name}</span>
-                        <span className="text-xs text-brand font-medium">{formatoTamano(archivoSeleccionado.size)}</span>
+                        <span className="text-xs text-brand font-medium">Archivo seleccionado listo para subir</span>
+                      </div>
+                    ) : editandoItem ? (
+                      <div>
+                        <span className="text-xs font-bold text-brand hover:underline block">
+                          Archivo actual: {editandoItem.nombreArchivo}
+                        </span>
+                        <span className="text-[11px] text-muted">Haz clic aquí si deseas subir un PDF de reemplazo</span>
                       </div>
                     ) : (
                       <div>
@@ -363,17 +485,18 @@ export function AdminTermsPage() {
                       placeholder="Ej. v1.1 o v2.0"
                       value={version}
                       onChange={e => setVersion(e.target.value)}
-                      disabled={subiendo}
+                      disabled={guardando}
                     />
                   </Field>
 
-                  <Field label="Título descriptivo">
+                  <Field label="Nombre del documento *">
                     <Input
                       icon="file"
+                      required
                       placeholder="Ej. Términos y Condiciones 2026"
                       value={titulo}
                       onChange={e => setTitulo(e.target.value)}
-                      disabled={subiendo}
+                      disabled={guardando}
                     />
                   </Field>
                 </div>
@@ -383,24 +506,24 @@ export function AdminTermsPage() {
                     <Checkbox
                       checked={activarInmediato}
                       onChange={e => setActivarInmediato(e.target.checked)}
-                      disabled={subiendo}
+                      disabled={guardando}
                     />
                     <div className="text-xs">
-                      <span className="font-bold text-ink block">Activar inmediatamente</span>
+                      <span className="font-bold text-ink block">Activar como versión oficial</span>
                       <span className="text-muted">
-                        Esta versión se convertirá en la oficial para los pacientes durante el registro.
+                        Esta versión será la que firmen o acepten los pacientes durante su registro.
                       </span>
                     </div>
                   </label>
                 </div>
 
                 <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={subiendo}>
+                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
                     Cancelar
                   </Button>
 
-                  <Button type="submit" disabled={subiendo || !archivoSeleccionado}>
-                    {subiendo ? 'Subiendo a S3…' : 'Subir y guardar en S3'}
+                  <Button type="submit" disabled={guardando || (!editandoItem && !archivoSeleccionado)}>
+                    {guardando ? 'Guardando en S3…' : editandoItem ? 'Guardar cambios' : 'Subir y guardar en S3'}
                   </Button>
                 </div>
               </form>
@@ -409,157 +532,263 @@ export function AdminTermsPage() {
         )}
       </AnimatePresence>
 
-      {/* TABLA PRINCIPAL (PATRÓN ESTÁNDAR DEL PROYECTO) */}
-      <Card>
-        <Toolbar>
-          <SearchInput
-            placeholder="Buscar por versión, título o clave S3…"
-            value={busqueda}
-            onChange={e => {
-              setBusqueda(e.target.value)
-              setPagina(1)
-            }}
-            onClear={() => {
-              setBusqueda('')
-              setPagina(1)
-            }}
-            className="w-full sm:min-w-56 sm:flex-1"
-          />
+      {/* LAYOUT EN 2 PANELES: VERSIONES (IZQUIERDA) Y ACEPTACIONES (DERECHA) */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        {/* PANEL IZQUIERDO: VERSIONES DE TÉRMINOS (CRUD) */}
+        <div className="xl:col-span-7">
+          <Card>
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="font-bold text-ink">Versiones de Términos</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Documentos registrados en S3. La versión activa no puede eliminarse ni desactivarse directamente.
+              </p>
+            </div>
 
-          <AnimatedSelect
-            label="Estado"
-            value={filtroEstado}
-            onChange={val => {
-              setFiltroEstado(val as FiltroEstado)
-              setPagina(1)
-            }}
-            options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'activas', label: 'Activas' },
-              { value: 'inactivas', label: 'Inactivas' },
-            ]}
-            className="w-full sm:w-44"
-          />
-        </Toolbar>
-
-        <Table
-          columns={COLUMNS}
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-        >
-          {cargando ? (
-            <TableSkeletonRows rows={POR_PAGINA} cols={COLUMNS.length} />
-          ) : (
-            <>
-              <TableState
-                colSpan={COLUMNS.length}
-                error={error && !mostrarForm ? error : null}
-                empty={!error && filtrados.length === 0}
-                emptyLabel="No hay versiones de términos registradas en el sistema."
+            <Toolbar>
+              <SearchInput
+                placeholder="Buscar por versión o nombre…"
+                value={busquedaVersiones}
+                onChange={e => {
+                  setBusquedaVersiones(e.target.value)
+                  setPaginaVersiones(1)
+                }}
+                onClear={() => {
+                  setBusquedaVersiones('')
+                  setPaginaVersiones(1)
+                }}
+                className="w-full sm:min-w-44 sm:flex-1"
               />
 
-              {visibles.map(item => (
-                <tr key={item.id}>
-                  <td>
-                    <span className="font-mono font-bold text-xs bg-brand-soft text-brand px-2 py-0.5 rounded">
-                      {item.version}
-                    </span>
-                  </td>
+              <AnimatedSelect
+                label="Estado"
+                value={filtroEstado}
+                onChange={val => {
+                  setFiltroEstado(val as FiltroEstado)
+                  setPaginaVersiones(1)
+                }}
+                options={[
+                  { value: '', label: 'Todos los estados' },
+                  { value: 'activas', label: 'Activas' },
+                  { value: 'inactivas', label: 'Inactivas' },
+                ]}
+                className="w-full sm:w-40"
+              />
+            </Toolbar>
 
-                  <td>
-                    <div className="font-bold text-ink">{item.titulo}</div>
-                    <div className="text-xs text-muted">{item.nombreArchivo}</div>
-                  </td>
+            <Table
+              columns={COLUMNS_VERSIONES}
+              sortColumn={sortColVer}
+              sortDirection={sortDirVer}
+              onSort={handleSortVer}
+            >
+              {cargandoVersiones ? (
+                <TableSkeletonRows rows={POR_PAGINA_VERSIONES} cols={COLUMNS_VERSIONES.length} />
+              ) : (
+                <>
+                  <TableState
+                    colSpan={COLUMNS_VERSIONES.length}
+                    error={errorVersiones}
+                    empty={!errorVersiones && versionesFiltradas.length === 0}
+                    emptyLabel="No hay versiones de términos registradas."
+                  />
 
-                  <td>
-                    <code className="text-xs text-ink-soft bg-alt px-2 py-0.5 rounded border border-line max-w-[220px] truncate block font-mono">
-                      {item.claveS3}
-                    </code>
-                  </td>
+                  {versionesVisibles.map(item => (
+                      <tr key={item.id}>
+                        <td>
+                          <span className="font-mono font-bold text-xs bg-brand-soft text-brand px-2 py-0.5 rounded">
+                            {item.version}
+                          </span>
+                        </td>
 
-                  <td className="text-xs text-ink-soft whitespace-nowrap">
-                    {formatoTamano(item.tamanoBytes)}
-                  </td>
+                        <td>
+                          <div className="text-xs text-black">{item.titulo}</div>
+                        </td>
 
-                  <td className="text-xs text-muted whitespace-nowrap">
-                    {formatoFecha(item.fechaCreacion)}
-                  </td>
+                        <td className="text-xs text-muted whitespace-nowrap">
+                          {formatoFecha(item.fechaCreacion)}
+                        </td>
 
-                  <td className="text-center">
-                    <div className="flex justify-center">
-                      <Badge tone={item.activo ? 'green' : 'gray'}>
-                        {item.activo ? 'Activa' : 'Inactiva'}
-                      </Badge>
-                    </div>
-                  </td>
+                        <td className="text-center">
+                          <div className="flex justify-center">
+                            <Badge tone={item.activo ? 'green' : 'gray'}>
+                              {item.activo ? 'Activa' : 'Inactiva'}
+                            </Badge>
+                          </div>
+                        </td>
 
-                  <ActionsCell align="center">
-                    <RowActions
-                      actions={[
-                        {
-                          label: 'Ver documento PDF',
-                          icon: 'externalLink',
-                          onClick: () => window.open(legalApi.getUrlDescarga(item.id), '_blank'),
-                        },
-                        {
-                          label: item.activo ? 'Desactivar versión' : 'Activar como oficial',
-                          icon: item.activo ? 'xCircle' : 'checkCircle',
-                          onClick: () => setItemToggle(item),
-                          variant: item.activo ? 'danger' : 'success',
-                        },
-                        {
-                          label: 'Eliminar de S3',
-                          icon: 'trash',
-                          onClick: () => setItemEliminar(item),
-                          variant: 'danger',
-                        },
-                      ]}
-                    />
-                  </ActionsCell>
-                </tr>
-              ))}
-            </>
-          )}
-        </Table>
+                        <ActionsCell align="center">
+                          <RowActions
+                            actions={[
+                              {
+                                label: 'Ver documento (PDF)',
+                                icon: 'externalLink',
+                                onClick: () => handleVerDocumento(item),
+                              },
+                              {
+                                label: 'Editar versión',
+                                icon: 'edit',
+                                onClick: () => abrirEditar(item),
+                              },
+                              {
+                                label: 'Activar como oficial',
+                                icon: 'checkCircle',
+                                show: !item.activo,
+                                onClick: () => setItemActivar(item),
+                                variant: 'success',
+                              },
+                              {
+                                label: 'Eliminar de S3',
+                                icon: 'trash',
+                                show: !item.activo,
+                                onClick: () => setItemEliminar(item),
+                                variant: 'danger',
+                              },
+                            ]}
+                          />
+                        </ActionsCell>
+                      </tr>
+                    ))}
+                  </>
+              )}
+            </Table>
 
-        {filtrados.length > 0 && (
-          <TableFoot
-            summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, filtrados.length)} de ${filtrados.length} versiones`}
-          >
-            <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
-          </TableFoot>
-        )}
-      </Card>
+            {versionesFiltradas.length > 0 && (
+              <TableFoot
+                summary={`Mostrando ${inicioVer + 1}–${Math.min(inicioVer + POR_PAGINA_VERSIONES, versionesFiltradas.length)} de ${versionesFiltradas.length} versiones`}
+              >
+                <Pagination page={pagActVer} totalPages={totalPagsVer} onChange={setPaginaVersiones} />
+              </TableFoot>
+            )}
+          </Card>
+        </div>
 
-      {/* DIÁLOGOS DE CONFIRMACIÓN */}
+        {/* PANEL DERECHO: PERSONAS QUE ACEPTARON LOS TÉRMINOS (SOLO VISUAL) */}
+        <div className="xl:col-span-5">
+          <Card>
+            <div className="border-b border-line px-5 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-ink">Aceptaciones Registradas</h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  Registro de auditoría de pacientes y usuarios que aceptaron los términos.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-brand bg-brand-soft px-2.5 py-1 rounded-full whitespace-nowrap">
+                {aceptaciones.length} {aceptaciones.length === 1 ? 'firma' : 'firmas'}
+              </span>
+            </div>
+
+            <Toolbar>
+              <SearchInput
+                placeholder="Buscar persona o correo…"
+                value={busquedaAceptaciones}
+                onChange={e => {
+                  setBusquedaAceptaciones(e.target.value)
+                  setPaginaAceptaciones(1)
+                }}
+                onClear={() => {
+                  setBusquedaAceptaciones('')
+                  setPaginaAceptaciones(1)
+                }}
+                className="w-full sm:min-w-44 sm:flex-1"
+              />
+
+              {opcionesVersionesAceptacion.length > 2 && (
+                <AnimatedSelect
+                  label="Versión"
+                  value={filtroVersionAceptacion}
+                  onChange={val => {
+                    setFiltroVersionAceptacion(val)
+                    setPaginaAceptaciones(1)
+                  }}
+                  options={opcionesVersionesAceptacion}
+                  className="w-full sm:w-36"
+                />
+              )}
+            </Toolbar>
+
+            <Table
+              columns={COLUMNS_ACEPTACIONES}
+              sortColumn={sortColAcep}
+              sortDirection={sortDirAcep}
+              onSort={handleSortAcep}
+            >
+              {cargandoAceptaciones ? (
+                <TableSkeletonRows rows={POR_PAGINA_ACEPTACIONES} cols={COLUMNS_ACEPTACIONES.length} />
+              ) : (
+                <>
+                  <TableState
+                    colSpan={COLUMNS_ACEPTACIONES.length}
+                    error={errorAceptaciones}
+                    empty={!errorAceptaciones && aceptacionesFiltradas.length === 0}
+                    emptyLabel="No hay aceptaciones de términos registradas."
+                  />
+
+                  {aceptacionesVisibles.map(item => (
+                    <tr key={item.id}>
+                      <td>
+                        <div className="font-bold text-ink">{item.nombreCompleto}</div>
+                        <div className="text-xs text-muted truncate max-w-[170px]" title={item.correo}>
+                          {item.correo}
+                        </div>
+                      </td>
+
+                      <td className="text-center whitespace-nowrap">
+                        <span className="font-mono text-xs font-semibold bg-alt text-ink-soft px-2 py-0.5 rounded border border-line">
+                          {item.versionTerminos}
+                        </span>
+                      </td>
+
+                      <td className="text-xs text-muted whitespace-nowrap">
+                        {formatoFecha(item.aceptadoEn)}
+                      </td>
+
+                      <td className="text-xs font-mono text-ink-soft whitespace-nowrap">
+                        {item.ip || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
+            </Table>
+
+            {aceptacionesFiltradas.length > 0 && (
+              <TableFoot
+                summary={`Mostrando ${inicioAcep + 1}–${Math.min(inicioAcep + POR_PAGINA_ACEPTACIONES, aceptacionesFiltradas.length)} de ${aceptacionesFiltradas.length} aceptaciones`}
+              >
+                <Pagination page={pagActAcep} totalPages={totalPagsAcep} onChange={setPaginaAceptaciones} />
+              </TableFoot>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      {/* DIÁLOGO PARA ACTIVAR COMO OFICIAL */}
       <ConfirmDialog
-        open={itemToggle !== null}
-        title={itemToggle?.activo ? '¿Desactivar versión?' : '¿Activar versión como oficial?'}
+        open={itemActivar !== null}
+        title="¿Activar versión como oficial?"
         description={
-          itemToggle
-            ? itemToggle.activo
-              ? `La versión ${itemToggle.version} dejará de ser la oficial para los pacientes.`
-              : `La versión ${itemToggle.version} (${itemToggle.nombreArchivo}) será la que acepten los pacientes al registrarse.`
+          itemActivar
+            ? `La versión ${itemActivar.version} (${itemActivar.titulo}) se convertirá en la oficial vigente para todos los pacientes al registrarse.`
             : ''
         }
-        confirmLabel={procesando ? 'Procesando…' : itemToggle?.activo ? 'Desactivar' : 'Activar'}
+        confirmLabel={procesandoAccion ? 'Activando…' : 'Activar como oficial'}
         cancelLabel="Cancelar"
-        onConfirm={confirmarToggleEstado}
-        onCancel={() => setItemToggle(null)}
+        onConfirm={confirmarActivar}
+        onCancel={() => setItemActivar(null)}
       />
 
+      {/* DIÁLOGO PARA ELIMINAR (SOLO INACTIVAS) */}
       <ConfirmDialog
         open={itemEliminar !== null}
         title="¿Eliminar versión de términos?"
         description={
           itemEliminar
-            ? `¿Estás seguro de eliminar la versión ${itemEliminar.version} (${itemEliminar.nombreArchivo}) de S3 y de la base de datos?`
+            ? `¿Estás seguro de eliminar permanentemente la versión ${itemEliminar.version} (${itemEliminar.nombreArchivo}) de S3 y del sistema?`
             : ''
         }
-        confirmLabel={procesando ? 'Eliminando…' : 'Sí, eliminar de S3'}
+        confirmLabel={procesandoAccion ? 'Eliminando…' : 'Sí, eliminar de S3'}
         cancelLabel="Cancelar"
-        onConfirm={confirmarEliminarVersion}
+        onConfirm={confirmarEliminar}
         onCancel={() => setItemEliminar(null)}
       />
     </>
