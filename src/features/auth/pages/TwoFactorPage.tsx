@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Alert, Button, Card, Icon, OtpInput } from '@/shared/components/ui'
 import { useAuth } from '../model/useAuth'
 
-const INITIAL_COOLDOWN_SECONDS = 45
+const INITIAL_COOLDOWN_SECONDS = 60
 
 export function TwoFactorPage() {
   const {

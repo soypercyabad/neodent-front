@@ -6,7 +6,7 @@ import { authApi } from '../api/authApi'
 import { useAuth } from '../model/useAuth'
 import type { RegisterInput } from '../model/auth.types'
 
-const INITIAL_COOLDOWN_SECONDS = 45
+const INITIAL_COOLDOWN_SECONDS = 60
 
 interface RegistrationState {
   challengeId: number
