@@ -408,15 +408,15 @@ export function AdminTermsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="mb-6"
+            className="mb-6 min-w-0 max-w-full"
           >
-            <Card className="border-brand/30 p-5 sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
+            <Card className="border-brand/30 p-4 sm:p-6 min-w-0 max-w-full overflow-hidden">
+              <div className="mb-4 sm:mb-5 flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg font-bold text-ink truncate">
                     {editandoItem ? `Editar versión ${editandoItem.version}` : 'Subir nueva versión de términos'}
                   </h2>
-                  <p className="mt-1 text-sm text-muted">
+                  <p className="mt-1 text-xs sm:text-sm text-muted">
                     {editandoItem
                       ? 'Actualiza el nombre, código o reemplaza el PDF oficial en S3.'
                       : 'Carga el documento PDF directamente a tu almacenamiento en S3.'}
@@ -428,14 +428,14 @@ export function AdminTermsPage() {
                   aria-label="Cerrar formulario"
                   onClick={cerrarForm}
                   disabled={guardando}
-                  className="rounded-lg p-2 text-muted transition hover:bg-alt"
+                  className="rounded-lg p-1.5 sm:p-2 text-muted transition hover:bg-alt shrink-0"
                 >
                   <Icon name="x" size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleGuardar} className="grid gap-4">
-                <label className="block">
+              <form onSubmit={handleGuardar} className="grid gap-4 min-w-0 max-w-full">
+                <label className="block min-w-0 max-w-full">
                   <span className="mb-1.5 block text-sm font-semibold text-ink">
                     Documento PDF {editandoItem ? '(Opcional para reemplazar)' : <span className="text-danger">*</span>}
                   </span>
@@ -451,33 +451,33 @@ export function AdminTermsPage() {
 
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line hover:border-brand/50 hover:bg-brand-soft/20 cursor-pointer p-4 transition-colors text-center"
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line hover:border-brand/50 hover:bg-brand-soft/20 cursor-pointer p-3 sm:p-4 transition-colors text-center min-w-0 max-w-full overflow-hidden"
                   >
-                    <Icon name="file" size={26} className="text-brand" />
+                    <Icon name="file" size={26} className="text-brand shrink-0" />
                     {archivoSeleccionado ? (
-                      <div>
-                        <span className="text-sm font-bold text-ink block">{archivoSeleccionado.name}</span>
-                        <span className="text-xs text-brand font-medium">Archivo seleccionado listo para subir</span>
+                      <div className="min-w-0 max-w-full px-2">
+                        <span className="text-sm font-bold text-ink block truncate max-w-[260px] sm:max-w-md mx-auto">{archivoSeleccionado.name}</span>
+                        <span className="text-xs text-brand font-medium block mt-0.5">Archivo seleccionado listo para subir</span>
                       </div>
                     ) : editandoItem ? (
-                      <div>
-                        <span className="text-xs font-bold text-brand hover:underline block">
+                      <div className="min-w-0 max-w-full px-2">
+                        <span className="text-xs font-bold text-brand hover:underline block break-all text-center">
                           Archivo actual: {editandoItem.nombreArchivo}
                         </span>
-                        <span className="text-[11px] text-muted">Haz clic aquí si deseas subir un PDF de reemplazo</span>
+                        <span className="text-[11px] text-muted block mt-0.5">Haz clic aquí si deseas subir un PDF de reemplazo</span>
                       </div>
                     ) : (
-                      <div>
+                      <div className="min-w-0 max-w-full px-2">
                         <span className="text-xs font-bold text-brand hover:underline block">
                           Haz clic aquí para seleccionar el archivo PDF
                         </span>
-                        <span className="text-[11px] text-muted">Tamaño máximo permitido: 10 MB</span>
+                        <span className="text-[11px] text-muted block mt-0.5">Tamaño máximo permitido: 10 MB</span>
                       </div>
                     )}
                   </div>
                 </label>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
                   <Field label="Código de versión *">
                     <Input
                       icon="lock"
@@ -501,28 +501,28 @@ export function AdminTermsPage() {
                   </Field>
                 </div>
 
-                <div className="rounded-xl border border-line bg-alt/40 p-3.5">
-                  <label className="flex items-center gap-2.5 cursor-pointer">
+                <div className="rounded-xl border border-line bg-alt/40 p-3 sm:p-3.5 min-w-0 max-w-full">
+                  <label className="flex items-start sm:items-center gap-2.5 cursor-pointer">
                     <Checkbox
                       checked={activarInmediato}
                       onChange={e => setActivarInmediato(e.target.checked)}
                       disabled={guardando}
                     />
-                    <div className="text-xs">
+                    <div className="text-xs min-w-0 flex-1">
                       <span className="font-bold text-ink block">Activar como versión oficial</span>
-                      <span className="text-muted">
+                      <span className="text-muted block mt-0.5">
                         Esta versión será la que firmen o acepten los pacientes durante su registro.
                       </span>
                     </div>
                   </label>
                 </div>
 
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 border-t border-line pt-4">
+                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando} className="w-full sm:w-auto">
                     Cancelar
                   </Button>
 
-                  <Button type="submit" disabled={guardando || (!editandoItem && !archivoSeleccionado)}>
+                  <Button type="submit" disabled={guardando || (!editandoItem && !archivoSeleccionado)} className="w-full sm:w-auto">
                     {guardando ? 'Guardando en S3…' : editandoItem ? 'Guardar cambios' : 'Subir y guardar en S3'}
                   </Button>
                 </div>
@@ -533,10 +533,10 @@ export function AdminTermsPage() {
       </AnimatePresence>
 
       {/* LAYOUT EN 2 PANELES: VERSIONES (IZQUIERDA) Y ACEPTACIONES (DERECHA) */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 min-w-0 max-w-full">
         {/* PANEL IZQUIERDO: VERSIONES DE TÉRMINOS (CRUD) */}
-        <div className="xl:col-span-7">
-          <Card>
+        <div className="xl:col-span-7 min-w-0 max-w-full">
+          <Card className="min-w-0 max-w-full overflow-hidden">
             <div className="border-b border-line px-5 py-4">
               <h2 className="font-bold text-ink">Versiones de Términos</h2>
               <p className="mt-0.5 text-xs text-muted">
@@ -663,8 +663,8 @@ export function AdminTermsPage() {
         </div>
 
         {/* PANEL DERECHO: PERSONAS QUE ACEPTARON LOS TÉRMINOS (SOLO VISUAL) */}
-        <div className="xl:col-span-5">
-          <Card>
+        <div className="xl:col-span-5 min-w-0 max-w-full">
+          <Card className="min-w-0 max-w-full overflow-hidden">
             <div className="border-b border-line px-5 py-4 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-ink">Aceptaciones Registradas</h2>
