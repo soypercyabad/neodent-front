@@ -1,11 +1,10 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/app/layouts/AppShell'
 import { AuthLayout } from '@/app/layouts/AuthLayout'
-import { Placeholder } from '@/shared/components/ui'
 import {
   HomeRedirect, LoginPage, RegisterPage, RequireAuth, TwoFactorPage,
   ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage,
-  RestartVerificationPage, AccountActivationPage, MyProfilePage,
+  RestartVerificationPage, AccountActivationPage, MyProfilePage, TermsPage,
 } from '@/features/auth'
 import {
   AppointmentsPage, AppointmentDetailPage, MyAppointmentsPage,
@@ -23,6 +22,7 @@ import { ForbiddenPage } from '@/app/pages/ForbiddenPage'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { PATIENT_ROLES, STAFF_ROLES, type Role } from '@/domain/identity'
 import { SchedulesPage, ScheduleHistoryPage, ScheduleBlocksPage, BlockTypesPage } from '@/features/schedules'
+import { AdminTermsPage } from '@/features/legal'
 
 const ADMIN_ROLES: readonly Role[] = ['Administrador']
 const ADMIN_RECEPTION_ROLES: readonly Role[] = ['Administrador', 'Recepcionista']
@@ -39,7 +39,7 @@ export function AppRouter() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verificar-correo" element={<VerifyEmailPage />} />
         <Route path="/activar-cuenta-pendiente" element={<RestartVerificationPage />} />
-        <Route path="/terminos" element={<Placeholder title="Términos y condiciones" />} />
+        <Route path="/terminos" element={<TermsPage />} />
         <Route path="/activar-personal" element={<AccountActivationPage type="staff" />} />
         <Route path="/activate-account" element={<AccountActivationPage type="patient" />} />
       </Route>
@@ -78,6 +78,7 @@ export function AppRouter() {
             <Route path="/especialidades" element={<EspecialidadesPage />} />
             <Route path="/servicios" element={<ServiciosPage />} />
             <Route path="/tipos-bloqueo" element={<BlockTypesPage />} />
+            <Route path="/terminos-admin" element={<AdminTermsPage />} />
           </Route>
         </Route>
       </Route>

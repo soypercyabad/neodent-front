@@ -22,6 +22,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Especialidades', icon: 'tooth', href: '/especialidades' },
   { label: 'Servicios', icon: 'toothCracked', href: '/servicios' },
   { label: 'Sedes', icon: 'location', href: '/sedes' },
+  { label: 'Legales', icon: 'file', href: '/terminos-admin' },
 ]
 
 const RECEPTION_NAV: NavItem[] = [

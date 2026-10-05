@@ -547,9 +547,14 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
           onChange={e => update('aceptaTerminos', e.target.checked)}
           label={
             <>Estoy de acuerdo con los{' '}
-              <Link to="/terminos" className="font-bold text-brand hover:underline">
+              <a
+                href={import.meta.env.VITE_TERMINOS_URL || `${import.meta.env.VITE_API_URL || ''}/api/terminos-condiciones`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-brand hover:underline inline-flex items-center gap-1"
+              >
                 Términos y condiciones
-              </Link>
+              </a>
             </>
           } />
         {errors.aceptaTerminos && (

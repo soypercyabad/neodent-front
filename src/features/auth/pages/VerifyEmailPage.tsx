@@ -66,6 +66,7 @@ export function VerifyEmailPage() {
           email: d.correo.trim().toLowerCase(),
           direccion: null,
           password: d.password,
+          aceptaTerminos: d.aceptaTerminos,
         })
       } else {
         const response = await authApi.verifyRegistrationEmail(challengeId, codigo)

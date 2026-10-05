@@ -80,6 +80,7 @@ export interface PatientRegistrationRequest {
   direccion: string | null
   password: string
   turnstileToken: string
+  aceptaTerminos?: boolean
 }
 
 export interface PatientRegistrationResponse {
@@ -135,4 +136,5 @@ export interface PatientRegistrationConfirmRequest {
   email: string
   direccion: string | null
   password: string
+  aceptaTerminos?: boolean
 }
