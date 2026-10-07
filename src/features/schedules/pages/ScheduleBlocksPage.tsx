@@ -1,21 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  AnimatedDatePicker,
-  AnimatedSelect,
-  Badge,
-  Button,
-  Card,
-  Checkbox,
-  ClockTimePicker,
-  ConfirmDialog,
-  Icon,
-  PageHead,
-  Pagination,
-  ScheduleBlocksSkeleton,
-  TableFoot,
-  Toast,
-  type ToastAviso,
+import { AnimatedDatePicker, AnimatedSelect, Badge, Button,
+  Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon, PageHead,
+  Pagination, ScheduleBlocksSkeleton, TableFoot, Toast,  type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -116,6 +103,7 @@ export function ScheduleBlocksPage() {
   const [eliminar, setEliminar] = useState<AgendaBlock | null>(null)
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
@@ -280,15 +268,15 @@ export function ScheduleBlocksPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
   }
 
   const guardar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!accessToken || !tipoSeleccionado || guardando) return
-
+    if (!accessToken || !tipoSeleccionado || guardandoRef.current) return
+    guardandoRef.current = true
     setGuardando(true)
     setAviso(null)
 
@@ -351,6 +339,7 @@ export function ScheduleBlocksPage() {
         texto: e instanceof Error ? e.message : 'No se pudo registrar el bloqueo.',
       })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

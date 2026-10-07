@@ -1,36 +1,12 @@
 import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  ActionsCell,
-  AnimatedSelect,
-  Badge,
-  Button,
-  Card,
-  Checkbox,
-  ConfirmDialog,
-  Field,
-  Icon,
-  Input,
-  PageHead,
-  Pagination,
-  RowActions,
-  SearchInput,
-  Table,
-  TableFoot,
-  TableSkeletonRows,
-  TableState,
-  Toast,
-  Toolbar,
-  useTableSort,
-  type Column,
-  type ToastAviso,
+import { ActionsCell, AnimatedSelect, Badge, Button, Card, Checkbox, ConfirmDialog,
+  Field, Icon, Input, PageHead, Pagination, RowActions, SearchInput, Table, TableFoot,
+  TableSkeletonRows, TableState, Toast, Toolbar, useTableSort,
+  type Column, type ToastAviso,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
-import {
-  legalApi,
-  type TerminosCondicionesItem,
-  type AceptacionTerminosItem,
-} from '../api/legalApi'
+import { legalApi, type TerminosCondicionesItem, type AceptacionTerminosItem } from '../api/legalApi'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
 const COLUMNS_VERSIONES: Column[] = [
@@ -79,6 +55,7 @@ export function AdminTermsPage() {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [editandoItem, setEditandoItem] = useState<TerminosCondicionesItem | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null)
   const [titulo, setTitulo] = useState('')
   const [version, setVersion] = useState('')
@@ -161,13 +138,17 @@ export function AdminTermsPage() {
     }
   }
 
-  const cerrarForm = () => {
-    if (guardando) return
+  const limpiarYCerrarForm = () => {
     setMostrarForm(false)
     setEditandoItem(null)
     setArchivoSeleccionado(null)
     setTitulo('')
     setVersion('')
+  }
+
+  const cerrarForm = () => {
+    if (guardandoRef.current) return
+    limpiarYCerrarForm()
   }
 
   const handleSeleccionarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +173,7 @@ export function AdminTermsPage() {
 
   const handleGuardar = async (e: FormEvent) => {
     e.preventDefault()
-    if (!accessToken) return
+    if (!accessToken || guardandoRef.current) return
 
     if (!editandoItem && !archivoSeleccionado) {
       setAviso({ tipo: 'error', texto: 'Debes seleccionar un archivo PDF para la nueva versión.' })
@@ -203,6 +184,7 @@ export function AdminTermsPage() {
     const tituloLimpio = titulo.trim() || `Términos y Condiciones ${versionLimpia}`
 
     try {
+      guardandoRef.current = true
       setGuardando(true)
 
       if (editandoItem) {
@@ -232,12 +214,13 @@ export function AdminTermsPage() {
         })
       }
 
-      cerrarForm()
-      cargarVersiones()
+      limpiarYCerrarForm()
+      void cargarVersiones()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo guardar la versión en S3.'
       setAviso({ tipo: 'error', texto: msg })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

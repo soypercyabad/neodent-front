@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, SedesCardsSkeleton, TableFoot, Toast } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
@@ -59,6 +59,7 @@ export function SedesPage() {
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
@@ -209,7 +210,7 @@ export function SedesPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
     setFormError('')
@@ -218,8 +219,8 @@ export function SedesPage() {
   // GUARDAR SEDE.
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!accessToken || guardando) return
-
+    if (!accessToken || guardandoRef.current) return
+    guardandoRef.current = true
     setGuardando(true)
     setFormError('')
     setAviso(null)
@@ -263,6 +264,7 @@ export function SedesPage() {
       setFormError(mensaje)
       setAviso({ tipo: 'error', texto: mensaje })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

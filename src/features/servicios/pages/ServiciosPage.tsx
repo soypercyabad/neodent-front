@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, Checkbox, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, ServicesCardsSkeleton, TableFoot, Toast, Toolbar } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
@@ -52,6 +52,7 @@ export function ServiciosPage() {
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
@@ -132,7 +133,7 @@ export function ServiciosPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
     setFormError('')
@@ -172,8 +173,8 @@ export function ServiciosPage() {
   // REGISTRAR O EDITAR SERVICIO.
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!accessToken || guardando || procesando) return
-
+    if (!accessToken || guardandoRef.current || procesando) return
+    guardandoRef.current = true
     setGuardando(true)
     setFormError('')
     setAviso(null)
@@ -240,6 +241,7 @@ export function ServiciosPage() {
       setFormError(mensaje)
       setAviso({ tipo: 'error', texto: mensaje })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

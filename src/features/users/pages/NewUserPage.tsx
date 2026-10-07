@@ -56,6 +56,7 @@ export function NewUserPage() {
   const [datosAutomaticos, setDatosAutomaticos] = useState(false)
   const [checking, setChecking] = useState(false)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [cargandoEspecialidades, setCargandoEspecialidades] = useState(false)
   const [cargandoRoles, setCargandoRoles,] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
@@ -268,12 +269,7 @@ export function NewUserPage() {
   }, [])
 
   useEffect(() => {
-    if (
-      !accessToken ||
-      !esDni ||
-      form.numeroDocumento.length !== 8 ||
-      !tipoDocumentoId
-    ) return
+    if (!accessToken || !esDni || form.numeroDocumento.length !== 8 || !tipoDocumentoId) return
 
     const currentId = ++requestId.current
     const dni = form.numeroDocumento
@@ -462,7 +458,8 @@ export function NewUserPage() {
 
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (saving) return
+
+    if (savingRef.current) return
 
     const campos: FormKey[] = [
       'numeroDocumento',
@@ -476,19 +473,26 @@ export function NewUserPage() {
 
     const nuevosErrores: Errors = {}
 
-    if (!tipoDocumentoId)
+    if (!tipoDocumentoId) {
       nuevosErrores.tipoDocumento = 'Selecciona un tipo de documento.'
+    }
 
-    campos.forEach(k => {
+    campos.forEach((k) => {
       const msg = validarCampo(k, form[k])
-      if (msg) nuevosErrores[k] = msg
+
+      if (msg) {
+        nuevosErrores[k] = msg
+      }
     })
 
-    if (!roles.length)
+    if (!roles.length) {
       nuevosErrores.roles = 'Selecciona al menos un rol.'
+    }
 
-    if (esOdontologo && !especialidadIds.length)
-      nuevosErrores.especialidades = 'Selecciona al menos una especialidad.'
+    if (esOdontologo && !especialidadIds.length) {
+      nuevosErrores.especialidades =
+        'Selecciona al menos una especialidad.'
+    }
 
     setErrors(nuevosErrores)
     setError('')
@@ -499,17 +503,21 @@ export function NewUserPage() {
     }
 
     if (!documentoListo) {
-      setErrors(c => ({
+      setErrors((c) => ({
         ...c,
         numeroDocumento: esDni
           ? 'Primero debes validar el DNI.'
           : 'Espera un momento mientras validamos el formato del documento.',
       }))
+
       return
     }
 
-    if (Object.keys(nuevosErrores).length) return
+    if (Object.keys(nuevosErrores).length) {
+      return
+    }
 
+    savingRef.current = true
     setSaving(true)
 
     try {
@@ -522,30 +530,45 @@ export function NewUserPage() {
         apellidoPaterno: form.apellidoPaterno.trim(),
         apellidoMaterno: form.apellidoMaterno.trim() || null,
         telefono: form.telefono.trim() || null,
-        numeroColegiatura: esOdontologo ? form.numeroColegiatura.trim() : null,
-        especialidadIds: esOdontologo ? especialidadIds.map(Number) : [],
+        numeroColegiatura: esOdontologo
+          ? form.numeroColegiatura.trim()
+          : null,
+        especialidadIds: esOdontologo
+          ? especialidadIds.map(Number)
+          : [],
       })
 
       if (esOdontologo && foto) {
         try {
-          const usuarioConFoto = await usersApi.subirFoto(accessToken, usuarioCreado.usuarioId, foto)
+          const usuarioConFoto = await usersApi.subirFoto(
+            accessToken,
+            usuarioCreado.usuarioId,
+            foto,
+          )
+
           if (!usuarioConFoto.fotoNombreArchivo) {
-            throw new Error('El servidor no confirmó el guardado de la fotografía.')
+            throw new Error(
+              'El servidor no confirmó el guardado de la fotografía.',
+            )
           }
         } catch (fotoErr) {
-          const mensaje = fotoErr instanceof Error
-            ? fotoErr.message
-            : 'No se pudo subir la fotografía.'
+          const mensaje =
+            fotoErr instanceof Error
+              ? fotoErr.message
+              : 'No se pudo subir la fotografía.'
 
           navigate('/usuarios', {
             replace: true,
             state: {
               aviso: {
                 tipo: 'warning',
-                texto: `El trabajador fue registrado, pero la fotografía no pudo guardarse: ${mensaje}`,
+                texto:
+                  `El trabajador fue registrado, pero la fotografía ` +
+                  `no pudo guardarse: ${mensaje}`,
               },
             },
           })
+
           return
         }
       }
@@ -564,30 +587,48 @@ export function NewUserPage() {
         const mensaje = err.message
         const texto = mensaje.toLowerCase()
 
-        if (texto.includes('correo') || texto.includes('email'))
-          setErrors(c => ({ ...c, correo: mensaje }))
-        else if (
+        if (texto.includes('correo') || texto.includes('email')) {
+          setErrors((c) => ({
+            ...c,
+            correo: mensaje,
+          }))
+        } else if (
           texto.includes('documento') ||
           texto.includes('dni') ||
           texto.includes('pasaporte') ||
           texto.includes('carné')
-        )
-          setErrors(c => ({ ...c, numeroDocumento: mensaje }))
-        else if (texto.includes('colegiatura'))
-          setErrors(c => ({ ...c, numeroColegiatura: mensaje }))
-        else if (texto.includes('especialidad'))
-          setErrors(c => ({ ...c, especialidades: mensaje }))
-        else
+        ) {
+          setErrors((c) => ({
+            ...c,
+            numeroDocumento: mensaje,
+          }))
+        } else if (texto.includes('colegiatura')) {
+          setErrors((c) => ({
+            ...c,
+            numeroColegiatura: mensaje,
+          }))
+        } else if (texto.includes('especialidad')) {
+          setErrors((c) => ({
+            ...c,
+            especialidades: mensaje,
+          }))
+        } else {
           setError(mensaje)
+        }
 
-        if (err.fieldErrors)
-          setErrors(c => ({ ...c, ...err.fieldErrors }))
+        if (err.fieldErrors) {
+          setErrors((c) => ({
+            ...c,
+            ...err.fieldErrors,
+          }))
+        }
       } else {
         setError(
           'No se pudo registrar al trabajador. Intenta nuevamente.',
         )
       }
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -602,10 +643,7 @@ export function NewUserPage() {
         title="Registrar trabajador"
         description="Configura sus datos personales, acceso al sistema y, si corresponde, su perfil profesional."
         actions={
-          <Button
-            variant="outline"
-            onClick={() => navigate('/usuarios')}
-          >
+          <Button variant="outline" onClick={() => navigate('/usuarios')} disabled={saving}>
             Volver a usuarios
           </Button>
         }

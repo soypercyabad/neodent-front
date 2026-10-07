@@ -11,6 +11,7 @@ interface BookingLayoutProps {
   steps?: readonly Step[]
   title?: string
   exitTo?: string
+  onExit?: () => void | Promise<void>
 }
 
 export function BookingLayout({
@@ -20,6 +21,7 @@ export function BookingLayout({
   steps = BOOKING_STEPS,
   title = 'Programar una cita',
   exitTo = '/mis-citas',
+  onExit,
 }: BookingLayoutProps) {
   
   const navigate = useNavigate()
@@ -30,8 +32,16 @@ export function BookingLayout({
         <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6">
           <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-[1.9rem]">{title}</h1>
 
-          <Button variant="ghost" icon="logout" onClick={() => navigate(exitTo)} className="shrink-0">
-            Salir
+          <Button variant="ghost" icon="logout"
+            onClick={() => {
+              if (onExit) {
+                void Promise.resolve(onExit()).then(() => navigate(exitTo))
+                return
+              }
+
+              navigate(exitTo)
+            }}
+            className="shrink-0"> Salir
           </Button>
         </header>
 

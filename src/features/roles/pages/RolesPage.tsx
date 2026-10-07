@@ -1,26 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  ActionsCell,
-  AnimatedSelect,
-  Badge,
-  Button,
-  Card,
-  ConfirmDialog,
-  Field,
-  Input,
-  PageHead,
-  Pagination,
-  RolesTableSkeleton,
-  RowActions,
-  SearchInput,
-  Table,
-  TableFoot,
-  TableState,
-  Toast,
-  Toolbar,
-  useTableSort,
-  type Column,
+import { ActionsCell, AnimatedSelect, Badge, Button, Card, ConfirmDialog,
+  Field, Input, PageHead, Pagination, RolesTableSkeleton, RowActions, SearchInput,
+  Table, TableFoot, TableState, Toast, Toolbar, useTableSort, type Column,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -48,6 +30,7 @@ export function RolesPage() {
   const [pagina, setPagina] = useState(1)
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [editando, setEditando] = useState<RolResponse | null>(null)
@@ -139,13 +122,13 @@ export function RolesPage() {
   const guardar = async (e: FormEvent) => {
     e.preventDefault()
 
-    if (!accessToken || guardando) return
-
+    if (!accessToken || guardandoRef.current) return
     if (!nombre.trim()) {
       setError('Ingresa el nombre del rol.')
       return
     }
 
+    guardandoRef.current = true
     setGuardando(true)
     setError('')
 
@@ -176,6 +159,7 @@ export function RolesPage() {
           : 'No se pudo guardar el rol.',
       )
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

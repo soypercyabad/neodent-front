@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, ConfirmDialog, EspecialidadesSkeleton, Icon, PageHead, Pagination, SearchInput, TableFoot, Toast } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
@@ -30,6 +30,7 @@ export function EspecialidadesPage() {
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
@@ -83,7 +84,7 @@ export function EspecialidadesPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
     setFormError('')
@@ -92,8 +93,8 @@ export function EspecialidadesPage() {
   // GUARDAR ESPECIALIDAD.
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!accessToken || guardando) return
-
+    if (!accessToken || guardandoRef.current) return
+    guardandoRef.current = true
     setGuardando(true)
     setFormError('')
     setAviso(null)
@@ -130,6 +131,7 @@ export function EspecialidadesPage() {
       setFormError(mensaje)
       setAviso({ tipo: 'error', texto: mensaje })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

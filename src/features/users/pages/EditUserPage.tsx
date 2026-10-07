@@ -121,6 +121,7 @@ export function EditUserPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [errors, setErrors] = useState<Errors>({})
   const [error, setError] = useState('')
 
@@ -425,12 +426,9 @@ export function EditUserPage() {
     }
   }
 
-  const guardar = async (
-    e: FormEvent<HTMLFormElement>,
-  ) => {
+  const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
-    if (!accessToken || saving) return
+    if (!accessToken || savingRef.current) return
 
     const nuevos: Errors = {}
 
@@ -450,36 +448,18 @@ export function EditUserPage() {
     })
 
     if (esOdontologo) {
-      const msg =
-        validarCampo(
-          'numeroColegiatura',
-          form.numeroColegiatura,
-        )
-
-      if (msg)
-        nuevos.numeroColegiatura = msg
+      const msg = validarCampo('numeroColegiatura', form.numeroColegiatura)
+      if (msg) nuevos.numeroColegiatura = msg
     }
 
-    if (!tipoDocumentoId)
-      nuevos.tipoDocumento =
-        'Selecciona un tipo de documento.'
-
-    if (!roles.length)
-      nuevos.roles =
-        'Selecciona al menos un rol.'
-
-    if (
-      esOdontologo &&
-      !especialidadIds.length
-    ) {
-      nuevos.especialidades =
-        'Selecciona al menos una especialidad.'
-    }
+    if (!tipoDocumentoId) nuevos.tipoDocumento = 'Selecciona un tipo de documento.'
+    if (!roles.length) nuevos.roles = 'Selecciona al menos un rol.'
+    if (esOdontologo && !especialidadIds.length) nuevos.especialidades = 'Selecciona al menos una especialidad.'
 
     setErrors(nuevos)
 
     if (Object.keys(nuevos).length) return
-
+    savingRef.current = true
     setSaving(true)
     setError('')
 
@@ -488,71 +468,25 @@ export function EditUserPage() {
         accessToken,
         usuarioId,
         {
-          correo:
-            form.correo
-              .trim()
-              .toLowerCase(),
-
-          nuevaContrasena:
-            form.nuevaContrasena.trim() ||
-            null,
-
+          correo: form.correo.trim().toLowerCase(),
+          nuevaContrasena: form.nuevaContrasena.trim() || null,
           roles,
-
-          tipoDocumentoId:
-            Number(tipoDocumentoId),
-
-          numeroDocumento:
-            form.numeroDocumento.trim(),
-
-          nombres:
-            form.nombres.trim(),
-
-          apellidoPaterno:
-            form.apellidoPaterno.trim(),
-
-          apellidoMaterno:
-            form.apellidoMaterno.trim() ||
-            null,
-
-          telefono:
-            form.telefono.trim() ||
-            null,
-
-          numeroColegiatura:
-            esOdontologo
-              ? form.numeroColegiatura.trim()
-              : null,
-
-          especialidadIds:
-            esOdontologo
-              ? especialidadIds.map(Number)
-              : [],
+          tipoDocumentoId: Number(tipoDocumentoId),
+          numeroDocumento: form.numeroDocumento.trim(),
+          nombres: form.nombres.trim(),
+          apellidoPaterno: form.apellidoPaterno.trim(),
+          apellidoMaterno: form.apellidoMaterno.trim() || null,
+          telefono: form.telefono.trim() || null,
+          numeroColegiatura: esOdontologo ? form.numeroColegiatura.trim() : null,
+          especialidadIds: esOdontologo ? especialidadIds.map(Number) : [],
         },
       )
 
       if (esOdontologo && foto) {
-        const actualizado =
-          await usersApi.subirFoto(
-            accessToken,
-            usuarioId,
-            foto,
-          )
-
-        if (!actualizado.fotoNombreArchivo) {
-          throw new Error(
-            'El servidor no confirmó el guardado de la fotografía.',
-          )
-        }
-      } else if (
-        esOdontologo &&
-        eliminarFoto &&
-        usuario?.fotoNombreArchivo
-      ) {
-        await usersApi.eliminarFoto(
-          accessToken,
-          usuarioId,
-        )
+        const actualizado = await usersApi.subirFoto(accessToken, usuarioId, foto)
+        if (!actualizado.fotoNombreArchivo) throw new Error('El servidor no confirmó el guardado de la fotografía.')
+      } else if (esOdontologo && eliminarFoto && usuario?.fotoNombreArchivo) {
+        await usersApi.eliminarFoto(accessToken, usuarioId)
       }
 
       navigate(
@@ -562,8 +496,7 @@ export function EditUserPage() {
           state: {
             aviso: {
               tipo: 'success',
-              texto:
-                'Trabajador actualizado correctamente.',
+              texto: 'Trabajador actualizado correctamente.',
             },
           },
         },
@@ -578,59 +511,25 @@ export function EditUserPage() {
 
       const texto = mensaje.toLowerCase()
 
-      if (
-        texto.includes('correo') ||
-        texto.includes('email')
-      ) {
-        setErrors(c => ({
-          ...c,
-          correo: mensaje,
-        }))
-      } else if (
-        texto.includes('documento') ||
-        texto.includes('dni') ||
-        texto.includes('pasaporte') ||
-        texto.includes('carné')
-      ) {
-        setErrors(c => ({
-          ...c,
-          numeroDocumento: mensaje,
-        }))
-      } else if (
-        texto.includes('colegiatura')
-      ) {
-        setErrors(c => ({
-          ...c,
-          numeroColegiatura: mensaje,
-        }))
-      } else if (
-        texto.includes('especialidad')
-      ) {
-        setErrors(c => ({
-          ...c,
-          especialidades: mensaje,
-        }))
-      } else if (
-        texto.includes('rol')
-      ) {
-        setErrors(c => ({
-          ...c,
-          roles: mensaje,
-        }))
+      if (texto.includes('correo') || texto.includes('email')) {
+        setErrors(c => ({  ...c, correo: mensaje}))
+      } else if (texto.includes('documento') || texto.includes('dni') || texto.includes('pasaporte') || texto.includes('carné')) {
+        setErrors(c => ({  ...c, numeroDocumento: mensaje}))
+      } else if (texto.includes('colegiatura')) {
+        setErrors(c => ({  ...c, numeroColegiatura: mensaje}))
+      } else if (texto.includes('especialidad')) {
+        setErrors(c => ({  ...c, especialidades: mensaje}))
+      } else if (texto.includes('rol')) {
+        setErrors(c => ({  ...c, roles: mensaje}))
       } else {
         setError(mensaje)
       }
 
-      if (
-        e instanceof ApiError &&
-        e.fieldErrors
-      ) {
-        setErrors(c => ({
-          ...c,
-          ...e.fieldErrors,
-        }))
+      if (e instanceof ApiError && e.fieldErrors) {
+        setErrors(c => ({...c, ...e.fieldErrors}))
       }
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -661,14 +560,7 @@ export function EditUserPage() {
         title="Editar trabajador"
         description={`Actualiza la información y permisos de ${usuario.nombres} ${usuario.apellidoPaterno}.`}
         actions={
-          <Button
-            variant="outline"
-            onClick={() =>
-              navigate(
-                `/usuarios/${usuarioId}`,
-              )
-            }
-          >
+          <Button variant="outline" onClick={() => navigate(`/usuarios/${usuarioId}`)} disabled={saving}>
             Cancelar edición
           </Button>
         }

@@ -1,43 +1,18 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  ActionsCell,
-  AnimatedDatePicker,
-  AnimatedSelect,
-  Avatar,
-  Badge,
-  Button,
-  Card,
-  Checkbox,
-  ClockTimePicker,
-  ConfirmDialog,
-  Icon,
-  PageHead,
-  Pagination,
-  ProtectedImage,
-  RowActions,
-  TableFoot,
-  Toast,
-  type ToastAviso,
+import { ActionsCell, AnimatedDatePicker, AnimatedSelect, Avatar,
+  Badge, Button, Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon,
+  PageHead, Pagination, ProtectedImage, RowActions, TableFoot, Toast,  type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { bookingApi, type BookingBranch } from '@/features/appointments/api/bookingApi'
-import {
-  schedulesApi,
-  type HorarioOdontologo,
-  type HorarioOdontologoCatalogo,
-  type HorarioOdontologoInput,
+import { schedulesApi, type HorarioOdontologo,
+  type HorarioOdontologoCatalogo, type HorarioOdontologoInput,
 } from '../api/schedulesApi'
 import { ScheduleAgendaTabs } from '../components/ScheduleAgendaTabs'
-import {
-  DIAS,
-  calcularResumenVigencia,
-  fechaCorta,
-  hora12,
-  hoyIso,
-} from '../model/scheduleUtils'
+import { DIAS, calcularResumenVigencia, fechaCorta, hora12, hoyIso } from '../model/scheduleUtils'
 
 type EstadoFiltro = 'todos' | 'vigentes' | 'proximos' | 'expirados'
 
@@ -99,6 +74,7 @@ export function ScheduleHistoryPage() {
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
@@ -388,7 +364,7 @@ export function ScheduleHistoryPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
   }
@@ -396,8 +372,8 @@ export function ScheduleHistoryPage() {
   // GUARDAR
   const guardar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!accessToken || guardando) return
-
+    if (!accessToken || guardandoRef.current) return
+    guardandoRef.current = true
     setGuardando(true)
 
     try {
@@ -461,6 +437,7 @@ export function ScheduleHistoryPage() {
         texto: err instanceof Error ? err.message : 'No se pudo guardar el horario.',
       })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

@@ -1,19 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  AnimatedDatePicker,
-  AnimatedSelect,
-  Avatar,
-  Badge,
-  Button,
-  Card,
-  Checkbox,
-  ClockTimePicker,
-  ConfirmDialog,
-  Icon,
-  PageHead,
-  ProtectedImage,
-  Toast,
+import { AnimatedDatePicker, AnimatedSelect, Avatar,
+  Badge, Button, Card, Checkbox, ClockTimePicker,
+  ConfirmDialog, Icon, PageHead, ProtectedImage, Toast,
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
@@ -305,6 +294,7 @@ export function SchedulesPage() {
 
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
@@ -573,7 +563,7 @@ export function SchedulesPage() {
   }
 
   const cerrarForm = () => {
-    if (guardando) return
+    if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
   }
@@ -581,8 +571,9 @@ export function SchedulesPage() {
   const guardar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!accessToken || guardando) return
+    if (!accessToken || guardandoRef.current) return
 
+    guardandoRef.current = true
     setGuardando(true)
 
     try {
@@ -661,6 +652,7 @@ export function SchedulesPage() {
         texto: e instanceof Error ? e.message : 'No se pudo guardar el horario.',
       })
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }

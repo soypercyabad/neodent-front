@@ -65,77 +65,83 @@ export function NewAppointmentConfirmPage() {
   const confirmando = useRef(false)
   const confirmado = useRef(false)
   const liberado = useRef(false)
+  const liberando = useRef(false)
 
-  const liberar = useCallback((keepalive = false) => {
-    if (!accessToken || !token || confirmado.current || confirmando.current) return
-    if (liberado.current || reservasLiberadas.has(token)) return
+  const liberarYEsperar = useCallback(async () => {
+    if (!accessToken ||!token ||confirmado.current ||confirmando.current) return true
+    if (liberado.current ||reservasLiberadas.has(token) ) return true
+    if (liberando.current) return false
+    
+    liberando.current = true
 
-    liberado.current = true
-    reservasLiberadas.add(token)
-
-    void bookingApi.liberar(accessToken, token, keepalive).catch(() => {
-      // Si falla la liberación, el backend conserva la expiración automática.
-    })
+    try {
+      await bookingApi.liberar(accessToken,token)
+      liberado.current = true
+      reservasLiberadas.add(token)
+      return true
+    } catch {
+      return false
+    } finally {
+      liberando.current = false
+    }
   }, [accessToken, token])
 
-const formatoHora = (hora: string) => {
-  const [h, m] = hora.split(':').map(Number)
-  return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
-}
+
+const liberarAlSalir = useCallback(() => {
+    if (!accessToken || !token ||confirmado.current ||confirmando.current ||liberado.current ||reservasLiberadas.has(token)) return
+
+    void bookingApi.liberar(accessToken, token,true).then(() => {
+      liberado.current = true
+      reservasLiberadas.add(token)
+      })
+      .catch(() => {
+        // Si el navegador cancela la solicitud,
+        // el backend liberará el HOLD por expiración.
+      })
+  }, [accessToken, token])
+
+  const formatoHora = (hora: string) => {
+    const [h, m] = hora.split(':').map(Number)
+    return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+  }
 
   useEffect(() => {
     montado.current = true
 
     const actualizar = () => setRestante(tiempoRestante(venceEnMs))
     actualizar()
-
-    const intervalo = window.setInterval(actualizar, 500)
-    const salir = () => liberar(true)
-
-    window.addEventListener('pagehide', salir)
-
+    const intervalo =window.setInterval(actualizar,500)
+    const salir = () => liberarAlSalir()
+    window.addEventListener('pagehide',salir)
     return () => {
       montado.current = false
       window.clearInterval(intervalo)
-      window.removeEventListener('pagehide', salir)
-
-      queueMicrotask(() => {
-        if (!montado.current) liberar()
-      })
+      window.removeEventListener('pagehide',salir)
+      queueMicrotask(() => {if (!montado.current) liberarAlSalir()})
     }
-  }, [venceEnMs, liberar])
+  }, [venceEnMs, liberarAlSalir])
 
-  const regresar = () => {
-    if (guardando || confirmando.current) return
+  const regresar = async () => {
+    if (guardando ||confirmando.current) return
 
-    liberar()
+    setGuardando(true)
+    const liberadoOk = await liberarYEsperar()
 
-    if (!reserva) {
-      navigate(administrativo ? '/citas/nueva' : '/mis-citas/nueva', { replace: true })
+    if (!liberadoOk) {
+      setGuardando(false)
+      setAviso({tipo: 'error',texto:'No se pudo liberar el horario reservado. Inténtalo nuevamente.'})
       return
     }
 
-    const {
-      pacienteId,
-      pacienteNombre,
-      pacienteDocumento,
-      servicioId,
-      servicioNombre,
-      especialidadId,
-      duracionMinutos,
-      precioReferencial,
-      sedeId,
-      sedeNombre,
-      sedeDireccion,
-    } = reserva
+    if (!reserva) {
+      navigate(administrativo ? '/citas/nueva' : '/mis-citas/nueva',{replace: true})
+      return
+    }
 
-    navigate(
-      administrativo
-        ? '/citas/nueva/fecha-y-hora'
-        : '/mis-citas/nueva/fecha-y-hora',
-      {
+    const {pacienteId,pacienteNombre,pacienteDocumento,servicioId,servicioNombre,especialidadId,duracionMinutos,precioReferencial,sedeId,sedeNombre,sedeDireccion,} = reserva
+
+    navigate(administrativo ? '/citas/nueva/fecha-y-hora' : '/mis-citas/nueva/fecha-y-hora',{
         replace: true,
-
         state: {
           paciente: reserva.paciente,
           pacienteId,
@@ -187,7 +193,7 @@ const formatoHora = (hora: string) => {
       confirmando.current = false
 
       if (montado.current) setGuardando(false)
-      else liberar()
+      else liberarAlSalir()
     }
   }
 
@@ -228,6 +234,13 @@ const formatoHora = (hora: string) => {
       step={administrativo ? 3 : 2}
       steps={administrativo ? STAFF_BOOKING_STEPS : undefined}
       exitTo={administrativo ? '/citas' : '/mis-citas'}
+      onExit={async () => {
+        const ok = await liberarYEsperar()
+
+        if (!ok) {
+          throw new Error('No se pudo liberar el horario')
+        }
+      }}
       footer={cita ? (
         <>
           <Button
