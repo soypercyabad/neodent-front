@@ -13,34 +13,34 @@ const DASHBOARD: NavItem = {
 
 const ADMIN_NAV: NavItem[] = [
   DASHBOARD,
-  { label: 'Citas', icon: 'citas', href: '/citas' },
+  // { label: 'Citas', icon: 'citas', href: '/citas' },
   { label: 'Pacientes', icon: 'pacientes', href: '/pacientes' },
   { label: 'Personal', icon: 'user', href: '/usuarios' },
-  { label: 'Horarios', icon: 'clock', href: '/horarios' },
-  { label: 'Bloqueos', icon: 'calendarEdit', href: '/tipos-bloqueo' },
+  // { label: 'Horarios', icon: 'clock', href: '/horarios' },
+  // { label: 'Bloqueos', icon: 'calendarEdit', href: '/tipos-bloqueo' },
   { label: 'Roles', icon: 'lock', href: '/roles' },
-  { label: 'Especialidades', icon: 'tooth', href: '/especialidades' },
-  { label: 'Servicios', icon: 'toothCracked', href: '/servicios' },
+  // { label: 'Especialidades', icon: 'tooth', href: '/especialidades' },
+  // { label: 'Servicios', icon: 'toothCracked', href: '/servicios' },
   { label: 'Sedes', icon: 'location', href: '/sedes' },
   { label: 'Legales', icon: 'file', href: '/terminos-admin' },
 ]
 
 const RECEPTION_NAV: NavItem[] = [
   DASHBOARD,
-  { label: 'Citas', icon: 'citas', href: '/citas' },
+  // { label: 'Citas', icon: 'citas', href: '/citas' },
   { label: 'Pacientes', icon: 'pacientes', href: '/pacientes' },
-  { label: 'Horarios', icon: 'clock', href: '/horarios' },
+  // { label: 'Horarios', icon: 'clock', href: '/horarios' },
 ]
 
 const DENTIST_NAV: NavItem[] = [
   DASHBOARD,
-  { label: 'Citas', icon: 'citas', href: '/citas' },
+  // { label: 'Citas', icon: 'citas', href: '/citas' },
   { label: 'Pacientes', icon: 'pacientes', href: '/pacientes' },
 ]
 
 const PATIENT_NAV: NavItem[] = [
   DASHBOARD,
-  { label: 'Mis Citas', icon: 'citas', href: '/mis-citas' },
+  // { label: 'Mis Citas', icon: 'citas', href: '/mis-citas' },
 ]
 
 export const navItemsFor = (rol: Role): NavItem[] => {
