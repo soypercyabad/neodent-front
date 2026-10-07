@@ -13,6 +13,7 @@ import type {
   PatientRegistrationResponse,
   PatientRegistrationInitRequest,
   PatientRegistrationInitResponse,
+  PatientRegistrationValidationResponse,
   PatientRegistrationConfirmRequest,
   VerifyRegistrationEmailResponse,
   StaffInvitationResponse,
@@ -126,6 +127,16 @@ export const authApi = {
           numeroDocumento,
           turnstileToken,
         }),
+      },
+    )
+  },
+
+  validatePatientRegistration(data: PatientRegistrationInitRequest) {
+    return apiRequest<PatientRegistrationValidationResponse>(
+      '/api/auth/patient-registration/validate',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
       },
     )
   },

@@ -114,8 +114,21 @@ export interface StaffActivationCompleteResponse {
 export interface PatientRegistrationInitRequest {
   tipoDocumento: string
   numeroDocumento: string
+  nombres: string
+  apellidoPaterno: string
+  apellidoMaterno: string | null
+  fechaNacimiento: string
+  telefono: string
   email: string
+  password: string
+  aceptaTerminos: boolean
   turnstileToken: string
+}
+
+
+export interface PatientRegistrationValidationResponse {
+  valid: boolean
+  message: string
 }
 
 export interface PatientRegistrationInitResponse {

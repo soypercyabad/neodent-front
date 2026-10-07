@@ -277,15 +277,35 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo completar el registro.'
 
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError) {
+        if (error.fieldErrors) {
+          setErrors(current => ({
+            ...current,
+            ...error.fieldErrors,
+          }))
+        }
+
         const campo = /teléfono|telefono/i.test(message) ? 'telefono'
           : /correo|email/i.test(message) ? 'correo'
             : /documento|DNI|pasaporte|carn[eé]/i.test(message) ? 'numeroDocumento'
-              : null
+              : /nombres?/i.test(message) ? 'nombres'
+                : /apellido paterno/i.test(message) ? 'apellidoPaterno'
+                  : /fecha de nacimiento/i.test(message) ? 'fechaNacimiento'
+                    : /contraseña|password/i.test(message) ? 'password'
+                      : /términos|terminos/i.test(message) ? 'aceptaTerminos'
+                        : null
 
-        if (campo) setErrors(current => ({ ...current, [campo]: message }))
-        else setServerError(message)
-      } else setServerError(message)
+        if (campo && !error.fieldErrors?.[campo]) {
+          setErrors(current => ({
+            ...current,
+            [campo]: message,
+          }))
+        } else if (!campo && !error.fieldErrors) {
+          setServerError(message)
+        }
+      } else {
+        setServerError(message)
+      }
 
       setSecurityKey(current => current + 1)
     } finally {
@@ -326,21 +346,23 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
         </motion.span>
       )}
 
-      {((esDni && documentStatus === 'valid') || (!esDni && documentoManualConfirmado)) && (
-        <motion.span key="valid" initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="grid size-5 place-items-center rounded-full bg-success text-white">
-          <Icon name="check" size={12} />
-        </motion.span>
-      )}
+      {!errors.numeroDocumento &&
+        ((esDni && documentStatus === 'valid') || (!esDni && documentoManualConfirmado)) && (
+          <motion.span key="valid" initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="grid size-5 place-items-center rounded-full bg-success text-white">
+            <Icon name="check" size={12} />
+          </motion.span>
+        )}
 
-      {esDni && (documentStatus === 'conflict' || documentStatus === 'error') && (
-        <motion.span key="invalid" initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="grid size-5 place-items-center rounded-full bg-danger-soft text-danger">
-          <Icon name="warning" size={12} />
-        </motion.span>
-      )}
+      {(errors.numeroDocumento ||
+        (esDni && (documentStatus === 'conflict' || documentStatus === 'error'))) && (
+          <motion.span key="invalid" initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="grid size-5 place-items-center rounded-full bg-danger-soft text-danger">
+            <Icon name="warning" size={12} />
+          </motion.span>
+        )}
     </AnimatePresence>
   )
 
@@ -420,7 +442,7 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
               </motion.p>
             )}
 
-            {!esDni && documentoManualConfirmado && (
+            {!esDni && documentoManualConfirmado && !errors.numeroDocumento && (
               <motion.p key="manual-ready"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
