@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Alert, AnimatedDatePicker, AnimatedSelect, Button, Checkbox, Field, FieldCheck, FieldError, Icon, Input } from '@/shared/components/ui'
+import { Alert, AnimatedDatePicker, AnimatedSelect, Button, Checkbox, Field, FieldCheck, FieldError, Icon, Input, PasswordRequirements } from '@/shared/components/ui'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { ApiError } from '@/shared/api/apiClient'
-import { EMAIL_RE, MIN_PASSWORD } from '@/shared/lib/validation'
+import { EMAIL_RE, validatePassword } from '@/shared/lib/validation'
 import { authApi } from '../api/authApi'
 import type { RegisterInput } from '../model/auth.types'
 import { SecurityVerification } from './SecurityVerification'
@@ -62,6 +62,7 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [passwordFocused, setPasswordFocused] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [securityToken, setSecurityToken] = useState<string | null>(null)
   const [securityKey, setSecurityKey] = useState(0)
@@ -238,9 +239,19 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
       e.telefono = 'Ingresa un teléfono válido. Puedes usar código de país, por ejemplo +51987654321.'
 
     if (!EMAIL_RE.test(values.correo.trim())) e.correo = 'Ingresa un correo válido.'
-    if (values.password.length < MIN_PASSWORD) e.password = `Debe tener al menos ${MIN_PASSWORD} caracteres.`
-    if (!values.confirmPassword || values.confirmPassword !== values.password)
+
+    const passwordValidation = validatePassword(values.password)
+    if (!values.password) {
+      e.password = 'Ingresa una contraseña.'
+    } else if (!passwordValidation.isValid) {
+      e.password = 'La contraseña no cumple con todos los requisitos de seguridad.'
+    }
+
+    if (!values.confirmPassword) {
+      e.confirmPassword = 'Confirma tu contraseña.'
+    } else if (values.confirmPassword !== values.password) {
       e.confirmPassword = 'Las contraseñas no coinciden.'
+    }
     if (!values.aceptaTerminos) e.aceptaTerminos = 'Debes aceptar los términos y condiciones.'
 
     return e
@@ -321,8 +332,9 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
   const fechaOk = !!values.fechaNacimiento && values.fechaNacimiento <= hoy
   const telefonoOk = PHONE_RE.test(values.telefono.replace(/[\s-]/g, ''))
   const correoOk = EMAIL_RE.test(values.correo.trim())
-  const passwordOk = values.password.length >= MIN_PASSWORD
-  const confirmarOk = !!values.confirmPassword && values.confirmPassword === values.password
+  const passwordValidation = validatePassword(values.password)
+  const passwordOk = passwordValidation.isValid
+  const confirmarOk = !!values.confirmPassword && values.confirmPassword === values.password && passwordOk
 
   const nombreConfirmado = useDelayedValid(nombreOk, `${identidadLista}|${values.nombres}`)
   const paternoConfirmado = useDelayedValid(paternoOk, `${identidadLista}|${values.apellidoPaterno}`)
@@ -541,6 +553,8 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
         <Input type={showPassword ? 'text' : 'password'} icon="lock"
           placeholder="••••••••••••" autoComplete="new-password"
           value={values.password} disabled={submitting}
+          onFocus={() => setPasswordFocused(true)}
+          onBlur={() => setPasswordFocused(false)}
           onChange={e => update('password', e.target.value)}
           trailing={
             <span className="flex items-center gap-1">
@@ -550,6 +564,12 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
             </span>
           } />
       </Field>
+
+      <AnimatePresence>
+        {(passwordFocused || values.password.length > 0 || errors.password) && (
+          <PasswordRequirements password={values.password} />
+        )}
+      </AnimatePresence>
 
       <Field label="Confirmar contraseña" error={errors.confirmPassword}>
         <Input type={showConfirm ? 'text' : 'password'} icon="lock"
