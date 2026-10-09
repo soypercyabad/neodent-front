@@ -47,6 +47,15 @@ export interface ResetPasswordResponse {
   message: string
 }
 
+export interface ModuloInfo {
+  id?: number
+  idModulo?: number
+  codigo: string
+  nombre: string
+  icono?: string | null
+  orden: number
+}
+
 export interface AuthenticatedUserResponse {
   idUsuario: number
   correo: string
@@ -57,6 +66,7 @@ export interface AuthenticatedUserResponse {
   estado: string
   idPersonal: number | null
   idPaciente: number | null
+  modulos?: ModuloInfo[]
 }
 
 export interface PatientRegistrationCheckResponse {

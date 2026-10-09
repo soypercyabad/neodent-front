@@ -44,53 +44,69 @@ export function AppRouter() {
         <Route path="/activate-account" element={<AccountActivationPage type="patient" />} />
       </Route>
 
-      {/* PERSONAL INTERNO: ADMIN / RECEPCIONISTA / ODONTÓLOGO */}
-      <Route element={<RequireAuth roles={STAFF_ROLES} />}>
+      {/* RUTAS PROTEGIDAS CON APPSHELL */}
+      <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route path="/citas" element={<AppointmentsPage />} />
-          <Route path="/citas/:id" element={<AppointmentDetailPage />} />
-          <Route path="/pacientes" element={<PatientsPage />} />
-          <Route path="/pacientes/:id" element={<PatientDetailPage />} />
-
-          {/* ADMIN + RECEPCIONISTA */}
-          <Route element={<RequireAuth roles={ADMIN_RECEPTION_ROLES} />}>
+          {/* Citas */}
+          <Route element={<RequireAuth module="CITAS" roles={STAFF_ROLES} />}>
+            <Route path="/citas" element={<AppointmentsPage />} />
+            <Route path="/citas/:id" element={<AppointmentDetailPage />} />
             <Route path="/citas/nueva" element={<StaffAppointmentPatientPage />} />
             <Route path="/citas/nueva/datos" element={<NewAppointmentPage />} />
             <Route path="/citas/nueva/fecha-y-hora" element={<NewAppointmentSchedulePage />} />
             <Route path="/citas/nueva/confirmar" element={<NewAppointmentConfirmPage />} />
             <Route path="/citas/:id/reprogramar" element={<ReprogramAppointmentPage />} />
+          </Route>
+
+          {/* Pacientes */}
+          <Route element={<RequireAuth module="PACIENTES" roles={STAFF_ROLES} />}>
+            <Route path="/pacientes" element={<PatientsPage />} />
+            <Route path="/pacientes/:id" element={<PatientDetailPage />} />
             <Route path="/pacientes/nuevo" element={<NewPatientPage />} />
             <Route path="/pacientes/:id/editar" element={<EditPatientPage />} />
+          </Route>
+
+          {/* Horarios */}
+          <Route element={<RequireAuth module="HORARIOS" roles={ADMIN_RECEPTION_ROLES} />}>
             <Route path="/horarios" element={<SchedulesPage />} />
             <Route path="/horarios/cronogramas" element={<ScheduleHistoryPage />} />
             <Route path="/horarios/bloqueos" element={<ScheduleBlocksPage />} />
+            <Route path="/tipos-bloqueo" element={<BlockTypesPage />} />
           </Route>
 
-          {/* SOLO ADMIN */}
-          <Route element={<RequireAuth roles={ADMIN_ROLES} />}>
+          {/* Personal */}
+          <Route element={<RequireAuth module="PERSONAL" roles={ADMIN_ROLES} />}>
             <Route path="/usuarios" element={<UsersPage />} />
             <Route path="/usuarios/nuevo" element={<NewUserPage />} />
             <Route path="/usuarios/:id" element={<UserDetailPage />} />
             <Route path="/usuarios/:id/editar" element={<EditUserPage />} />
+          </Route>
 
+          {/* Catálogo y Administración */}
+          <Route element={<RequireAuth module="ROLES" roles={ADMIN_ROLES} />}>
             <Route path="/roles" element={<RolesPage />} />
+          </Route>
+          <Route element={<RequireAuth module="SEDES" roles={ADMIN_ROLES} />}>
             <Route path="/sedes" element={<SedesPage />} />
+          </Route>
+          <Route element={<RequireAuth module="ESPECIALIDADES" roles={ADMIN_ROLES} />}>
             <Route path="/especialidades" element={<EspecialidadesPage />} />
+          </Route>
+          <Route element={<RequireAuth module="SERVICIOS" roles={ADMIN_ROLES} />}>
             <Route path="/servicios" element={<ServiciosPage />} />
-            <Route path="/tipos-bloqueo" element={<BlockTypesPage />} />
+          </Route>
+          <Route element={<RequireAuth module="LEGALES" roles={ADMIN_ROLES} />}>
             <Route path="/terminos-admin" element={<AdminTermsPage />} />
           </Route>
-        </Route>
-      </Route>
 
-      {/* PORTAL DEL PACIENTE */}
-      <Route element={<RequireAuth roles={PATIENT_ROLES} />}>
-        <Route element={<AppShell />}>
-          <Route path="/mis-citas" element={<MyAppointmentsPage />} />
-          <Route path="/mis-citas/:id" element={<AppointmentDetailPage />} />
-          <Route path="/mis-citas/nueva" element={<NewAppointmentPage />} />
-          <Route path="/mis-citas/nueva/fecha-y-hora" element={<NewAppointmentSchedulePage />} />
-          <Route path="/mis-citas/nueva/confirmar" element={<NewAppointmentConfirmPage />} />
+          {/* Portal del paciente */}
+          <Route element={<RequireAuth module="MIS_CITAS" roles={PATIENT_ROLES} />}>
+            <Route path="/mis-citas" element={<MyAppointmentsPage />} />
+            <Route path="/mis-citas/:id" element={<AppointmentDetailPage />} />
+            <Route path="/mis-citas/nueva" element={<NewAppointmentPage />} />
+            <Route path="/mis-citas/nueva/fecha-y-hora" element={<NewAppointmentSchedulePage />} />
+            <Route path="/mis-citas/nueva/confirmar" element={<NewAppointmentConfirmPage />} />
+          </Route>
         </Route>
       </Route>
 

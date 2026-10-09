@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ActionsCell, AnimatedSelect, Badge, Button, Card, ConfirmDialog,
+import { ActionsCell, AnimatedSelect, Badge, Button, Card, Checkbox, ConfirmDialog,
   Field, Input, PageHead, Pagination, RolesTableSkeleton, RowActions, SearchInput,
   Table, TableFoot, TableState, Toast, Toolbar, useTableSort, type Column,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { ApiError } from '@/shared/api/apiClient'
-import { rolesApi, type RolResponse } from '../api/rolesApi'
+import { cn } from '@/shared/lib/cn'
+import { rolesApi, modulosApi, type RolResponse, type ModuloResponse } from '../api/rolesApi'
 
 const COLUMNS: Column[] = [
   { key: 'nombre', label: 'Rol', sortable: true },
   { key: 'descripcion', label: 'Descripción', sortable: true },
+  { label: 'Módulos', align: 'center' },
   { key: 'sistema', label: 'Tipo', align: 'center', sortable: true },
   { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
@@ -22,8 +24,10 @@ const POR_PAGINA = 10
 type Aviso = { tipo: 'success' | 'error'; texto: string }
 
 export function RolesPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, recargarPerfil } = useAuth()
   const [roles, setRoles] = useState<RolResponse[]>([])
+  const [modulos, setModulos] = useState<ModuloResponse[]>([])
+  const [selectedModulos, setSelectedModulos] = useState<number[]>([])
   const [query, setQuery] = useState('')
   const [tipo, setTipo] = useState('')
   const [estado, setEstado] = useState('')
@@ -39,6 +43,11 @@ export function RolesPage() {
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [actualizacion, setActualizacion] = useState(0)
+
+  useEffect(() => {
+    if (!accessToken) return
+    modulosApi.listar(accessToken).then(setModulos).catch(() => {})
+  }, [accessToken])
 
   useEffect(() => {
     if (!accessToken) return
@@ -105,6 +114,7 @@ export function RolesPage() {
     setEditando(null)
     setNombre('')
     setDescripcion('')
+    setSelectedModulos([])
     setError('')
     setMostrarForm(true)
     scrollToTopOrElement()
@@ -114,9 +124,16 @@ export function RolesPage() {
     setEditando(rol)
     setNombre(rol.nombre)
     setDescripcion(rol.descripcion ?? '')
+    setSelectedModulos((rol.modulos ?? []).map(m => m.id ?? m.idModulo!))
     setError('')
     setMostrarForm(true)
     scrollToTopOrElement()
+  }
+
+  const toggleModulo = (id: number) => {
+    setSelectedModulos(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
   }
 
   const guardar = async (e: FormEvent) => {
@@ -136,6 +153,7 @@ export function RolesPage() {
       const data = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
+        modulosIds: selectedModulos,
       }
 
       if (editando) {
@@ -143,6 +161,8 @@ export function RolesPage() {
       } else {
         await rolesApi.crear(accessToken, data)
       }
+
+      await recargarPerfil()
 
       setMostrarForm(false)
       setAviso({
@@ -175,6 +195,8 @@ export function RolesPage() {
       } else {
         await rolesApi.desactivar(accessToken, confirmar.id)
       }
+
+      await recargarPerfil()
 
       setAviso({
         tipo: 'success',
@@ -222,49 +244,124 @@ export function RolesPage() {
             <Card className="p-5">
               <form
                 onSubmit={guardar}
-                className="grid gap-4 md:grid-cols-[1fr_2fr_auto] md:items-end"
+                className="flex flex-col gap-4"
               >
-                <Field label="Nombre del rol *">
-                  <Input
-                    icon="lock"
-                    value={nombre}
-                    onChange={e =>
-                      setNombre(
-                        e.target.value
-                          .toUpperCase()
-                          .replace(/\s+/g, '_'),
+                <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
+                  <Field label="Nombre del rol *">
+                    <Input
+                      icon="lock"
+                      value={nombre}
+                      onChange={e =>
+                        setNombre(
+                          e.target.value
+                            .toUpperCase()
+                            .replace(/\s+/g, '_'),
+                        )
+                      }
+                      disabled={guardando || Boolean(editando?.sistema)}
+                      placeholder="Ej. CONTADOR"
+                    />
+                  </Field>
+
+                  <Field label="Descripción">
+                    <Input
+                      icon="file"
+                      value={descripcion}
+                      onChange={e => setDescripcion(e.target.value)}
+                      disabled={guardando}
+                      placeholder="Describe el alcance del rol"
+                    />
+                  </Field>
+                </div>
+
+                <div className="rounded-xl border border-line bg-surface-muted/30 p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
+                        Módulos con acceso ({selectedModulos.length} de {modulos.length} seleccionados)
+                      </h4>
+                      <p className="text-xs text-muted">
+                        Marca los módulos a los que tendrán acceso los usuarios con este rol.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModulos(modulos.map(m => m.id ?? m.idModulo!))}
+                        disabled={guardando}
+                        className="text-xs font-semibold text-brand hover:underline disabled:opacity-50"
+                      >
+                        Seleccionar todos
+                      </button>
+                      <span className="text-xs text-muted">·</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModulos([])}
+                        disabled={guardando}
+                        className="text-xs font-semibold text-muted hover:underline disabled:opacity-50"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                    {modulos.map(m => {
+                      const moduloId = m.id ?? m.idModulo!
+                      const checked = selectedModulos.includes(moduloId)
+                      return (
+                        <div
+                          key={moduloId}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            if (!guardando) toggleModulo(moduloId)
+                          }}
+                          onKeyDown={e => {
+                            if ((e.key === ' ' || e.key === 'Enter') && !guardando) {
+                              e.preventDefault()
+                              toggleModulo(moduloId)
+                            }
+                          }}
+                          className={cn(
+                            'flex items-center gap-2.5 rounded-lg border p-2 text-xs font-medium transition cursor-pointer select-none',
+                            checked
+                              ? 'border-brand/40 bg-brand-soft text-brand font-semibold shadow-xs'
+                              : 'border-line/70 bg-surface text-ink-soft hover:bg-hover hover:text-ink',
+                            guardando && 'cursor-not-allowed opacity-60'
+                          )}
+                        >
+                          <span className="pointer-events-none flex items-center">
+                            <Checkbox
+                              checked={checked}
+                              disabled={guardando}
+                              readOnly
+                              tabIndex={-1}
+                            />
+                          </span>
+                          <span className="truncate">{m.nombre}</span>
+                        </div>
                       )
-                    }
-                    disabled={guardando || Boolean(editando?.sistema)}
-                    placeholder="Ej. SUPERVISOR"
-                  />
-                </Field>
+                    })}
+                  </div>
+                </div>
 
-                <Field label="Descripción">
-                  <Input
-                    icon="file"
-                    value={descripcion}
-                    onChange={e => setDescripcion(e.target.value)}
-                    disabled={guardando}
-                    placeholder="Describe el alcance del rol"
-                  />
-                </Field>
-
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={guardando}>
-                    {guardando
-                      ? 'Guardando…'
-                      : editando
-                        ? 'Actualizar'
-                        : 'Crear'}
-                  </Button>
-
+                <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
                     variant="ghost"
                     onClick={() => setMostrarForm(false)}
                     disabled={guardando}
                   >
                     Cancelar
+                  </Button>
+
+                  <Button type="submit" disabled={guardando}>
+                    {guardando
+                      ? 'Guardando…'
+                      : editando
+                        ? 'Actualizar'
+                        : 'Crear'}
                   </Button>
                 </div>
               </form>
@@ -359,6 +456,29 @@ export function RolesPage() {
 
               <td className="max-w-md whitespace-normal text-ink-soft">
                 {rol.descripcion || 'Sin descripción'}
+              </td>
+
+              <td className="text-center">
+                <div className="flex justify-center">
+                  {(() => {
+                    const count = rol.modulos?.length ?? 0
+                    if (count === 0) {
+                      return <span className="text-xs text-muted">0 módulos</span>
+                    }
+                    const nombres = rol.modulos!.map(m => m.nombre).join(', ')
+                    const esTodos = modulos.length > 0 && count >= modulos.length
+
+                    return (
+                      <span
+                        title={`Módulos asignados:\n${nombres}`}
+                        className="inline-flex cursor-help items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft/80"
+                      >
+                        <span className="size-1.5 rounded-full bg-brand" />
+                        {esTodos ? `Todos (${count})` : `${count} ${count === 1 ? 'módulo' : 'módulos'}`}
+                      </span>
+                    )
+                  })()}
+                </div>
               </td>
 
               <td className="text-center">

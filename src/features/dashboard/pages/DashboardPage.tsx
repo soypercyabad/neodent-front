@@ -382,10 +382,11 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const role = user?.rol || 'Administrador'
-  const isAdmin = role === 'Administrador'
-  const isReception = role === 'Recepcionista'
-  const isDentist = role === 'Odontólogo'
+  const role = user?.rol || ''
+  const isAdmin = role === 'Administrador' || Boolean(user?.rolesRaw?.includes('ADMIN'))
+  const isReception = role === 'Recepcionista' || Boolean(user?.rolesRaw?.includes('RECEPCIONISTA'))
+  const isDentist = role === 'Odontólogo' || Boolean(user?.rolesRaw?.includes('ODONTOLOGO'))
+  const isPatient = role === 'Paciente' || Boolean(user?.rolesRaw?.includes('PACIENTE'))
 
   useEffect(() => {
     if (!accessToken) {
@@ -408,6 +409,10 @@ export function DashboardPage() {
         } else if (isReception) {
           const res = await dashboardApi.getReceptionData(accessToken)
           if (activo) setReceptionData(res)
+        } else {
+          // Rol personalizado con acceso a dashboard
+          if (activo) setLoading(false)
+          return
         }
       } catch (e) {
         if (activo) setError(e instanceof Error ? e.message : 'Error al cargar datos del dashboard')
@@ -421,7 +426,7 @@ export function DashboardPage() {
   }, [accessToken, isAdmin, isDentist, isReception, user?.id])
 
   // Si es Paciente, renderizar su Dashboard especializado
-  if (user?.rol === 'Paciente') {
+  if (isPatient) {
     return <PatientDashboard />
   }
 
@@ -1230,6 +1235,32 @@ export function DashboardPage() {
                   icon="pacientes"
                 />
               </div>
+            </div>
+          )}
+
+          {/* VISTA GENERAL PARA OTROS ROLES PERSONALIZADOS */}
+          {!isAdmin && !isDentist && !isReception && (
+            <div className="space-y-6">
+              <Card className="p-6">
+                <h3 className="text-lg font-bold text-ink">Bienvenido a NeoDents</h3>
+                <p className="mt-1 text-sm text-ink-soft">
+                  Has iniciado sesión como <strong>{user?.nombre} {user?.apellido}</strong> ({user?.rol}). Módulos a los que tienes acceso:
+                </p>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {(user?.modulos || [])
+                    .filter(m => m.codigo !== 'DASHBOARD')
+                    .map(m => (
+                      <QuickLink
+                        key={m.idModulo}
+                        href={m.codigo === 'PERSONAL' ? '/usuarios' : m.codigo === 'ROLES' ? '/roles' : m.codigo === 'SEDES' ? '/sedes' : m.codigo === 'SERVICIOS' ? '/servicios' : m.codigo === 'ESPECIALIDADES' ? '/especialidades' : m.codigo === 'LEGALES' ? '/terminos-admin' : m.codigo === 'PACIENTES' ? '/pacientes' : m.codigo === 'CITAS' ? '/citas' : m.codigo === 'HORARIOS' ? '/horarios' : '/dashboard'}
+                        label={m.nombre}
+                        description={`Acceso al módulo de ${m.nombre}`}
+                        icon="file"
+                      />
+                    ))}
+                </div>
+              </Card>
             </div>
           )}
         </>

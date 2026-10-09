@@ -15,7 +15,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const items = user ? navItemsFor(user.rol) : []
+  const items = user ? navItemsFor(user.rol, user.modulos) : []
 
   const handleLogout = async () => {
     onNavigate?.()

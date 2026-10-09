@@ -376,6 +376,14 @@ export function RolesTableSkeleton({ rows = 4 }: { rows?: number }) {
             <Skeleton className="h-3.5 w-72 max-w-full rounded-full opacity-80" />
           </td>
 
+          {/* Módulos */}
+          <td className="px-4 py-4">
+            <div className="flex gap-1">
+              <Skeleton className="h-5 w-16 rounded-md" />
+              <Skeleton className="h-5 w-20 rounded-md" />
+            </div>
+          </td>
+
           {/* Tipo (Badge) */}
           <td className="px-4 py-4 text-center">
             <Skeleton className="mx-auto h-5 w-20 rounded-full" />

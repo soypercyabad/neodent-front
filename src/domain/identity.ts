@@ -8,7 +8,7 @@ export const ROLES = [
   'Paciente',
 ] as const
 
-export type Role = (typeof ROLES)[number]
+export type Role = (typeof ROLES)[number] | string
 
 export const STAFF_ROLES = [
   'Odontólogo',
@@ -21,6 +21,15 @@ export type StaffRole = (typeof STAFF_ROLES)[number]
 export const PATIENT_ROLES = ['Paciente'] as const
 
 export type PatientRole = (typeof PATIENT_ROLES)[number]
+
+export interface UserModulo {
+  id?: number
+  idModulo?: number
+  codigo: string
+  nombre: string
+  icono?: string | null
+  orden: number
+}
 
 export interface User {
   id: Id
@@ -42,11 +51,15 @@ export interface User {
    * Paciente, y es la que enlaza al usuario con sus citas.
    */
   pacId?: Id
+  /** Módulos a los que el usuario tiene acceso según sus roles asignados */
+  modulos?: UserModulo[]
+  /** Nombres de roles técnicos directos del backend (ej. ADMIN, RECEPCIONISTA, CONTADOR) */
+  rolesRaw?: string[]
 }
 
 export type UserInput = Pick<User, 'nombre' | 'apellido' | 'correo' | 'rol' | 'esp' | 'activo'>
 
-export const roleTone: Record<Role, BadgeTone> = {
+export const roleTone: Record<string, BadgeTone> = {
   Odontólogo: 'green',
   Administrador: 'blue',
   Recepcionista: 'blue',

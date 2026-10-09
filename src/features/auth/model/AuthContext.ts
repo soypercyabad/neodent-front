@@ -19,6 +19,7 @@ export interface AuthStore {
 
   register: (input: RegisterInput) => Promise<void>
   logout: () => Promise<void>
+  recargarPerfil: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthStore | null>(null)

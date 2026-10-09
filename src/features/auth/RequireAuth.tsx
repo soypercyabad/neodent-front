@@ -4,9 +4,10 @@ import { useAuth } from './model/useAuth'
 
 interface RequireAuthProps {
   roles?: readonly Role[]
+  module?: string
 }
 
-export function RequireAuth({ roles }: RequireAuthProps) {
+export function RequireAuth({ roles, module }: RequireAuthProps) {
   const { user, isLoading } = useAuth()
   const location = useLocation()
 
@@ -24,7 +25,19 @@ export function RequireAuth({ roles }: RequireAuthProps) {
     )
   }
 
-  if (roles && !roles.includes(user.rol)) {
+  const isAdmin = user.rol === 'Administrador' || user.rolesRaw?.includes('ADMIN')
+
+  // Si la ruta requiere un módulo específico, validar que el usuario tenga ese módulo asignado
+  if (module) {
+    const isRolesManagement = module === 'ROLES' && isAdmin
+    const hasModule = user.modulos?.some(m => m.codigo === module)
+    if (!hasModule && !isRolesManagement) {
+      return <Navigate to="/403" replace />
+    }
+  }
+
+  // Si la ruta tiene restricción por rol
+  if (roles && !isAdmin && !roles.includes(user.rol)) {
     return <Navigate to="/403" replace />
   }
 

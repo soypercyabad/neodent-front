@@ -6,39 +6,7 @@ import type { Credentials, RegisterInput } from './auth.types'
 import { restoreSession } from './sessionService'
 import { setTokenRefresher, setSessionExpiredHandler } from '@/shared/api/apiClient'
 
-function mapBackendRole(roles: string[]): Role {
-  if (roles.includes('ADMIN')) return 'Administrador'
-  if (roles.includes('RECEPCIONISTA')) return 'Recepcionista'
-  if (roles.includes('ODONTOLOGO')) return 'Odontólogo'
-  if (roles.includes('PACIENTE')) return 'Paciente'
-
-  throw new Error('El usuario no tiene un rol válido.')
-}
-
-function mapProfileToUser(profile: AuthenticatedUserResponse): User {
-  const rol = mapBackendRole(profile.roles)
-
-  return {
-    id: profile.idUsuario,
-    nombre: profile.nombres,
-    apellido: [
-      profile.apellidoPaterno,
-      profile.apellidoMaterno,
-    ]
-      .filter(Boolean)
-      .join(' '),
-
-    correo: profile.correo,
-    rol,
-    esp: '',
-    activo: profile.estado === 'ACTIVO',
-    tieneHorario: false,
-
-    ...(profile.idPaciente !== null
-      ? { pacId: profile.idPaciente }
-      : {}),
-  }
-}
+import { mapProfileToUser } from './auth.mappers'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -201,6 +169,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [limpiarSesion])
 
+  const recargarPerfil = useCallback(async () => {
+    if (!accessToken) return
+    try {
+      const profile = await authApi.me(accessToken)
+      setUser(mapProfileToUser(profile))
+    } catch {
+      // Ignorar error temporal de recarga
+    }
+  }, [accessToken])
+
   const value = useMemo<AuthStore>(
     () => ({
       user,
@@ -213,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendTwoFactor,
       register,
       logout,
+      recargarPerfil,
     }),
     [
       user,
@@ -224,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendTwoFactor,
       register,
       logout,
+      recargarPerfil,
     ],
   )
 

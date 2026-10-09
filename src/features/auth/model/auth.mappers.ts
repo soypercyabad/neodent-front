@@ -6,8 +6,9 @@ export function mapBackendRole(roles: string[]): Role {
   if (roles.includes('RECEPCIONISTA')) return 'Recepcionista'
   if (roles.includes('ODONTOLOGO')) return 'Odontólogo'
   if (roles.includes('PACIENTE')) return 'Paciente'
+  if (roles.length > 0) return roles[0]
 
-  throw new Error('El usuario no tiene un rol válido.')
+  return 'Personal'
 }
 
 export function mapProfileToUser(profile: AuthenticatedUserResponse): User {
@@ -28,6 +29,8 @@ export function mapProfileToUser(profile: AuthenticatedUserResponse): User {
     esp: '',
     activo: profile.estado === 'ACTIVO',
     tieneHorario: false,
+    modulos: profile.modulos ?? [],
+    rolesRaw: profile.roles,
 
     ...(profile.idPaciente !== null
       ? { pacId: profile.idPaciente }
