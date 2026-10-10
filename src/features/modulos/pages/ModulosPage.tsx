@@ -611,7 +611,8 @@ export function ModulosPage() {
                         {
                           label: m.activo ? 'Desactivar módulo' : 'Activar módulo',
                           icon: m.activo ? 'xCircle' : 'checkCircle',
-                          tone: m.activo ? 'destructive' : 'default',
+                          variant: m.activo ? 'danger' : 'success',
+                          danger: m.activo,
                           onClick: () => setConfirmar(m),
                         },
                       ]}
@@ -623,11 +624,7 @@ export function ModulosPage() {
           )}
         </Table>
 
-        <TableFoot>
-          <span className="text-xs text-muted">
-            Mostrando {visibles.length} de {filtrados.length} módulos
-          </span>
-
+        <TableFoot summary={`Mostrando ${visibles.length} de ${filtrados.length} módulos`}>
           <Pagination
             totalPages={totalPaginas}
             page={paginaActual}
@@ -707,7 +704,7 @@ export function ModulosPage() {
 
       <ConfirmDialog
         open={Boolean(confirmar)}
-        onClose={() => setConfirmar(null)}
+        onCancel={() => setConfirmar(null)}
         onConfirm={cambiarEstado}
         title={confirmar?.activo ? 'Desactivar módulo' : 'Activar módulo'}
         description={
@@ -715,8 +712,7 @@ export function ModulosPage() {
             ? `¿Estás seguro de desactivar el módulo "${confirmar.nombre}"? Los usuarios no podrán acceder a esta sección mientras esté inactivo.`
             : `¿Deseas activar el módulo "${confirmar?.nombre}"? Volverá a estar disponible para los roles que lo tengan asignado.`
         }
-        confirmText={confirmar?.activo ? 'Desactivar' : 'Activar'}
-        tone={confirmar?.activo ? 'destructive' : 'primary'}
+        confirmLabel={confirmar?.activo ? 'Desactivar' : 'Activar'}
       />
     </>
   )

@@ -1,13 +1,25 @@
 import { apiRequest } from '@/shared/api/apiClient'
 import { citaDetalleApi, type DetalleCita } from '@/features/appointments/api/citaDetalleApi'
 import { bookingApi, type CreatedAppointment } from '@/features/appointments/api/bookingApi'
-import { patientsApi } from '@/features/patients/api/patientsApi'
-import { usersApi } from '@/features/users/api/usersApi'
-import { serviciosApi } from '@/features/servicios/api/serviciosApi'
-import { sedesApi } from '@/features/sedes/api/sedesApi'
+
+export interface DashboardCitaResumen {
+  idCita: number
+  fechaHoraInicio: string
+  fechaHoraFin: string
+  estado: string
+  pacienteId?: number
+  pacienteNombre: string
+  pacienteTipoDocumento?: string
+  pacienteNumeroDocumento?: string
+  pacienteTelefono?: string
+  odontologoNombre?: string
+  servicioNombre: string
+  sedeNombre?: string
+  precioReferencial?: number
+}
 
 export interface AdminDashboardData {
-  citas: DetalleCita[]
+  citas: DashboardCitaResumen[]
   pacientesTotal: number
   pacientesActivos: number
   pacientesNuevosMes: number
@@ -23,10 +35,15 @@ export interface AdminDashboardData {
   recepcionistasTotal: number
   sedesTotal: number
   serviciosTotal: number
+  evolucion: Array<{ fecha: string; Programadas: number; Atendidas: number }>
+  topServicios: Array<{ name: string; total: number }>
+  distribucionEstados: Array<{ name: string; value: number; color: string }>
+  productividadDoctores: Array<{ doctor: string; citas: number; atendidas: number }>
+  sedesData: Array<{ name: string; total: number }>
 }
 
 export interface DentistDashboardData {
-  citas: DetalleCita[]
+  citas: DashboardCitaResumen[]
   citasHoy: number
   citasAtendidasHoy: number
   citasProximas: number
@@ -34,9 +51,9 @@ export interface DentistDashboardData {
 }
 
 export interface ReceptionDashboardData {
-  citas: DetalleCita[]
-  citasDeHoy: DetalleCita[]
-  citasProximas: DetalleCita[]
+  citas: DashboardCitaResumen[]
+  citasDeHoy: DashboardCitaResumen[]
+  citasProximas: DashboardCitaResumen[]
   citasHoy: number
   citasPendientesHoy: number
   citasAtendidasHoy: number
@@ -73,183 +90,105 @@ export const getLocalDateStr = (d: Date = new Date()): string => {
   return `${y}-${m}-${day}`
 }
 
-const hoyStr = () => getLocalDateStr()
-
-const esMismoDia = (fechaIso: string, objetivoIso: string) => {
-  return fechaIso.slice(0, 10) === objetivoIso.slice(0, 10)
-}
-
 export const dashboardApi = {
   /**
-   * Carga métricas consolidadas para el Administrador
+   * Carga métricas consolidadas optimizadas para el Administrador desde /api/dashboard/admin
    */
-  async getAdminData(accessToken: string): Promise<AdminDashboardData> {
-    const [citasRes, pacsRes, usersRes, servsRes, sedesRes] = await Promise.allSettled([
-      citaDetalleApi.agenda(accessToken),
-      patientsApi.listar(accessToken, { page: 0, size: 250 }),
-      usersApi.listar(accessToken, { page: 0, size: 250 }),
-      serviciosApi.listar(accessToken),
-      sedesApi.listar(accessToken),
-    ])
+  async getAdminData(accessToken: string, periodo: string = '30D'): Promise<AdminDashboardData> {
+    interface BackendAdminResponse {
+      kpis: {
+        pacientesTotal: number
+        pacientesActivos: number
+        pacientesNuevosMes: number
+        citasTotal: number
+        citasAtendidas: number
+        citasConfirmadas: number
+        citasCanceladas: number
+        citasEnAtencion: number
+        citasHoy: number
+        facturacionEstimada: number
+        personalTotal: number
+        odontologosTotal: number
+        recepcionistasTotal: number
+        sedesTotal: number
+        serviciosTotal: number
+      }
+      evolucion: Array<{ fecha: string; Programadas: number; Atendidas: number }>
+      topServicios: Array<{ name: string; total: number }>
+      distribucionEstados: Array<{ name: string; value: number; color: string }>
+      productividadDoctores: Array<{ doctor: string; citas: number; atendidas: number }>
+      sedesData: Array<{ name: string; total: number }>
+      citasRecientes: DashboardCitaResumen[]
+    }
 
-    const citas = citasRes.status === 'fulfilled' ? citasRes.value : []
-    const pacs = pacsRes.status === 'fulfilled' ? pacsRes.value : { totalElementos: 0, contenido: [] }
-    const users = usersRes.status === 'fulfilled' ? usersRes.value : { totalElementos: 0, contenido: [] }
-    const servicios = servsRes.status === 'fulfilled' ? servsRes.value : []
-    const sedes = sedesRes.status === 'fulfilled' ? sedesRes.value : []
-
-    const hoy = hoyStr()
-    const inicioMes = new Date()
-    inicioMes.setDate(1)
-    inicioMes.setHours(0, 0, 0, 0)
-
-    const citasHoy = citas.filter(c => esMismoDia(c.fechaHoraInicio, hoy)).length
-    const citasAtendidas = citas.filter(c => c.estado === 'ATENDIDA').length
-    const citasConfirmadas = citas.filter(c => c.estado === 'CONFIRMADA').length
-    const citasCanceladas = citas.filter(c => c.estado === 'CANCELADA' || c.estado === 'NO_ASISTIO').length
-    const citasEnAtencion = citas.filter(c => c.estado === 'EN_ATENCION').length
-
-    // Facturación estimada: suma del precio referencial de citas atendidas o confirmadas
-    const facturacionEstimada = citas
-      .filter(c => c.estado === 'ATENDIDA' || c.estado === 'CONFIRMADA')
-      .reduce((acc, c) => acc + (c.precioReferencial || 0), 0)
-
-    // Pacientes
-    const pacientesActivos = pacs.contenido.filter(p => p.activo).length
-    const pacientesNuevosMes = pacs.contenido.filter(p => {
-      if (!p.fechaCreacion) return false
-      return new Date(p.fechaCreacion).getTime() >= inicioMes.getTime()
-    }).length
-
-    // Usuarios
-    const odontologosTotal = users.contenido.filter(u => u.roles.includes('ODONTOLOGO')).length
-    const recepcionistasTotal = users.contenido.filter(u => u.roles.includes('RECEPCIONISTA')).length
+    const data = await apiRequest<BackendAdminResponse>(
+      `/api/dashboard/admin?periodo=${encodeURIComponent(periodo)}`,
+      { accessToken },
+    )
 
     return {
-      citas,
-      pacientesTotal: pacs.totalElementos || pacs.contenido.length,
-      pacientesActivos,
-      pacientesNuevosMes,
-      citasTotal: citas.length,
-      citasAtendidas,
-      citasConfirmadas,
-      citasCanceladas,
-      citasEnAtencion,
-      citasHoy,
-      facturacionEstimada,
-      personalTotal: users.totalElementos || users.contenido.length,
-      odontologosTotal,
-      recepcionistasTotal,
-      sedesTotal: sedes.length,
-      serviciosTotal: servicios.length,
+      citas: data.citasRecientes || [],
+      pacientesTotal: data.kpis?.pacientesTotal ?? 0,
+      pacientesActivos: data.kpis?.pacientesActivos ?? 0,
+      pacientesNuevosMes: data.kpis?.pacientesNuevosMes ?? 0,
+      citasTotal: data.kpis?.citasTotal ?? 0,
+      citasAtendidas: data.kpis?.citasAtendidas ?? 0,
+      citasConfirmadas: data.kpis?.citasConfirmadas ?? 0,
+      citasCanceladas: data.kpis?.citasCanceladas ?? 0,
+      citasEnAtencion: data.kpis?.citasEnAtencion ?? 0,
+      citasHoy: data.kpis?.citasHoy ?? 0,
+      facturacionEstimada: data.kpis?.facturacionEstimada ?? 0,
+      personalTotal: data.kpis?.personalTotal ?? 0,
+      odontologosTotal: data.kpis?.odontologosTotal ?? 0,
+      recepcionistasTotal: data.kpis?.recepcionistasTotal ?? 0,
+      sedesTotal: data.kpis?.sedesTotal ?? 0,
+      serviciosTotal: data.kpis?.serviciosTotal ?? 0,
+      evolucion: data.evolucion || [],
+      topServicios: data.topServicios || [],
+      distribucionEstados: data.distribucionEstados || [],
+      productividadDoctores: data.productividadDoctores || [],
+      sedesData: data.sedesData || [],
     }
   },
 
   /**
-   * Carga métricas y agenda para el Odontólogo
+   * Carga métricas y citas del odontólogo autenticado desde /api/dashboard/odontologo
    */
-  async getDentistData(accessToken: string, odontologoId?: number): Promise<DentistDashboardData> {
-    let citas: DetalleCita[] = []
-
-    try {
-      // Intentar consultar mi agenda si existe el endpoint paginado
-      const paginaRes = await apiRequest<{ contenido: CreatedAppointment[] }>(
-        '/api/citas/mi-agenda?pagina=0&tamano=100',
-        { accessToken },
-      )
-      if (paginaRes?.contenido?.length) {
-        citas = await Promise.all(
-          paginaRes.contenido.map(c => citaDetalleApi.detalle(accessToken, c.idCita)),
-        )
-      }
-    } catch {
-      // Fallback a consultar agenda general y filtrar por odontólogo
-      const todas = await citaDetalleApi.agenda(accessToken)
-      if (odontologoId) {
-        citas = todas.filter(c => c.odontologoId === odontologoId)
-      } else {
-        citas = todas
-      }
-    }
-
-    const hoy = hoyStr()
-    const ahora = Date.now()
-
-    const citasHoy = citas.filter(c => esMismoDia(c.fechaHoraInicio, hoy)).length
-    const citasAtendidasHoy = citas.filter(
-      c => esMismoDia(c.fechaHoraInicio, hoy) && c.estado === 'ATENDIDA',
-    ).length
-    const citasProximas = citas.filter(
-      c => new Date(c.fechaHoraInicio).getTime() >= ahora && c.estado !== 'CANCELADA',
-    ).length
-
-    const pacientesUnicos = new Set(citas.map(c => c.pacienteId)).size
+  async getDentistData(accessToken: string): Promise<DentistDashboardData> {
+    const data = await apiRequest<DentistDashboardData>(
+      '/api/dashboard/odontologo',
+      { accessToken },
+    )
 
     return {
-      citas,
-      citasHoy,
-      citasAtendidasHoy,
-      citasProximas,
-      pacientesUnicos,
+      citas: data.citas || [],
+      citasHoy: data.citasHoy || 0,
+      citasAtendidasHoy: data.citasAtendidasHoy || 0,
+      citasProximas: data.citasProximas || 0,
+      pacientesUnicos: data.pacientesUnicos || 0,
     }
   },
 
   /**
-   * Carga métricas y agenda para la Recepcionista
+   * Carga métricas operativas del día para la Recepcionista desde /api/dashboard/recepcion
    */
   async getReceptionData(accessToken: string): Promise<ReceptionDashboardData> {
-    const [citasRes, pacsRes] = await Promise.allSettled([
-      citaDetalleApi.agenda(accessToken),
-      patientsApi.listar(accessToken, { page: 0, size: 250 }),
-    ])
-
-    const citas = citasRes.status === 'fulfilled' ? citasRes.value : []
-    const pacs = pacsRes.status === 'fulfilled' ? pacsRes.value : { totalElementos: 0, contenido: [] }
-
-    const hoy = hoyStr()
-    const haceUnaSemana = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const ahora = Date.now()
-
-    // Ordenar cronológicamente
-    const citasOrdenadas = [...citas].sort(
-      (a, b) => new Date(a.fechaHoraInicio).getTime() - new Date(b.fechaHoraInicio).getTime(),
+    const data = await apiRequest<ReceptionDashboardData>(
+      '/api/dashboard/recepcion',
+      { accessToken },
     )
-
-    const citasDeHoy = citasOrdenadas.filter(c => esMismoDia(c.fechaHoraInicio, hoy))
-    const citasPendientesHoy = citasDeHoy.filter(
-      c => c.estado === 'PROGRAMADA' || c.estado === 'CONFIRMADA',
-    ).length
-    const citasAtendidasHoy = citasDeHoy.filter(c => c.estado === 'ATENDIDA').length
-    const citasEnAtencionHoy = citasDeHoy.filter(c => c.estado === 'EN_ATENCION').length
-
-    // Citas próximas: desde hoy en adelante o que no estén concluidas/canceladas
-    const citasProximas = citasOrdenadas.filter(
-      c =>
-        new Date(c.fechaHoraInicio).getTime() >= ahora - 12 * 60 * 60 * 1000 &&
-        c.estado !== 'CANCELADA' &&
-        c.estado !== 'NO_ASISTIO',
-    )
-
-    const citasPendientesTotal = citas.filter(
-      c => c.estado === 'PROGRAMADA' || c.estado === 'CONFIRMADA',
-    ).length
-
-    const pacientesNuevosSemana = pacs.contenido.filter(p => {
-      if (!p.fechaCreacion) return false
-      return new Date(p.fechaCreacion).getTime() >= haceUnaSemana
-    }).length
 
     return {
-      citas: citasOrdenadas,
-      citasDeHoy,
-      citasProximas,
-      citasHoy: citasDeHoy.length,
-      citasPendientesHoy,
-      citasAtendidasHoy,
-      citasEnAtencionHoy,
-      citasPendientesTotal,
-      citasProximasTotal: citasProximas.length,
-      pacientesNuevosSemana,
+      citas: data.citasDeHoy || [],
+      citasDeHoy: data.citasDeHoy || [],
+      citasProximas: data.citasProximas || [],
+      citasHoy: data.citasHoy || 0,
+      citasPendientesHoy: data.citasPendientesHoy || 0,
+      citasAtendidasHoy: data.citasAtendidasHoy || 0,
+      citasEnAtencionHoy: data.citasEnAtencionHoy || 0,
+      citasPendientesTotal: data.citasPendientesTotal || 0,
+      citasProximasTotal: data.citasProximasTotal || 0,
+      pacientesNuevosSemana: data.pacientesNuevosSemana || 0,
     }
   },
 

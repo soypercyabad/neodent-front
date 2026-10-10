@@ -34,6 +34,7 @@ import {
   type AdminDashboardData,
   type DentistDashboardData,
   type ReceptionDashboardData,
+  type DashboardCitaResumen,
 } from '../api/dashboardApi'
 import type { DetalleCita } from '@/features/appointments/api/citaDetalleApi'
 import { citaReferencia } from '@/features/appointments/model/citaReferencia'
@@ -169,7 +170,7 @@ function RealAppointmentsTable({
   filtroEstado,
   mostrarOdontologo = true,
 }: {
-  citas: DetalleCita[]
+  citas: Array<DashboardCitaResumen | DetalleCita>
   titulo?: string
   descripcion?: string
   verTodoHref?: string
@@ -197,12 +198,12 @@ function RealAppointmentsTable({
     }
     const dir = sortDirection === 'asc' ? 1 : -1
     const ordenadas = [...res].sort((a, b) => {
-      if (sortColumn === 'idCita') return (a.idCita - b.idCita) * dir
-      if (sortColumn === 'pacienteNombre') return a.pacienteNombre.localeCompare(b.pacienteNombre, 'es') * dir
-      if (sortColumn === 'servicioNombre') return a.servicioNombre.localeCompare(b.servicioNombre, 'es') * dir
+      if (sortColumn === 'idCita') return ((a.idCita || 0) - (b.idCita || 0)) * dir
+      if (sortColumn === 'pacienteNombre') return (a.pacienteNombre || '').localeCompare(b.pacienteNombre || '', 'es') * dir
+      if (sortColumn === 'servicioNombre') return (a.servicioNombre || '').localeCompare(b.servicioNombre || '', 'es') * dir
       if (sortColumn === 'odontologoNombre') return (a.odontologoNombre || '').localeCompare(b.odontologoNombre || '', 'es') * dir
-      if (sortColumn === 'fechaHoraInicio') return a.fechaHoraInicio.localeCompare(b.fechaHoraInicio) * dir
-      if (sortColumn === 'estado') return a.estado.localeCompare(b.estado, 'es') * dir
+      if (sortColumn === 'fechaHoraInicio') return (a.fechaHoraInicio || '').localeCompare(b.fechaHoraInicio || '') * dir
+      if (sortColumn === 'estado') return (a.estado || '').localeCompare(b.estado || '', 'es') * dir
       return 0
     })
     return ordenadas.slice(0, 8)
@@ -345,8 +346,8 @@ function RealAppointmentsTable({
                   </td>
 
                   <td className="px-4 py-3.5 text-center">
-                    <Badge tone={tonoEstado(cita.estado)}>
-                      {cita.estado.replaceAll('_', ' ')}
+                    <Badge tone={tonoEstado(cita.estado || '')}>
+                      {(cita.estado || 'PENDIENTE').replaceAll('_', ' ')}
                     </Badge>
                   </td>
 
@@ -401,10 +402,10 @@ export function DashboardPage() {
       setError(null)
       try {
         if (isAdmin) {
-          const res = await dashboardApi.getAdminData(accessToken)
+          const res = await dashboardApi.getAdminData(accessToken, periodo)
           if (activo) setAdminData(res)
         } else if (isDentist) {
-          const res = await dashboardApi.getDentistData(accessToken, user?.id ? Number(user.id) : undefined)
+          const res = await dashboardApi.getDentistData(accessToken)
           if (activo) setDentistData(res)
         } else if (isReception) {
           const res = await dashboardApi.getReceptionData(accessToken)
@@ -423,150 +424,54 @@ export function DashboardPage() {
 
     void cargarDatos()
     return () => { activo = false }
-  }, [accessToken, isAdmin, isDentist, isReception, user?.id])
+  }, [accessToken, isAdmin, isDentist, isReception, periodo])
 
   // Si es Paciente, renderizar su Dashboard especializado
   if (isPatient) {
     return <PatientDashboard />
   }
 
-  // --- FILTRADO TEMPORAL PARA ADMINISTRADOR ---
-  const citasFiltradasAdmin = useMemo(() => {
-    if (!adminData) return []
-    const ahora = Date.now()
-    const dias = periodo === '7D' ? 7 : periodo === '30D' ? 30 : periodo === 'AÑO' ? 365 : 9999
-    const limite = ahora - dias * 24 * 60 * 60 * 1000
-
-    return adminData.citas.filter(c => new Date(c.fechaHoraInicio).getTime() >= limite)
-  }, [adminData, periodo])
-
   // 1. Datos para gráfico de evolución (AreaChart)
   const evolucionData = useMemo(() => {
-    const agrupado: Record<string, { total: number; atendidas: number }> = {}
-
-    // Orden cronológico
-    const ordenadas = [...citasFiltradasAdmin].sort(
-      (a, b) => new Date(a.fechaHoraInicio).getTime() - new Date(b.fechaHoraInicio).getTime(),
-    )
-
-    for (const c of ordenadas) {
-      const fecha = c.fechaHoraInicio.slice(5, 10) // MM-DD
-      if (!agrupado[fecha]) {
-        agrupado[fecha] = { total: 0, atendidas: 0 }
-      }
-      agrupado[fecha].total++
-      if (c.estado === 'ATENDIDA') {
-        agrupado[fecha].atendidas++
-      }
+    if (adminData?.evolucion?.length) {
+      return adminData.evolucion
     }
-
-    const resultado = Object.entries(agrupado).map(([label, v]) => ({
-      fecha: label,
-      Programadas: v.total,
-      Atendidas: v.atendidas,
-    }))
-
-    // Si hay muy pocos datos, asegurar al menos una estructura
-    if (resultado.length === 0) {
-      return [
-        { fecha: 'Inicio', Programadas: 0, Atendidas: 0 },
-        { fecha: 'Actual', Programadas: 0, Atendidas: 0 },
-      ]
-    }
-    return resultado
-  }, [citasFiltradasAdmin])
+    return [
+      { fecha: 'Inicio', Programadas: 0, Atendidas: 0 },
+      { fecha: 'Actual', Programadas: 0, Atendidas: 0 },
+    ]
+  }, [adminData])
 
   // 2. Datos para servicios más demandados
   const serviciosData = useMemo(() => {
-    const conteo: Record<string, number> = {}
-    for (const c of citasFiltradasAdmin) {
-      const nom = c.servicioNombre || 'Consulta General'
-      conteo[nom] = (conteo[nom] || 0) + 1
-    }
-
-    return Object.entries(conteo)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
-  }, [citasFiltradasAdmin])
+    return adminData?.topServicios || []
+  }, [adminData])
 
   // 3. Distribución de estados (Pie / Donut)
   const estadosData = useMemo(() => {
-    const conteo: Record<string, number> = {
-      Confirmadas: 0,
-      Atendidas: 0,
-      'En atención': 0,
-      Canceladas: 0,
-      Pendientes: 0,
-    }
-
-    for (const c of citasFiltradasAdmin) {
-      if (c.estado === 'CONFIRMADA') conteo.Confirmadas++
-      else if (c.estado === 'ATENDIDA') conteo.Atendidas++
-      else if (c.estado === 'EN_ATENCION') conteo['En atención']++
-      else if (c.estado === 'CANCELADA' || c.estado === 'NO_ASISTIO') conteo.Canceladas++
-      else conteo.Pendientes++
-    }
-
-    return [
-      { name: 'Atendidas', value: conteo.Atendidas, color: '#10B981' },
-      { name: 'Confirmadas', value: conteo.Confirmadas, color: '#3B82F6' },
-      { name: 'En atención', value: conteo['En atención'], color: '#8B5CF6' },
-      { name: 'Canceladas', value: conteo.Canceladas, color: '#EF4444' },
-      { name: 'Pendientes', value: conteo.Pendientes, color: '#F59E0B' },
-    ].filter(item => item.value > 0)
-  }, [citasFiltradasAdmin])
+    return adminData?.distribucionEstados || []
+  }, [adminData])
 
   // 4. Productividad por odontólogo
   const productividadDoctores = useMemo(() => {
-    const docMap: Record<string, { total: number; atendidas: number }> = {}
-
-    for (const c of citasFiltradasAdmin) {
-      const doc = c.odontologoNombre || 'Por asignar'
-      if (!docMap[doc]) {
-        docMap[doc] = { total: 0, atendidas: 0 }
-      }
-      docMap[doc].total++
-      if (c.estado === 'ATENDIDA') {
-        docMap[doc].atendidas++
-      }
-    }
-
-    return Object.entries(docMap)
-      .map(([doctor, val]) => ({
-        doctor: doctor.replace(/^Dr\(a\)\.\s*/, ''),
-        citas: val.total,
-        atendidas: val.atendidas,
-      }))
-      .sort((a, b) => b.citas - a.citas)
-      .slice(0, 5)
-  }, [citasFiltradasAdmin])
+    return adminData?.productividadDoctores || []
+  }, [adminData])
 
   // Facturación filtrada
   const facturacionPeriodo = useMemo(() => {
-    return citasFiltradasAdmin
-      .filter(c => c.estado === 'ATENDIDA' || c.estado === 'CONFIRMADA')
-      .reduce((acc, c) => acc + (c.precioReferencial || 0), 0)
-  }, [citasFiltradasAdmin])
+    return adminData?.facturacionEstimada ?? 0
+  }, [adminData])
 
   // 5. Demanda de atenciones por Sede
   const sedesData = useMemo(() => {
-    const conteo: Record<string, number> = {}
-    for (const c of citasFiltradasAdmin) {
-      const sede = c.sedeNombre || 'Sede Principal'
-      conteo[sede] = (conteo[sede] || 0) + 1
+    if (adminData?.sedesData?.length) {
+      return adminData.sedesData
     }
-
-    const items = Object.entries(conteo)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
-
-    if (items.length === 0 && adminData?.sedesTotal) {
+    if (adminData?.sedesTotal) {
       return [{ name: 'Sede Principal', total: 0 }]
     }
-    return items
-  }, [citasFiltradasAdmin, adminData])
+    return []
+  }, [adminData])
 
   // 6. Horarios / Turnos con mayor afluencia
   const turnosData = useMemo(() => {
@@ -576,7 +481,7 @@ export function DashboardPage() {
       'Noche (16 - 20h)': 0,
     }
 
-    for (const c of citasFiltradasAdmin) {
+    for (const c of (adminData?.citas || [])) {
       try {
         const hora = parseInt(c.fechaHoraInicio.slice(11, 13), 10)
         if (isNaN(hora)) {
@@ -594,7 +499,7 @@ export function DashboardPage() {
     }
 
     return Object.entries(conteo).map(([turno, total]) => ({ turno, total }))
-  }, [citasFiltradasAdmin])
+  }, [adminData])
 
   return (
     <div className="space-y-6">
@@ -673,7 +578,7 @@ export function DashboardPage() {
                 />
                 <MetricCard
                   title={`Citas (${periodo === 'TODO' ? 'Total' : periodo})`}
-                  value={citasFiltradasAdmin.length}
+                  value={adminData.citasTotal}
                   detail={`${adminData.citasAtendidas} atendidas · ${adminData.citasConfirmadas} confirmadas`}
                   icon="calendar"
                   accent="purple"
