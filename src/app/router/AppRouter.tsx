@@ -15,6 +15,7 @@ import { UsersPage, UserDetailPage, NewUserPage, EditUserPage } from '@/features
 import { PatientsPage, PatientDetailPage, NewPatientPage, EditPatientPage } from '@/features/patients'
 import { DashboardPage } from '@/features/dashboard'
 import { RolesPage } from '@/features/roles'
+import { ModulosPage } from '@/features/modulos'
 import { SedesPage } from '@/features/sedes/pages/SedesPage'
 import { EspecialidadesPage } from '@/features/especialidades/pages/EspecialidadesPage'
 import { ServiciosPage } from '@/features/servicios/pages/ServiciosPage'
@@ -85,6 +86,9 @@ export function AppRouter() {
           {/* Catálogo y Administración */}
           <Route element={<RequireAuth module="ROLES" roles={ADMIN_ROLES} />}>
             <Route path="/roles" element={<RolesPage />} />
+          </Route>
+          <Route element={<RequireAuth module="MODULOS" roles={ADMIN_ROLES} />}>
+            <Route path="/modulos" element={<ModulosPage />} />
           </Route>
           <Route element={<RequireAuth module="SEDES" roles={ADMIN_ROLES} />}>
             <Route path="/sedes" element={<SedesPage />} />

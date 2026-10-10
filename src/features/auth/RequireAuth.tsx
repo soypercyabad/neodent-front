@@ -29,9 +29,9 @@ export function RequireAuth({ roles, module }: RequireAuthProps) {
 
   // Si la ruta requiere un módulo específico, validar que el usuario tenga ese módulo asignado
   if (module) {
-    const isRolesManagement = module === 'ROLES' && isAdmin
+    const isSystemAdminModule = (module === 'ROLES' || module === 'MODULOS') && isAdmin
     const hasModule = user.modulos?.some(m => m.codigo === module)
-    if (!hasModule && !isRolesManagement) {
+    if (!hasModule && !isSystemAdminModule) {
       return <Navigate to="/403" replace />
     }
   }

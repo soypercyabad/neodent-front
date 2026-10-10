@@ -340,7 +340,12 @@ export function RolesPage() {
                               tabIndex={-1}
                             />
                           </span>
-                          <span className="truncate">{m.nombre}</span>
+                          <span className="truncate flex-1">{m.nombre}</span>
+                          {m.activo === false && (
+                            <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200/60">
+                              Inactivo
+                            </span>
+                          )}
                         </div>
                       )
                     })}

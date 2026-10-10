@@ -9,13 +9,24 @@ export interface ModuloResponse {
   orden: number
 }
 
+export interface RolModuloResponse {
+  id: number
+  codigo: string
+  nombre: string
+}
+
+export interface RolCatalogoResponse {
+  id: number
+  nombre: string
+}
+
 export interface RolResponse {
   id: number
   nombre: string
   descripcion: string | null
   activo: boolean
   sistema: boolean
-  modulos?: ModuloResponse[]
+  modulos?: RolModuloResponse[]
 }
 
 export interface RolRequest {
@@ -31,6 +42,10 @@ export const modulosApi = {
 }
 
 export const rolesApi = {
+  catalogo(accessToken: string) {
+    return apiRequest<RolCatalogoResponse[]>('/api/roles/catalogo', { accessToken })
+  },
+
   listar(accessToken: string, activo?: boolean) {
     const query = activo === undefined ? '' : `?activo=${activo}`
     return apiRequest<RolResponse[]>(`/api/roles${query}`, { accessToken })
