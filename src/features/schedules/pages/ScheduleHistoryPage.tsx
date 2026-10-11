@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ActionsCell, AnimatedDatePicker, AnimatedSelect, Avatar,
   Badge, Button, Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon,
-  PageHead, Pagination, ProtectedImage, RowActions, TableFoot, Toast,  type ToastAviso,
+  PageHead, Pagination, ProtectedImage, RowActions, TableFoot, Toast, Tooltip, type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -870,18 +870,19 @@ export function ScheduleHistoryPage() {
                             isSorted ? 'text-brand font-extrabold bg-brand-soft/20' : 'text-muted',
                             col.className,
                           )}
-                          title={`Ordenar por ${col.label}`}
                         >
-                          <div className="inline-flex items-center gap-1.5">
-                            <span>{col.label}</span>
-                            <span className={cn('inline-flex items-center transition-colors', isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted')}>
-                              {isSorted ? (
-                                sortDirection === 'asc' ? <Icon name="chevronUp" size={13} strokeWidth={2.5} /> : <Icon name="chevronDown" size={13} strokeWidth={2.5} />
-                              ) : (
-                                <Icon name="chevronsUpDown" size={12} strokeWidth={1.8} />
-                              )}
-                            </span>
-                          </div>
+                          <Tooltip content={`Ordenar por ${col.label}`}>
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>{col.label}</span>
+                              <span className={cn('inline-flex items-center transition-colors', isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted')}>
+                                {isSorted ? (
+                                  sortDirection === 'asc' ? <Icon name="chevronUp" size={13} strokeWidth={2.5} /> : <Icon name="chevronDown" size={13} strokeWidth={2.5} />
+                                ) : (
+                                  <Icon name="chevronsUpDown" size={12} strokeWidth={1.8} />
+                                )}
+                              </span>
+                            </div>
+                          </Tooltip>
                         </th>
                       )
                     })}
@@ -957,7 +958,7 @@ export function ScheduleHistoryPage() {
                         {/* ESPECIALIDAD */}
                         <td className="px-4 py-3.5">
                           <span className="font-medium text-ink">
-                            {matchDoc?.especialidadNombre ?? '—'}
+                            {matchDoc?.especialidadNombre ?? '-'}
                           </span>
                         </td>
 

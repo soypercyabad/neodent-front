@@ -4,6 +4,7 @@ import { AnimatedSelect, Button, Card, DateField, Field, FieldCheck, FieldError,
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { ApiError } from '@/shared/api/apiClient'
 import { EMAIL_RE } from '@/shared/lib/validation'
+import { formatPhone, cleanPhone } from '@/shared/lib/format'
 import { useAuth } from '@/features/auth'
 import { sedesApi, type SedeCatalogo } from '@/features/sedes/api/sedesApi'
 import {
@@ -77,7 +78,7 @@ export function PatientForm({
     apellidoPaterno: paciente?.apellidoPaterno ?? '',
     apellidoMaterno: paciente?.apellidoMaterno ?? '',
     fechaNacimiento: paciente?.fechaNacimiento ?? '',
-    telefono: paciente?.telefono ?? '',
+    telefono: paciente?.telefono ? formatPhone(paciente.telefono) : '',
     email: paciente?.email ?? '',
     direccion: paciente?.direccion ?? '',
     sedeId: paciente?.sedeRegistroId ?? null,
@@ -286,7 +287,8 @@ export function PatientForm({
     if (values.fechaNacimiento && values.fechaNacimiento > hoy) {
       e.fechaNacimiento = 'La fecha no puede ser futura.'
     }
-    if (values.telefono.trim() && !PHONE_RE.test(values.telefono.trim())) {
+    const telLimpio = cleanPhone(values.telefono)
+    if (telLimpio && !PHONE_RE.test(telLimpio)) {
       e.telefono = 'Ingresa un teléfono válido.'
     }
     if (values.email.trim() && !EMAIL_RE.test(values.email.trim())) {
@@ -307,7 +309,8 @@ export function PatientForm({
     documentoListo && (!values.apellidoMaterno.trim() || values.apellidoMaterno.trim().length >= 2),
     `${documentoListo}|${values.apellidoMaterno}`,
   )
-  const telefonoOk = useDelayedValid(!values.telefono || PHONE_RE.test(values.telefono), values.telefono)
+  const telLimpio = cleanPhone(values.telefono)
+  const telefonoOk = useDelayedValid(!telLimpio || PHONE_RE.test(telLimpio), telLimpio)
   const emailOk = useDelayedValid(!values.email || EMAIL_RE.test(values.email), values.email)
 
   const indicator = (key: keyof Values, ok: boolean) =>
@@ -336,7 +339,7 @@ export function PatientForm({
         apellidoPaterno: values.apellidoPaterno.trim(),
         apellidoMaterno: values.apellidoMaterno.trim() || null,
         fechaNacimiento: values.fechaNacimiento || null,
-        telefono: values.telefono.trim() || null,
+        telefono: cleanPhone(values.telefono) || null,
         email: values.email.trim().toLowerCase() || null,
         direccion: values.direccion.trim() || null,
         sedeId: values.sedeId || null,
@@ -351,7 +354,7 @@ export function PatientForm({
       apellidoPaterno: values.apellidoPaterno.trim(),
       apellidoMaterno: values.apellidoMaterno.trim() || null,
       fechaNacimiento: values.fechaNacimiento || null,
-      telefono: values.telefono.trim() || null,
+      telefono: cleanPhone(values.telefono) || null,
       email: values.email.trim().toLowerCase() || null,
       direccion: values.direccion.trim() || null,
       sedeId: values.sedeId || null,
@@ -524,14 +527,14 @@ export function PatientForm({
           <Field label="Teléfono" error={errors.telefono}>
             <Input
               icon="phone"
-              placeholder="Ej. +51987654321"
+              placeholder="Ej. 987 654 321"
               value={values.telefono}
               inputMode="tel"
-              maxLength={16}
+              maxLength={17}
               onChange={e =>
                 set(
                   'telefono',
-                  e.target.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '').slice(0, 16),
+                  formatPhone(e.target.value),
                 )
               }
               disabled={saving}

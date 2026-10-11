@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedDatePicker, AnimatedSelect, Avatar,
   Badge, Button, Card, Checkbox, ClockTimePicker,
-  ConfirmDialog, Icon, PageHead, ProtectedImage, Toast,
+  ConfirmDialog, Icon, PageHead, ProtectedImage, Toast, Tooltip,
   type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
@@ -1202,20 +1202,17 @@ export function SchedulesPage() {
                         {/* RESUMEN VISUAL DE TURNOS Y EXCEPCIONES */}
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {turnos.length > 0 && (
-                            <span
-                              title={`${turnos.length} turno${turnos.length === 1 ? '' : 'es'} habitual${turnos.length === 1 ? '' : 'es'}`}
-                              className="size-2.5 rounded-full bg-brand ring-2 ring-white shadow-2xs"
-                            />
+                            <Tooltip content={`${turnos.length} turno${turnos.length === 1 ? '' : 'es'} habitual${turnos.length === 1 ? '' : 'es'}`}>
+                              <span className="block size-2.5 rounded-full bg-brand ring-2 ring-white shadow-2xs" />
+                            </Tooltip>
                           )}
 
                           {tiposExcepcionUnicos.map(codigo => {
                             const estilo = getEstiloBloqueo(codigo)
                             return (
-                              <span
-                                key={`bloqueo-tipo-${codigo}`}
-                                title={estilo.nombre}
-                                className={cn('size-2.5 rounded-full ring-2 ring-white shadow-2xs', estilo.dotColor)}
-                              />
+                              <Tooltip key={`bloqueo-tipo-${codigo}`} content={estilo.nombre}>
+                                <span className={cn('block size-2.5 rounded-full ring-2 ring-white shadow-2xs', estilo.dotColor)} />
+                              </Tooltip>
                             )
                           })}
                         </div>
@@ -1324,24 +1321,26 @@ export function SchedulesPage() {
 
                               <div className="flex items-center gap-1 shrink-0">
                                 {bloqueoTotalFechaSeleccionada && <Badge tone="amber">Bloqueado</Badge>}
-                                <button
-                                  type="button"
-                                  title="Editar turno"
-                                  aria-label="Editar turno"
-                                  onClick={() => abrirEditar(horario)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
-                                >
-                                  <Icon name="edit" size={15} />
-                                </button>
-                                <button
-                                  type="button"
-                                  title="Eliminar turno"
-                                  aria-label="Eliminar turno"
-                                  onClick={() => setConfirmar(horario)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
-                                >
-                                  <Icon name="trash" size={15} />
-                                </button>
+                                <Tooltip content="Editar turno">
+                                  <button
+                                    type="button"
+                                    aria-label="Editar turno"
+                                    onClick={() => abrirEditar(horario)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
+                                  >
+                                    <Icon name="edit" size={15} />
+                                  </button>
+                                </Tooltip>
+                                <Tooltip content="Eliminar turno">
+                                  <button
+                                    type="button"
+                                    aria-label="Eliminar turno"
+                                    onClick={() => setConfirmar(horario)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
+                                  >
+                                    <Icon name="trash" size={15} />
+                                  </button>
+                                </Tooltip>
                               </div>
                             </div>
                           </div>

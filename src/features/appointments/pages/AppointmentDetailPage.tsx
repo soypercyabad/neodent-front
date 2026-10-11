@@ -680,7 +680,7 @@ export function AppointmentDetailPage() {
                                     <span className="text-ink-soft">→</span>
                                   </>
                                 ) : null}
-                                <span className="font-semibold text-ink">{etiquetaEstado(h.estadoNuevo) || '—'}</span>
+                                <span className="font-semibold text-ink">{etiquetaEstado(h.estadoNuevo) || '-'}</span>
                               </div>
                             )}
 

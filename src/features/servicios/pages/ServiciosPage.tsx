@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedSelect, Button, Card, Checkbox, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, ServicesCardsSkeleton, TableFoot, Toast, Toolbar } from '@/shared/components/ui'
+import { AnimatedSelect, Button, Card, Checkbox, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, ServicesCardsSkeleton, TableFoot, Toast, Toolbar, Tooltip } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { serviciosApi, type Servicio, type ServicioInput, type EspecialidadOption } from '../api/serviciosApi'
 import { sedesApi, type Sede } from '@/features/sedes/api/sedesApi'
@@ -825,13 +825,14 @@ export function ServiciosPage() {
 
                       <div className="flex shrink-0 items-center gap-1.5">
                         {servicio.destacado && (
-                          <span
-                            title="Servicio destacado"
-                            className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-0.5 text-[0.7rem] font-semibold text-amber-800"
-                          >
-                            <Icon name="starFilled" size={11} className="text-amber-500" />
-                            Destacado
-                          </span>
+                          <Tooltip content="Servicio destacado">
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-0.5 text-[0.7rem] font-semibold text-amber-800"
+                            >
+                              <Icon name="starFilled" size={11} className="text-amber-500" />
+                              Destacado
+                            </span>
+                          </Tooltip>
                         )}
 
                         <span
@@ -876,29 +877,34 @@ export function ServiciosPage() {
                       </span>
 
                       {sedesAsignadas.slice(0, 2).map(sede => (
-                        <span
+                        <Tooltip
                           key={sede.id}
-                          title={
+                          content={
                             sede.activo
                               ? sede.nombre
                               : `${sede.nombre} (inactiva)`
                           }
-                          className={cn(
-                            'max-w-[11rem] truncate rounded-full px-2 py-1 text-[0.7rem] font-medium',
-                            sede.activo
-                              ? 'bg-brand-soft text-brand'
-                              : 'bg-alt text-muted',
-                          )}
                         >
-                          {sede.nombre}
-                          {!sede.activo && ' (Inactiva)'}
-                        </span>
+                          <span
+                            className={cn(
+                              'max-w-[11rem] truncate rounded-full px-2 py-1 text-[0.7rem] font-medium',
+                              sede.activo
+                                ? 'bg-brand-soft text-brand'
+                                : 'bg-alt text-muted',
+                            )}
+                          >
+                            {sede.nombre}
+                            {!sede.activo && ' (Inactiva)'}
+                          </span>
+                        </Tooltip>
                       ))}
 
                       {sedesAsignadas.length > 2 && (
-                        <span className="rounded-full bg-alt px-2 py-1 text-[0.7rem] text-muted">
-                          +{sedesAsignadas.length - 2} más
-                        </span>
+                        <Tooltip content={sedesAsignadas.slice(2).map(s => s.nombre).join(', ')}>
+                          <span className="cursor-help rounded-full bg-alt px-2 py-1 text-[0.7rem] text-muted hover:bg-line transition-colors">
+                            +{sedesAsignadas.length - 2} más
+                          </span>
+                        </Tooltip>
                       )}
 
                       {sedesAsignadas.length === 0 && (
@@ -910,25 +916,26 @@ export function ServiciosPage() {
 
                     {/* ACCIONES */}
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-                      <button
-                        type="button"
-                        onClick={() => void toggleDestacado(servicio)}
-                        disabled={guardando || procesando}
-                        title={servicio.destacado ? 'Quitar de destacados' : 'Marcar como destacado'}
-                        className={cn(
-                          'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50',
-                          servicio.destacado
-                            ? 'border-amber-300/80 bg-surface text-amber-900 shadow-2xs hover:bg-amber-50/50 hover:border-amber-400'
-                            : 'border-line bg-surface text-ink-soft hover:border-line-hover hover:text-ink',
-                        )}
-                      >
-                        <Icon
-                          name={servicio.destacado ? 'starFilled' : 'star'}
-                          size={13}
-                          className={servicio.destacado ? 'text-amber-500' : 'text-muted'}
-                        />
-                        <span>{servicio.destacado ? 'Destacado' : 'Destacar'}</span>
-                      </button>
+                      <Tooltip content={servicio.destacado ? 'Quitar de destacados' : 'Marcar como destacado'}>
+                        <button
+                          type="button"
+                          onClick={() => void toggleDestacado(servicio)}
+                          disabled={guardando || procesando}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50',
+                            servicio.destacado
+                              ? 'border-amber-300/80 bg-surface text-amber-900 shadow-2xs hover:bg-amber-50/50 hover:border-amber-400'
+                              : 'border-line bg-surface text-ink-soft hover:border-line-hover hover:text-ink',
+                          )}
+                        >
+                          <Icon
+                            name={servicio.destacado ? 'starFilled' : 'star'}
+                            size={13}
+                            className={servicio.destacado ? 'text-amber-500' : 'text-muted'}
+                          />
+                          <span>{servicio.destacado ? 'Destacado' : 'Destacar'}</span>
+                        </button>
+                      </Tooltip>
 
                       <button
                         type="button"

@@ -25,12 +25,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const pacName = useCallback((id: Id) => {
     const p = patients.find((x) => x.id === id)
-    return p ? fullName(p) : '—'
+    return p ? fullName(p) : '-'
   }, [patients])
 
   const docName = useCallback((id: Id) => {
     const u = users.find((x) => x.id === id)
-    return u ? fullName(u) : '—'
+    return u ? fullName(u) : '-'
   }, [users])
 
   const docEsp = useCallback((id: Id) => users.find((x) => x.id === id)?.esp ?? '', [users])

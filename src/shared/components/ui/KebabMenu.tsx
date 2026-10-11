@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Icon, type IconName } from './Icon'
+import { Tooltip } from './Tooltip'
 import { cn } from '@/shared/lib/cn'
 
 export interface KebabAction {
@@ -179,29 +180,31 @@ export function KebabMenu({
 
   return (
     <div className={cn('relative inline-flex', className)}>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        aria-label="Abrir menú de acciones"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={event => {
-          event.stopPropagation()
+      <Tooltip content="Más opciones" disabled={open || disabled}>
+        <button
+          ref={buttonRef}
+          type="button"
+          disabled={disabled}
+          aria-label="Abrir menú de acciones"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={event => {
+            event.stopPropagation()
 
-          if (!disabled) {
-            setOpen(current => !current)
-          }
-        }}
-        className={cn(
-          'grid size-9 place-items-center rounded-lg border border-line bg-surface text-muted',
-          'transition-colors hover:border-brand/40 hover:bg-alt hover:text-ink',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-        )}
-      >
-        <Icon name="kebab" size={18} />
-      </button>
+            if (!disabled) {
+              setOpen(current => !current)
+            }
+          }}
+          className={cn(
+            'grid size-9 place-items-center rounded-lg border border-line bg-surface text-muted',
+            'transition-colors hover:border-brand/40 hover:bg-alt hover:text-ink',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+          )}
+        >
+          <Icon name="kebab" size={18} />
+        </button>
+      </Tooltip>
 
       {typeof document !== 'undefined' &&
         createPortal(menu, document.body)}

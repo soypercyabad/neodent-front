@@ -8,6 +8,7 @@ import {
 import { ApiError } from '@/shared/api/apiClient'
 import { useAuth } from '@/features/auth'
 import { sedesApi, type SedeCatalogo } from '@/features/sedes/api/sedesApi'
+import { formatPhone } from '@/shared/lib/format'
 import { patientsApi, type PacienteResumenResponse, type PaginaResponse } from '../api/patientsApi'
 
 const PAGE_SIZE = 10
@@ -232,7 +233,7 @@ export function PatientsPage() {
               onClick={() => setActualizacion(n => n + 1)}
               disabled={loading}
               aria-label="Actualizar listado de pacientes"
-              title="Actualizar listado de pacientes"
+              tooltip="Actualizar listado de pacientes"
               className="px-3"
             >
               <Icon name="refreshCw" size={17} className={loading ? 'animate-spin' : ''} />
@@ -365,14 +366,14 @@ export function PatientsPage() {
 
                       {p.telefono ? (
                         <div className="flex items-center gap-1.5 text-xs">
-                          <Tooltip content={`Llamar al ${p.telefono}`} offset={8}>
+                          <Tooltip content={`Llamar al ${formatPhone(p.telefono)}`} offset={8}>
                             <a
                               href={`tel:${p.telefono}`}
                               className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-muted transition-colors hover:bg-alt hover:text-ink"
                               onClick={e => e.stopPropagation()}
                             >
                               <Icon name="phone" size={12} className="shrink-0 text-muted" />
-                              <span className="tabular-nums font-medium text-ink">{p.telefono}</span>
+                              <span className="tabular-nums font-medium text-ink">{formatPhone(p.telefono)}</span>
                             </a>
                           </Tooltip>
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Icon } from './Icon'
+import { Tooltip } from './Tooltip'
 
 export type SortDirection = 'asc' | 'desc' | null
 
@@ -64,36 +65,50 @@ export function Table<T = string>({
                         : 'text-left',
                     c.className,
                   )}
-                  title={isSortable ? `Ordenar por ${c.label}` : undefined}
                 >
-                  <div
-                    className={cn(
-                      'inline-flex items-center gap-1.5',
-                      c.align === 'center'
-                        ? 'justify-center w-full'
-                        : c.align === 'right'
-                          ? 'justify-end w-full'
-                          : 'justify-start',
-                    )}
-                  >
-                    <span>{c.label}</span>
-                    {isSortable && (
-                      <span
+                  {isSortable ? (
+                    <Tooltip content={`Ordenar por ${c.label}`}>
+                      <div
                         className={cn(
-                          'inline-flex items-center justify-center transition-colors',
-                          isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted',
+                          'inline-flex items-center gap-1.5',
+                          c.align === 'center'
+                            ? 'justify-center'
+                            : c.align === 'right'
+                              ? 'justify-end'
+                              : 'justify-start',
                         )}
                       >
-                        {currentDir === 'asc' ? (
-                          <Icon name="chevronUp" size={14} strokeWidth={2.5} />
-                        ) : currentDir === 'desc' ? (
-                          <Icon name="chevronDown" size={14} strokeWidth={2.5} />
-                        ) : (
-                          <Icon name="chevronsUpDown" size={13} strokeWidth={1.8} />
-                        )}
-                      </span>
-                    )}
-                  </div>
+                        <span>{c.label}</span>
+                        <span
+                          className={cn(
+                            'inline-flex items-center justify-center transition-colors',
+                            isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted',
+                          )}
+                        >
+                          {currentDir === 'asc' ? (
+                            <Icon name="chevronUp" size={14} strokeWidth={2.5} />
+                          ) : currentDir === 'desc' ? (
+                            <Icon name="chevronDown" size={14} strokeWidth={2.5} />
+                          ) : (
+                            <Icon name="chevronsUpDown" size={13} strokeWidth={1.8} />
+                          )}
+                        </span>
+                      </div>
+                    </Tooltip>
+                  ) : (
+                    <div
+                      className={cn(
+                        'inline-flex items-center gap-1.5',
+                        c.align === 'center'
+                          ? 'justify-center'
+                          : c.align === 'right'
+                            ? 'justify-end'
+                            : 'justify-start',
+                      )}
+                    >
+                      <span>{c.label}</span>
+                    </div>
+                  )}
                 </th>
               )
             })}

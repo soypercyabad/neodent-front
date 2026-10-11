@@ -9,6 +9,7 @@ import { EMAIL_RE, MIN_PASSWORD } from '@/shared/lib/validation'
 import { usersApi, type UsuarioInternoResponse } from '../api/usersApi'
 import { useNavigate, useParams } from 'react-router-dom'
 import { normalizarImagenAJpeg } from '@/shared/lib/image'
+import { formatPhone, cleanPhone } from '@/shared/lib/format'
 
 const PHONE_RE = /^\+?\d{7,15}$/
 const FIELD_DELAY = 600
@@ -182,7 +183,7 @@ export function EditUserPage() {
           nombres: u.nombres,
           apellidoPaterno: u.apellidoPaterno,
           apellidoMaterno: u.apellidoMaterno ?? '',
-          telefono: u.telefono ?? '',
+          telefono: u.telefono ? formatPhone(u.telefono) : '',
           correo: u.correo,
           numeroColegiatura: u.numeroColegiatura ?? '',
           nuevaContrasena: '',
@@ -279,10 +280,12 @@ export function EditUserPage() {
         ? 'Ingresa un apellido válido.'
         : ''
 
-    if (key === 'telefono')
-      return v && !PHONE_RE.test(v)
+    if (key === 'telefono') {
+      const telLimpio = cleanPhone(v)
+      return telLimpio && !PHONE_RE.test(telLimpio)
         ? 'Ingresa un teléfono válido.'
         : ''
+    }
 
     if (key === 'correo')
       return !EMAIL_RE.test(v)
@@ -476,7 +479,7 @@ export function EditUserPage() {
           nombres: form.nombres.trim(),
           apellidoPaterno: form.apellidoPaterno.trim(),
           apellidoMaterno: form.apellidoMaterno.trim() || null,
-          telefono: form.telefono.trim() || null,
+          telefono: cleanPhone(form.telefono) || null,
           numeroColegiatura: esOdontologo ? form.numeroColegiatura.trim() : null,
           especialidadIds: esOdontologo ? especialidadIds.map(Number) : [],
         },
@@ -752,26 +755,18 @@ export function EditUserPage() {
             >
               <Input
                 icon="phone"
+                placeholder="Ej. 987 654 321"
                 value={form.telefono}
                 disabled={saving}
                 inputMode="tel"
-                maxLength={16}
+                maxLength={17}
                 onBlur={() =>
                   marcar('telefono')
                 }
                 onChange={e =>
                   update(
                     'telefono',
-                    e.target.value
-                      .replace(
-                        /[^\d+]/g,
-                        '',
-                      )
-                      .replace(
-                        /(?!^)\+/g,
-                        '',
-                      )
-                      .slice(0, 16),
+                    formatPhone(e.target.value),
                   )
                 }
                 trailing={

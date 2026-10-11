@@ -14,6 +14,7 @@ import {
   type SortDirection,
 } from '@/shared/components/ui'
 import { documentTypesApi } from '@/shared/api/documentTypesApi'
+import { formatPhone } from '@/shared/lib/format'
 import type { UsuarioInternoResponse } from '../api/usersApi'
 
 const COLUMNS: Column[] = [
@@ -186,7 +187,7 @@ export function UsersTable({
                     <div className="flex items-center gap-1.5 text-muted">
                       <Icon name="phone" size={13} className="shrink-0 text-muted" />
                       <span className="tabular-nums">
-                        {usuario.telefono || <span className="italic text-muted">Sin teléfono</span>}
+                        {usuario.telefono ? formatPhone(usuario.telefono) : <span className="italic text-muted">Sin teléfono</span>}
                       </span>
                     </div>
                   </div>

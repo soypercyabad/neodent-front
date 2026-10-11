@@ -590,7 +590,7 @@ export function ModulosPage() {
                   </td>
 
                   <td className="max-w-xs truncate text-xs text-muted" title={m.descripcion ?? ''}>
-                    {m.descripcion || '—'}
+                    {m.descripcion || '-'}
                   </td>
 
                   <td className="text-center">

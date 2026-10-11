@@ -9,6 +9,7 @@ import { EMAIL_RE } from '@/shared/lib/validation'
 import { usersApi } from '../api/usersApi'
 import { rolesApi, type RolResponse, } from '@/features/roles/api/rolesApi'
 import { normalizarImagenAJpeg } from '@/shared/lib/image'
+import { formatPhone, cleanPhone } from '@/shared/lib/format'
 
 const INITIAL = {
   numeroDocumento: '', nombres: '', apellidoPaterno: '', apellidoMaterno: '',
@@ -118,10 +119,12 @@ export function NewUserPage() {
         return v.length < 2 ? 'Ingresa el apellido paterno.' : ''
       case 'apellidoMaterno':
         return v && v.length < 2 ? 'Ingresa un apellido válido.' : ''
-      case 'telefono':
-        return v && !PHONE_RE.test(v)
+      case 'telefono': {
+        const telLimpio = cleanPhone(v)
+        return telLimpio && !PHONE_RE.test(telLimpio)
           ? 'Ingresa un teléfono válido, por ejemplo +51987654321.'
           : ''
+      }
       case 'correo':
         return !EMAIL_RE.test(v)
           ? 'Ingresa un correo electrónico válido.'
@@ -529,7 +532,7 @@ export function NewUserPage() {
         nombres: form.nombres.trim(),
         apellidoPaterno: form.apellidoPaterno.trim(),
         apellidoMaterno: form.apellidoMaterno.trim() || null,
-        telefono: form.telefono.trim() || null,
+        telefono: cleanPhone(form.telefono) || null,
         numeroColegiatura: esOdontologo
           ? form.numeroColegiatura.trim()
           : null,
@@ -837,21 +840,18 @@ export function NewUserPage() {
             <Field label="Teléfono" error={errors.telefono}>
               <Input
                 icon="phone"
-                placeholder="Ej. +51987654321"
+                placeholder="Ej. 987 654 321"
                 value={form.telefono}
                 onChange={e =>
                   update(
                     'telefono',
-                    e.target.value
-                      .replace(/[^\d+]/g, '')
-                      .replace(/(?!^)\+/g, '')
-                      .slice(0, 16),
+                    formatPhone(e.target.value),
                   )
                 }
                 onBlur={() => marcar('telefono')}
                 trailing={check('telefono')}
                 inputMode="tel"
-                maxLength={16}
+                maxLength={17}
                 disabled={saving}
               />
             </Field>

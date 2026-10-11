@@ -25,6 +25,7 @@ import {
   Icon,
   PageHead,
   RowActions,
+  Tooltip as UiTooltip,
 } from '@/shared/components/ui'
 import type { IconName } from '@/shared/components/ui/Icon'
 import { useAuth } from '@/features/auth'
@@ -237,18 +238,19 @@ function RealAppointmentsTable({
           align === 'center' ? 'text-center' : 'text-left',
           isSorted ? 'text-brand font-extrabold bg-brand-soft/20' : 'text-muted',
         )}
-        title={`Ordenar por ${label}`}
       >
-        <div className={cn('inline-flex items-center gap-1.5', align === 'center' && 'justify-center w-full')}>
-          <span>{label}</span>
-          <span className={cn('inline-flex items-center transition-colors', isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted')}>
-            {isSorted ? (
-              sortDirection === 'asc' ? <Icon name="chevronUp" size={13} strokeWidth={2.5} /> : <Icon name="chevronDown" size={13} strokeWidth={2.5} />
-            ) : (
-              <Icon name="chevronsUpDown" size={12} strokeWidth={1.8} />
-            )}
-          </span>
-        </div>
+        <UiTooltip content={`Ordenar por ${label}`}>
+          <div className="inline-flex items-center gap-1.5">
+            <span>{label}</span>
+            <span className={cn('inline-flex items-center transition-colors', isSorted ? 'text-brand' : 'text-muted/40 group-hover:text-muted')}>
+              {isSorted ? (
+                sortDirection === 'asc' ? <Icon name="chevronUp" size={13} strokeWidth={2.5} /> : <Icon name="chevronDown" size={13} strokeWidth={2.5} />
+              ) : (
+                <Icon name="chevronsUpDown" size={12} strokeWidth={1.8} />
+              )}
+            </span>
+          </div>
+        </UiTooltip>
       </th>
     )
   }

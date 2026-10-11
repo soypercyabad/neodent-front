@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ActionsCell, AnimatedSelect, Badge, Button, Card, Checkbox, ConfirmDialog,
   Field, Input, PageHead, Pagination, RolesTableSkeleton, RowActions, SearchInput,
-  Table, TableFoot, TableState, Toast, Toolbar, useTableSort, type Column,
+  Table, TableFoot, TableState, Toast, Toolbar, Tooltip, useTableSort, type Column,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -470,17 +470,27 @@ export function RolesPage() {
                     if (count === 0) {
                       return <span className="text-xs text-muted">0 módulos</span>
                     }
-                    const nombres = rol.modulos!.map(m => m.nombre).join(', ')
                     const esTodos = modulos.length > 0 && count >= modulos.length
 
+                    let tooltipTexto = ''
+                    if (esTodos) {
+                      tooltipTexto = 'Acceso total: todos los módulos habilitados'
+                    } else if (count <= 3) {
+                      tooltipTexto = `Módulos: ${rol.modulos!.map(m => m.nombre).join(', ')}`
+                    } else {
+                      const primeros = rol.modulos!.slice(0, 3).map(m => m.nombre).join(', ')
+                      tooltipTexto = `Módulos: ${primeros} (+${count - 3} más)`
+                    }
+
                     return (
-                      <span
-                        title={`Módulos asignados:\n${nombres}`}
-                        className="inline-flex cursor-help items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft/80"
-                      >
-                        <span className="size-1.5 rounded-full bg-brand" />
-                        {esTodos ? `Todos (${count})` : `${count} ${count === 1 ? 'módulo' : 'módulos'}`}
-                      </span>
+                      <Tooltip content={tooltipTexto}>
+                        <span
+                          className="inline-flex cursor-help items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft/80"
+                        >
+                          <span className="size-1.5 rounded-full bg-brand" />
+                          {esTodos ? `Todos (${count})` : `${count} ${count === 1 ? 'módulo' : 'módulos'}`}
+                        </span>
+                      </Tooltip>
                     )
                   })()}
                 </div>

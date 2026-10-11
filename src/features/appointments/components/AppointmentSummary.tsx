@@ -28,7 +28,7 @@ export function AppointmentSummary({ appointment: a }: { appointment: Appointmen
       <InfoRow label="Fecha" value={isoToDMY(a.fecha)} />
       <InfoRow label="Hora" value={a.hora} />
       <InfoRow label="Odontólogo" value={docName(a.docId)} />
-      <InfoRow label="Especialidad" value={docEsp(a.docId) || '—'} />
+      <InfoRow label="Especialidad" value={docEsp(a.docId) || '-'} />
       <InfoRow label="Lugar (sede)" value={a.lugar} />
       <InfoRow
         label="Estado de la cita"

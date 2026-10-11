@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Avatar, BackLink, Badge, Button, Card, Icon, InfoRow } from '@/shared/components/ui'
+import { Avatar, BackLink, Badge, Button, Card, Icon, InfoRow, Tooltip } from '@/shared/components/ui'
 import { apiBlob } from '@/shared/api/apiClient'
 import { useAuth } from '@/features/auth'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
+import { formatPhone } from '@/shared/lib/format'
 import { usersApi, type UsuarioInternoResponse } from '../api/usersApi'
 
 const NOMBRES_ROL: Record<string, string> = {
@@ -172,16 +173,32 @@ export function UserDetailPage() {
                   />
                 )}
 
-                <span
-                  title={estado?.texto}
-                  className={`absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface ${
-                    estado?.tono === 'green'
-                      ? 'bg-emerald-500'
-                      : estado?.tono === 'amber'
-                        ? 'bg-amber-500'
-                        : 'bg-slate-400'
-                  }`}
-                />
+                {estado?.texto ? (
+                  <Tooltip
+                    content={estado.texto}
+                    className="absolute bottom-1 right-1"
+                  >
+                    <span
+                      className={`block size-5 rounded-full border-2 border-surface ${
+                        estado?.tono === 'green'
+                          ? 'bg-emerald-500'
+                          : estado?.tono === 'amber'
+                            ? 'bg-amber-500'
+                            : 'bg-slate-400'
+                      }`}
+                    />
+                  </Tooltip>
+                ) : (
+                  <span
+                    className={`absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface ${
+                      estado?.tono === 'green'
+                        ? 'bg-emerald-500'
+                        : estado?.tono === 'amber'
+                          ? 'bg-amber-500'
+                          : 'bg-slate-400'
+                    }`}
+                  />
+                )}
               </div>
 
               <div className="min-w-0 flex-1 text-center sm:text-left">
@@ -225,7 +242,7 @@ export function UserDetailPage() {
               </h2>
 
               <InfoRow label="Documento" value={documentoTexto} />
-              <InfoRow label="Teléfono" value={usuario.telefono || 'No registrado'} />
+              <InfoRow label="Teléfono" value={usuario.telefono ? formatPhone(usuario.telefono) : 'No registrado'} />
               <InfoRow
                 label="Correo electrónico"
                 value={<span className="break-all">{usuario.correo}</span>}

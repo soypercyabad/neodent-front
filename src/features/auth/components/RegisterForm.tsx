@@ -5,6 +5,7 @@ import { Alert, AnimatedDatePicker, AnimatedSelect, Button, Checkbox, Field, Fie
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { ApiError } from '@/shared/api/apiClient'
 import { EMAIL_RE, validatePassword } from '@/shared/lib/validation'
+import { formatPhone, cleanPhone } from '@/shared/lib/format'
 import { authApi } from '../api/authApi'
 import type { RegisterInput } from '../model/auth.types'
 import { SecurityVerification } from './SecurityVerification'
@@ -234,7 +235,7 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
     if (!values.fechaNacimiento) e.fechaNacimiento = 'Ingresa tu fecha de nacimiento.'
     else if (values.fechaNacimiento > hoy) e.fechaNacimiento = 'La fecha no puede ser futura.'
 
-    const telefono = values.telefono.replace(/[\s-]/g, '')
+    const telefono = cleanPhone(values.telefono)
     if (!PHONE_RE.test(telefono))
       e.telefono = 'Ingresa un teléfono válido. Puedes usar código de país, por ejemplo +51987654321.'
 
@@ -531,13 +532,12 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
         </Field>
 
         <Field label="Teléfono" error={errors.telefono}>
-          <Input icon="phone" placeholder="Ej. +51987654321" inputMode="tel"
-            maxLength={16} autoComplete="tel" value={values.telefono}
+          <Input icon="phone" placeholder="Ej. 987 654 321" inputMode="tel"
+            maxLength={17} autoComplete="tel" value={values.telefono}
             disabled={submitting}
             trailing={indicador('telefono', telefonoConfirmado)}
             onChange={e =>
-              update('telefono',
-                e.target.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '').slice(0, 16))
+              update('telefono', formatPhone(e.target.value))
             } />
         </Field>
       </div>

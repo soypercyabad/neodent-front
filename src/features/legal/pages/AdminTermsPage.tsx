@@ -281,7 +281,7 @@ export function AdminTermsPage() {
   }
 
   const formatoFecha = (fechaStr: string) => {
-    if (!fechaStr) return '—'
+    if (!fechaStr) return '-'
     try {
       const d = new Date(fechaStr)
       return d.toLocaleDateString('es-PE', {
@@ -726,7 +726,7 @@ export function AdminTermsPage() {
                       </td>
 
                       <td className="text-xs font-mono text-ink-soft whitespace-nowrap">
-                        {item.ip || '—'}
+                        {item.ip || '-'}
                       </td>
                     </tr>
                   ))}
@@ -736,7 +736,7 @@ export function AdminTermsPage() {
 
             {aceptacionesFiltradas.length > 0 && (
               <TableFoot
-                summary={`Mostrando ${inicioAcep + 1}–${Math.min(inicioAcep + POR_PAGINA_ACEPTACIONES, aceptacionesFiltradas.length)} de ${aceptacionesFiltradas.length} aceptaciones`}
+                summary={`Mostrando ${inicioAcep + 1}-${Math.min(inicioAcep + POR_PAGINA_ACEPTACIONES, aceptacionesFiltradas.length)} de ${aceptacionesFiltradas.length} aceptaciones`}
               >
                 <Pagination page={pagActAcep} totalPages={totalPagsAcep} onChange={setPaginaAceptaciones} />
               </TableFoot>

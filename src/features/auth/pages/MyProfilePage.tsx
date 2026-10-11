@@ -1,4 +1,4 @@
-import { Avatar, Badge, Card, Icon, InfoRow, StatusDot } from '@/shared/components/ui'
+import { Avatar, Badge, Card, Icon, InfoRow, StatusDot, Tooltip } from '@/shared/components/ui'
 import { useAuth } from '../model/useAuth'
 import { roleTone } from '@/domain'
 import { fullName } from '@/shared/lib/people'
@@ -26,16 +26,16 @@ export function MyProfilePage() {
               className="ring-4 ring-brand-soft shadow-md"
             />
 
-            <span
-              title={
-                user.activo
-                  ? 'Cuenta activa'
-                  : 'Cuenta inactiva'
-              }
-              className={`absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface ${
-                user.activo ? 'bg-success' : 'bg-danger'
-              }`}
-            />
+            <Tooltip
+              content={user.activo ? 'Cuenta activa' : 'Cuenta inactiva'}
+              className="absolute bottom-1 right-1"
+            >
+              <span
+                className={`block size-5 rounded-full border-2 border-surface ${
+                  user.activo ? 'bg-success' : 'bg-danger'
+                }`}
+              />
+            </Tooltip>
           </div>
 
           <div className="min-w-0 flex-1 text-center sm:text-left">

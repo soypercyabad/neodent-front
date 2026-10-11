@@ -1,20 +1,29 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Icon, type IconName } from './Icon'
+import { Tooltip, type TooltipSide } from './Tooltip'
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: IconName
   size?: number
   iconSize?: number
+  tooltip?: string
+  tooltipSide?: TooltipSide
 }
 
-/** Botón cuadrado con borde, sólo icono. Requiere `aria-label`. */
+/**
+ * Botón cuadrado con borde, sólo icono.
+ * Si recibe `tooltip` o `title`, renderiza el componente dinámico `Tooltip`
+ * y omite el `title` nativo del navegador para mantener una estética consistente.
+ */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   function IconButton(
-    { icon, size = 34, iconSize = 18, className, ...props },
+    { icon, size = 34, iconSize = 18, className, tooltip, tooltipSide, title, ...props },
     ref,
   ) {
-    return (
+    const tooltipText = tooltip ?? title
+
+    const button = (
       <button
         ref={ref}
         type="button"
@@ -29,5 +38,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         <Icon name={icon} size={iconSize} />
       </button>
     )
+
+    if (tooltipText) {
+      return (
+        <Tooltip content={tooltipText} side={tooltipSide}>
+          {button}
+        </Tooltip>
+      )
+    }
+
+    return button
   },
 )

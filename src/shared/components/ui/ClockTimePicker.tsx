@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Icon } from './Icon'
+import { Tooltip } from './Tooltip'
 import { cn } from '@/shared/lib/cn'
 
 interface ClockTimePickerProps {
@@ -211,15 +212,17 @@ export function ClockTimePicker({
           aria-label={label}
           className="h-full w-full bg-transparent px-3.5 text-sm font-semibold tabular-nums text-ink outline-none"
         />
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setAbierto(true)}
-          className="grid h-full w-10 shrink-0 place-items-center text-muted transition hover:text-brand focus:outline-none"
-          title="Abrir selector con reloj"
-        >
-          <Icon name="clock" size={17} />
-        </button>
+        <Tooltip content="Abrir selector con reloj">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setAbierto(true)}
+            aria-label="Abrir selector con reloj"
+            className="grid h-full w-10 shrink-0 place-items-center text-muted transition hover:text-brand focus:outline-none"
+          >
+            <Icon name="clock" size={17} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* DIÁLOGO MODAL TIPO RELOJ */}

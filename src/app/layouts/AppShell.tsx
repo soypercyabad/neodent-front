@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { motion } from 'motion/react'
 
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -9,7 +10,19 @@ import { useAuth } from '@/features/auth'
 export function AppShell() {
   const { user, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('neodent_sidebar_collapsed') === 'true'
+  })
   const location = useLocation()
+
+  const toggleDesktopSidebar = () => {
+    setDesktopCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('neodent_sidebar_collapsed', String(next))
+      return next
+    })
+  }
 
   const hasModulos = Boolean(user?.modulos && user.modulos.length > 0)
   const isProfileRoute = location.pathname.startsWith('/perfil')
@@ -47,9 +60,14 @@ export function AppShell() {
 
       {/* Sidebar de escritorio (solo si tiene módulos asignados) */}
       {hasModulos && (
-        <div className="hidden w-sidebar flex-none border-r border-line md:block print:hidden">
-          <Sidebar />
-        </div>
+        <motion.aside
+          initial={false}
+          animate={{ width: desktopCollapsed ? 72 : 228 }}
+          transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+          className="hidden flex-none border-r border-line bg-surface md:block print:hidden overflow-hidden"
+        >
+          <Sidebar collapsed={desktopCollapsed} />
+        </motion.aside>
       )}
 
       {/* Sidebar móvil (solo si tiene módulos asignados) */}
@@ -86,7 +104,14 @@ export function AppShell() {
 
       {/* Contenido principal */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenuClick={() => { if (hasModulos) setMenuOpen(true) }} />
+        <Topbar
+          hasModulos={hasModulos}
+          desktopCollapsed={desktopCollapsed}
+          onToggleDesktop={toggleDesktopSidebar}
+          onMenuClick={() => {
+            if (hasModulos) setMenuOpen(true)
+          }}
+        />
 
         <main className="flex-1 min-w-0 overflow-y-auto p-4 md:p-7 print:overflow-visible print:p-0">
           {shouldBlock ? (

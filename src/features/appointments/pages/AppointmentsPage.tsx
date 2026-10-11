@@ -27,6 +27,7 @@ import { useAuth } from '@/features/auth/model/useAuth'
 import { citaDetalleApi, type CitaResumen } from '../api/citaDetalleApi'
 import { citaReferencia } from '../model/citaReferencia'
 import { bookingApi } from '../api/bookingApi'
+import { formatPhone } from '@/shared/lib/format'
 
 const COLUMNS: Column[] = [
   { key: 'idCita', label: 'Referencia', sortable: true },
@@ -170,7 +171,7 @@ export function AppointmentsPage() {
                 Programar cita
               </Button>
             )}
-            <Button variant="ghost" onClick={() => setActualizacion(n => n + 1)} disabled={loading} aria-label="Actualizar citas" title="Actualizar citas" className="px-3">
+            <Button variant="ghost" onClick={() => setActualizacion(n => n + 1)} disabled={loading} aria-label="Actualizar citas" tooltip="Actualizar citas" className="px-3">
               <Icon name="refreshCw" size={17} className={loading ? 'animate-spin' : ''} />
             </Button>
           </div>
@@ -320,14 +321,14 @@ export function AppointmentsPage() {
                             </p>
                             {cita.pacienteTelefono ? (
                               <div className="mt-1 flex items-center gap-1.5 text-xs">
-                                <Tooltip content={`Llamar al ${cita.pacienteTelefono}`} offset={8}>
+                                <Tooltip content={`Llamar al ${formatPhone(cita.pacienteTelefono)}`} offset={8}>
                                   <a
                                     href={`tel:${cita.pacienteTelefono}`}
                                     className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-muted transition-colors hover:bg-alt hover:text-ink"
                                     onClick={e => e.stopPropagation()}
                                   >
                                     <Icon name="phone" size={12} className="shrink-0 text-muted" />
-                                    <span className="text-[11px] font-medium">{cita.pacienteTelefono}</span>
+                                    <span className="text-[11px] font-medium">{formatPhone(cita.pacienteTelefono)}</span>
                                   </a>
                                 </Tooltip>
 

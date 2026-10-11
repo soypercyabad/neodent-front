@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedDatePicker, AnimatedSelect, Badge, Button,
   Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon, PageHead,
-  Pagination, ScheduleBlocksSkeleton, TableFoot, Toast,  type ToastAviso,
+  Pagination, ScheduleBlocksSkeleton, TableFoot, Toast, Tooltip,  type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -741,26 +741,28 @@ export function ScheduleBlocksPage() {
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          title="Editar bloqueo"
-                          aria-label="Editar bloqueo"
-                          onClick={() => abrirEditar(bloqueo)}
-                          disabled={guardando || procesando}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand disabled:opacity-50"
-                        >
-                          <Icon name="edit" size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Eliminar bloqueo"
-                          aria-label="Eliminar bloqueo"
-                          onClick={() => setEliminar(bloqueo)}
-                          disabled={guardando || procesando}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
-                        >
-                          <Icon name="trash" size={15} />
-                        </button>
+                        <Tooltip content="Editar bloqueo">
+                          <button
+                            type="button"
+                            aria-label="Editar bloqueo"
+                            onClick={() => abrirEditar(bloqueo)}
+                            disabled={guardando || procesando}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand disabled:opacity-50"
+                          >
+                            <Icon name="edit" size={15} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Eliminar bloqueo">
+                          <button
+                            type="button"
+                            aria-label="Eliminar bloqueo"
+                            onClick={() => setEliminar(bloqueo)}
+                            disabled={guardando || procesando}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                          >
+                            <Icon name="trash" size={15} />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
 

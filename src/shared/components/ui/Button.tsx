@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, Ref } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Icon, type IconName } from './Icon'
+import { Tooltip, type TooltipSide } from './Tooltip'
 
 type Variant = 'primary' | 'outline' | 'ghost' | 'danger'
 type Size = 'sm' | 'md' | 'lg'
@@ -24,11 +25,13 @@ const ICON_SIZES: Record<Size, number> = {
   lg: 18,
 }
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
   icon?: IconName
   ref?: Ref<HTMLButtonElement>
+  tooltip?: string
+  tooltipSide?: TooltipSide
 }
 
 export function Button({
@@ -38,9 +41,14 @@ export function Button({
   className,
   children,
   ref,
+  tooltip,
+  tooltipSide,
+  title,
   ...props
 }: ButtonProps) {
-  return (
+  const tooltipText = tooltip ?? title
+
+  const buttonElement = (
     <button
       ref={ref}
       type="button"
@@ -58,4 +66,14 @@ export function Button({
       {children}
     </button>
   )
+
+  if (tooltipText) {
+    return (
+      <Tooltip content={tooltipText} side={tooltipSide}>
+        {buttonElement}
+      </Tooltip>
+    )
+  }
+
+  return buttonElement
 }

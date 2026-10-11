@@ -32,4 +32,35 @@ export function time12h(hhmm: string) {
 }
 
 export const money = (n: number | null | undefined) =>
-  n != null ? `S/ ${Number(n).toFixed(2)}` : '—'
+  n != null ? `S/ ${Number(n).toFixed(2)}` : '-'
+
+export function formatPhone(raw: string | null | undefined): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+
+  if (trimmed.startsWith('+')) {
+    if (trimmed.startsWith('+51')) {
+      const rest = trimmed.slice(3).replace(/\D/g, '').slice(0, 9)
+      const parts = rest.match(/.{1,3}/g) || []
+      return parts.length > 0 ? `+51 ${parts.join(' ')}` : '+51'
+    }
+    const digits = trimmed.slice(1).replace(/\D/g, '').slice(0, 15)
+    const parts = digits.match(/.{1,3}/g) || []
+    return `+${parts.join(' ')}`
+  }
+
+  const digits = trimmed.replace(/\D/g, '').slice(0, 9)
+  const parts = digits.match(/.{1,3}/g) || []
+  return parts.join(' ')
+}
+
+/**
+ * Limpia el teléfono para guardado en base de datos (sin espacios ni guiones):
+ * '123 456 789' -> '123456789'
+ * '+51 987 654 321' -> '+51987654321'
+ */
+export function cleanPhone(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.replace(/[\s-]+/g, '').trim()
+}

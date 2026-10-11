@@ -10,9 +10,11 @@ import {
   Icon,
   InfoRow,
   Toast,
+  Tooltip,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
+import { formatPhone } from '@/shared/lib/format'
 import { patientsApi, type PacienteResponse } from '../api/patientsApi'
 
 type Aviso = {
@@ -238,12 +240,16 @@ export function PatientDetailPage() {
                   className="ring-4 ring-brand-soft shadow-md"
                 />
 
-                <span
-                  title={paciente.activo ? 'Paciente Activo' : 'Paciente Inactivo'}
-                  className={`absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface ${
-                    paciente.activo ? 'bg-emerald-500' : 'bg-slate-400'
-                  }`}
-                />
+                <Tooltip
+                  content={paciente.activo ? 'Paciente Activo' : 'Paciente Inactivo'}
+                  className="absolute bottom-1 right-1"
+                >
+                  <span
+                    className={`block size-5 rounded-full border-2 border-surface ${
+                      paciente.activo ? 'bg-emerald-500' : 'bg-slate-400'
+                    }`}
+                  />
+                </Tooltip>
               </div>
 
               <div className="min-w-0 flex-1 text-center sm:text-left">
@@ -257,7 +263,7 @@ export function PatientDetailPage() {
 
                 <p className="mt-1.5 break-words text-sm text-ink-soft">
                   {paciente.email || 'Sin correo registrado'}
-                  {paciente.telefono && ` · ${paciente.telefono}`}
+                  {paciente.telefono && ` · ${formatPhone(paciente.telefono)}`}
                 </p>
 
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
@@ -317,7 +323,7 @@ export function PatientDetailPage() {
 
               <InfoRow
                 label="Teléfono"
-                value={paciente.telefono || 'No registrado'}
+                value={paciente.telefono ? formatPhone(paciente.telefono) : 'No registrado'}
               />
 
               <InfoRow
