@@ -291,7 +291,7 @@ export function ModulosPage() {
     const payload: ModuloInput = {
       codigo: codFinal,
       nombre: nombre.trim(),
-      descripcion: descripcion.trim() || undefined,
+      descripcion: descripcion.trim() || null,
       ruta: `/${slugLimpio}`,
       icono,
       orden,

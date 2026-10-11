@@ -5,6 +5,7 @@ import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documen
 import { ApiError } from '@/shared/api/apiClient'
 import { EMAIL_RE } from '@/shared/lib/validation'
 import { useAuth } from '@/features/auth'
+import { sedesApi, type SedeCatalogo } from '@/features/sedes/api/sedesApi'
 import {
   patientsApi,
   type ActualizarPacienteRequest,
@@ -26,6 +27,7 @@ type Values = {
   telefono: string
   email: string
   direccion: string
+  sedeId: number | null
 }
 
 type Errors = Partial<Record<keyof Values, string>>
@@ -67,6 +69,7 @@ export function PatientForm({
   const requestId = useRef(0)
 
   const [tipos, setTipos] = useState<TipoDocumentoOption[]>([])
+  const [sedes, setSedes] = useState<SedeCatalogo[]>([])
   const [values, setValues] = useState<Values>({
     tipoDocumento: paciente?.tipoDocumento ?? initialTipoDocumento,
     numeroDocumento: paciente?.numeroDocumento ?? initialNumeroDocumento,
@@ -77,6 +80,7 @@ export function PatientForm({
     telefono: paciente?.telefono ?? '',
     email: paciente?.email ?? '',
     direccion: paciente?.direccion ?? '',
+    sedeId: paciente?.sedeRegistroId ?? null,
   })
 
   const [errors, setErrors] = useState<Errors>({})
@@ -90,7 +94,10 @@ export function PatientForm({
 
   useEffect(() => {
     documentTypesApi.listar().then(setTipos).catch(() => setTipos([]))
-  }, [])
+    if (accessToken) {
+      sedesApi.catalogo(accessToken).then(setSedes).catch(() => setSedes([]))
+    }
+  }, [accessToken])
 
   const tipo = tipos.find(t => t.codigo === values.tipoDocumento)
   const esDni = values.tipoDocumento === 'DNI'
@@ -332,6 +339,7 @@ export function PatientForm({
         telefono: values.telefono.trim() || null,
         email: values.email.trim().toLowerCase() || null,
         direccion: values.direccion.trim() || null,
+        sedeId: values.sedeId || null,
       })
       return
     }
@@ -346,6 +354,8 @@ export function PatientForm({
       telefono: values.telefono.trim() || null,
       email: values.email.trim().toLowerCase() || null,
       direccion: values.direccion.trim() || null,
+      sedeId: values.sedeId || null,
+      origenRegistro: 'RECEPCION',
     })
   }
 
@@ -549,15 +559,34 @@ export function PatientForm({
           )}
         </div>
 
-        <Field label="Dirección">
-          <Input
-            icon="location"
-            placeholder="Ej. Av. Larco 123, Miraflores"
-            value={values.direccion}
-            onChange={e => set('direccion', e.target.value)}
-            disabled={saving}
-          />
-        </Field>
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Dirección">
+            <Input
+              icon="location"
+              placeholder="Ej. Av. Larco 123, Miraflores"
+              value={values.direccion}
+              onChange={e => set('direccion', e.target.value)}
+              disabled={saving}
+            />
+          </Field>
+
+          <Field label="Sede de atención / registro">
+            <AnimatedSelect
+              label="Seleccionar sede"
+              value={values.sedeId ? String(values.sedeId) : ''}
+              options={[
+                { value: '', label: 'Sin sede asignada' },
+                ...sedes.map(s => ({
+                  value: String(s.id),
+                  label: s.distrito ? `${s.nombre} (${s.distrito})` : s.nombre,
+                })),
+              ]}
+              onChange={val => setValues(v => ({ ...v, sedeId: val ? Number(val) : null }))}
+              disabled={saving}
+              className="w-full"
+            />
+          </Field>
+        </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>

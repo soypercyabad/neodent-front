@@ -1,5 +1,24 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
+/** Resumen de paciente optimizado para listados y tablas (arquitectura limpia) */
+export interface PacienteResumenResponse {
+  id: number
+  tipoDocumento: string
+  numeroDocumento: string
+  nombres: string
+  apellidoPaterno: string
+  apellidoMaterno: string | null
+  telefono: string | null
+  email: string | null
+  activo: boolean
+  tieneCuenta: boolean
+  estadoCuenta: string | null
+  origenRegistro?: 'AUTORREGISTRO' | 'RECEPCION' | null
+  sedeRegistroNombre?: string | null
+  fechaCreacion: string | null
+}
+
+/** Información detallada y completa del paciente */
 export interface PacienteResponse {
   id: number
   tipoDocumento: string
@@ -16,6 +35,9 @@ export interface PacienteResponse {
   tieneCuenta: boolean
   estadoCuenta: string | null
   correoVerificado: boolean | null
+  origenRegistro?: 'AUTORREGISTRO' | 'RECEPCION' | null
+  sedeRegistroId?: number | null
+  sedeRegistroNombre?: string | null
   fechaCreacion: string | null
   fechaActualizacion: string | null
 }
@@ -40,6 +62,8 @@ export interface CrearPacienteRequest {
   telefono: string | null
   email: string | null
   direccion: string | null
+  sedeId?: number | null
+  origenRegistro?: 'AUTORREGISTRO' | 'RECEPCION' | null
 }
 
 export interface ActualizarPacienteRequest {
@@ -50,6 +74,7 @@ export interface ActualizarPacienteRequest {
   telefono: string | null
   email: string | null
   direccion: string | null
+  sedeId?: number | null
 }
 
 export interface DniResponse {
@@ -64,6 +89,8 @@ export const patientsApi = {
     buscar?: string
     activo?: boolean
     conCuenta?: boolean
+    origen?: string
+    sedeId?: string | number
     sortBy?: string
     direction?: string
     page: number
@@ -79,8 +106,12 @@ export const patientsApi = {
     if (params.buscar?.trim()) query.set('buscar', params.buscar.trim())
     if (params.activo !== undefined) query.set('activo', String(params.activo))
     if (params.conCuenta !== undefined) query.set('conCuenta', String(params.conCuenta))
+    if (params.origen?.trim()) query.set('origen', params.origen.trim())
+    if (params.sedeId !== undefined && params.sedeId !== null && params.sedeId !== '') {
+      query.set('sedeId', String(params.sedeId))
+    }
 
-    return apiRequest<PaginaResponse<PacienteResponse>>(`/api/pacientes?${query}`, {
+    return apiRequest<PaginaResponse<PacienteResumenResponse>>(`/api/pacientes?${query}`, {
       accessToken,
     })
   },
@@ -91,9 +122,13 @@ export const patientsApi = {
     })
   },
 
-  buscarPorDocumento(accessToken: string, tipoDocumento: string,numeroDocumento: string,) {
-    return apiRequest<PacienteResponse>(`/api/pacientes/documento/${
-      encodeURIComponent(tipoDocumento)}/${encodeURIComponent(numeroDocumento)}`,
+  buscarPorDocumento(
+    accessToken: string,
+    tipoDocumento: string,
+    numeroDocumento: string,
+  ) {
+    return apiRequest<PacienteResponse>(
+      `/api/pacientes/documento/${encodeURIComponent(tipoDocumento)}/${encodeURIComponent(numeroDocumento)}`,
       { accessToken },
     )
   },

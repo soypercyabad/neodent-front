@@ -13,11 +13,20 @@ export interface Sede {
   fechaCreacion: string | null
 }
 
+export interface SedeCatalogo {
+  id: number
+  nombre: string
+  distrito: string | null
+}
+
 export type SedeInput = Pick<Sede,
   'nombre' | 'direccion' | 'distrito' | 'provincia' | 'departamento' | 'telefono' | 'email'
 >
 
 export const sedesApi = {
+  catalogo: (token?: string) =>
+    apiRequest<SedeCatalogo[]>('/api/sedes/catalogo', { accessToken: token }),
+
   listar: (token: string) =>
     apiRequest<Sede[]>('/api/sedes', { accessToken: token }),
 

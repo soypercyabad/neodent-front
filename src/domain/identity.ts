@@ -27,6 +27,7 @@ export interface UserModulo {
   idModulo?: number
   codigo: string
   nombre: string
+  ruta?: string | null
   icono?: string | null
   orden: number
 }

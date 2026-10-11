@@ -124,7 +124,7 @@ export function RolesPage() {
     setEditando(rol)
     setNombre(rol.nombre)
     setDescripcion(rol.descripcion ?? '')
-    setSelectedModulos((rol.modulos ?? []).map(m => m.id ?? m.idModulo!))
+    setSelectedModulos((rol.modulos ?? []).map(m => m.id))
     setError('')
     setMostrarForm(true)
     scrollToTopOrElement()

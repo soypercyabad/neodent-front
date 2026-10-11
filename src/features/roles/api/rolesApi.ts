@@ -7,6 +7,7 @@ export interface ModuloResponse {
   nombre: string
   icono: string | null
   orden: number
+  activo?: boolean
 }
 
 export interface RolModuloResponse {

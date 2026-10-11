@@ -386,6 +386,37 @@ export function PatientDetailPage() {
               />
 
               <InfoRow
+                label="Canal de registro"
+                value={
+                  paciente.origenRegistro === 'AUTORREGISTRO' ? (
+                    <Badge tone="blue" className="inline-flex items-center gap-1">
+                      <Icon name="globe" size={12} />
+                      <span>Autoregistro (Web)</span>
+                    </Badge>
+                  ) : (
+                    <Badge tone="gray" className="inline-flex items-center gap-1">
+                      <Icon name="building" size={12} />
+                      <span>Recepción</span>
+                    </Badge>
+                  )
+                }
+              />
+
+              <InfoRow
+                label="Sede de registro"
+                value={
+                  paciente.sedeRegistroNombre ? (
+                    <div className="flex items-center gap-1.5 font-medium text-ink">
+                      <Icon name="mapPin" size={14} className="shrink-0 text-brand" />
+                      <span>{paciente.sedeRegistroNombre}</span>
+                    </div>
+                  ) : (
+                    <span className="italic text-muted">No asignada</span>
+                  )
+                }
+              />
+
+              <InfoRow
                 label="Fecha de registro"
                 value={formatearFechaLarga(paciente.fechaCreacion)}
               />
