@@ -261,19 +261,22 @@ export function PatientDetailPage() {
                   Paciente #{paciente.id}
                 </p>
 
-                <p className="mt-1.5 break-words text-sm text-ink-soft">
-                  {paciente.email || 'Sin correo registrado'}
-                  {paciente.telefono && ` · ${formatPhone(paciente.telefono)}`}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                   <Badge tone={paciente.activo ? 'green' : 'gray'}>
                     {paciente.activo ? 'Activo' : 'Inactivo'}
                   </Badge>
 
-                  <Badge tone={paciente.tieneCuenta ? 'blue' : 'amber'}>
-                    {paciente.tieneCuenta ? 'Cuenta creada' : 'Sin cuenta de portal'}
-                  </Badge>
+                  {!paciente.tieneCuenta ? (
+                    <Badge tone="gray">Sin cuenta de portal</Badge>
+                  ) : paciente.estadoCuenta === 'ACTIVO' || paciente.correoVerificado === true ? (
+                    <Badge tone="blue">Portal activo</Badge>
+                  ) : paciente.estadoCuenta === 'PENDIENTE' || paciente.correoVerificado === false ? (
+                    <Badge tone="amber">Portal pendiente</Badge>
+                  ) : paciente.estadoCuenta === 'BLOQUEADO' ? (
+                    <Badge tone="red">Portal bloqueado</Badge>
+                  ) : (
+                    <Badge tone="gray">Portal {paciente.estadoCuenta?.toLowerCase()}</Badge>
+                  )}
                 </div>
               </div>
 
@@ -353,15 +356,6 @@ export function PatientDetailPage() {
                 />
                 Cuenta y registro
               </h2>
-
-              <InfoRow
-                label="Estado del paciente"
-                value={
-                  <Badge tone={paciente.activo ? 'green' : 'gray'}>
-                    {paciente.activo ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                }
-              />
 
               <InfoRow
                 label="Cuenta de portal"

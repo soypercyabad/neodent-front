@@ -60,7 +60,7 @@ export function EditPatientPage() {
         data,
       )
 
-      navigate(`/pacientes/${paciente.id}`, {
+      navigate('/pacientes', {
         replace: true,
         state: {
           aviso: {
@@ -109,9 +109,7 @@ export function EditPatientPage() {
             onSubmit={data =>
               guardar(data as ActualizarPacienteRequest)
             }
-            onCancel={() =>
-              navigate(`/pacientes/${paciente.id}`)
-            }
+            onCancel={() => navigate('/pacientes')}
           />
         </>
       ) : null}

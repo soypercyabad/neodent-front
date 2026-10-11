@@ -290,6 +290,11 @@ export function UsersTableSkeleton({ rows = 5 }: { rows?: number }) {
             <Skeleton className="h-6 w-24 rounded-full" />
           </td>
 
+          {/* Especialidades */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-6 w-28 rounded-full opacity-70" />
+          </td>
+
           {/* Estado */}
           <td className="px-4 py-4 text-center">
             <Skeleton className="mx-auto h-5 w-20 rounded-full" />

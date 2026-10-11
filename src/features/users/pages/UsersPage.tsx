@@ -17,6 +17,7 @@ import { rolesApi, type RolResponse } from '@/features/roles/api/rolesApi'
 import { ApiError } from '@/shared/api/apiClient'
 import { useAuth } from '@/features/auth'
 import { UsersTable } from '../components/UsersTable'
+import { rolBadgeInfo } from '../model/users.helpers'
 
 const PAGE_SIZE = 10
 
@@ -91,7 +92,7 @@ export function UsersPage() {
         buscar: query,
         rol: rol || undefined,
         estado: estado || undefined,
-        sortBy: sortColumn,
+        sortBy: sortColumn === 'email' ? 'correo' : sortColumn,
         direction: sortDirection,
         page: page - 1,
         size: PAGE_SIZE,
@@ -212,7 +213,7 @@ export function UsersPage() {
       <Card>
         <Toolbar>
           <SearchInput
-            placeholder="Buscar por nombre, documento o correo…"
+            placeholder="Buscar por nombre, documento, correo o teléfono…"
             value={query}
             onChange={e => applyFilter(() => setQuery(e.target.value))}
             loading={loading && !!query}
@@ -224,7 +225,10 @@ export function UsersPage() {
             placeholder="Todos los roles"
             options={[
               { value: '', label: 'Todos los roles' },
-              ...rolesDisponibles.map(r => ({ value: r.nombre, label: r.nombre })),
+              ...rolesDisponibles.map(r => ({
+                value: r.nombre,
+                label: rolBadgeInfo(r.nombre).label,
+              })),
             ]}
             value={rol}
             onChange={value => applyFilter(() => setRol(value))}

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   ActionsCell,
   Avatar,
@@ -8,41 +7,29 @@ import {
   RowActions,
   Table,
   TableState,
+  Tooltip,
   UsersTableSkeleton,
-  type BadgeTone,
   type Column,
   type SortDirection,
 } from '@/shared/components/ui'
-import { documentTypesApi } from '@/shared/api/documentTypesApi'
 import { formatPhone } from '@/shared/lib/format'
 import type { UsuarioInternoResponse } from '../api/usersApi'
+import {
+  esOdontologo,
+  estadoUsuario,
+  nombreCompleto,
+  prefijoProfesional,
+  rolBadgeInfo,
+} from '../model/users.helpers'
 
 const COLUMNS: Column[] = [
   { key: 'nombres', label: 'Colaborador', sortable: true },
   { key: 'email', label: 'Contacto', sortable: true },
-  { key: 'roles', label: 'Roles', sortable: true },
+  { key: 'roles', label: 'Rol', sortable: true },
+  { key: 'especialidades', label: 'Especialidades' },
   { key: 'estado', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
-
-const ROL_CONFIG: Record<string, { label: string; tone: BadgeTone }> = {
-  ADMIN: { label: 'Administrador', tone: 'purple' },
-  ODONTOLOGO: { label: 'Odontólogo', tone: 'blue' },
-  RECEPCIONISTA: { label: 'Recepcionista', tone: 'teal' },
-}
-
-function estadoUsuario(usuario: UsuarioInternoResponse) {
-  if (usuario.estado === 'PENDIENTE') {
-    return { texto: 'Pendiente', tono: 'amber' as const }
-  }
-  if (usuario.estado === 'BLOQUEADO') {
-    return { texto: 'Bloqueado', tono: 'red' as const }
-  }
-  if (usuario.estado === 'ACTIVO' && usuario.personalActivo) {
-    return { texto: 'Activo', tono: 'green' as const }
-  }
-  return { texto: 'Inactivo', tono: 'gray' as const }
-}
 
 interface UsersTableProps {
   users: UsuarioInternoResponse[]
@@ -69,21 +56,6 @@ export function UsersTable({
   onEdit,
   onToggle,
 }: UsersTableProps) {
-  const [tiposDoc, setTiposDoc] = useState<Record<number, string>>({})
-
-  useEffect(() => {
-    documentTypesApi
-      .listar()
-      .then(lista => {
-        const mapa: Record<number, string> = {}
-        for (const t of lista) {
-          mapa[t.id] = t.codigo
-        }
-        setTiposDoc(mapa)
-      })
-      .catch(() => {})
-  }, [])
-
   return (
     <Table
       columns={COLUMNS}
@@ -98,35 +70,23 @@ export function UsersTable({
           <TableState
             colSpan={COLUMNS.length}
             empty={users.length === 0}
-            emptyLabel="No hay usuarios que coincidan con los filtros."
+            emptyLabel="No hay trabajadores que coincidan con los filtros."
           />
 
           {users.map(usuario => {
-            const nombreCompleto = [
-              usuario.nombres,
-              usuario.apellidoPaterno,
-              usuario.apellidoMaterno,
-            ]
-              .filter(Boolean)
-              .join(' ')
-
-            const esOdontologo =
-              usuario.roles.includes('ODONTOLOGO') || Boolean(usuario.odontologoId)
-            const prefijo = esOdontologo ? 'Dr(a). ' : ''
-
+            const nombre = nombreCompleto(usuario)
+            const odontologo = esOdontologo(usuario)
+            const prefijo = prefijoProfesional(usuario)
             const estado = estadoUsuario(usuario)
             const activo = usuario.estado === 'ACTIVO' && usuario.personalActivo
             const esCuentaPropia = usuario.usuarioId === usuarioActualId
             const puedeCambiarEstado =
               usuario.estado === 'INACTIVO' || usuario.estado === 'ACTIVO'
-            const tipoDocTexto =
-              usuario.tipoDocumentoCodigo ||
-              tiposDoc[usuario.tipoDocumentoId] ||
-              'DOC'
+            const tipoDocTexto = usuario.tipoDocumentoCodigo || 'DOC'
 
             return (
               <tr key={usuario.usuarioId}>
-                {/* COLABORADOR (FOTO/AVATAR + NOMBRE + COP) */}
+                {/* COLABORADOR (FOTO/AVATAR + NOMBRE + DOCUMENTO + COP) */}
                 <td>
                   <div className="flex items-center gap-3">
                     {usuario.odontologoId && usuario.fotoNombreArchivo ? (
@@ -134,7 +94,7 @@ export function UsersTable({
                         <ProtectedImage
                           path={`/api/odontologos/${usuario.odontologoId}/foto`}
                           accessToken={accessToken}
-                          alt={`${prefijo}${nombreCompleto}`}
+                          alt={`${prefijo}${nombre}`}
                           className="size-full object-cover"
                           fallback={
                             <Avatar
@@ -153,7 +113,7 @@ export function UsersTable({
                         nombre={usuario.nombres}
                         apellido={usuario.apellidoPaterno}
                         seed={usuario.usuarioId}
-                        size={36}
+                        size={38}
                         animate="hover"
                         trackCursor={false}
                       />
@@ -161,15 +121,27 @@ export function UsersTable({
 
                     <div className="min-w-0">
                       <p className="font-bold text-ink">
-                        {prefijo}{nombreCompleto}
+                        {prefijo}{nombre}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted">
-                        <span className="font-semibold text-ink-soft">{tipoDocTexto}</span>{' '}
-                        <span className="text-muted">·</span>{' '}
+
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                        <span className="font-semibold text-ink-soft">{tipoDocTexto}</span>
+                        <span className="text-muted">·</span>
                         <span className="tabular-nums font-medium text-ink">
                           {usuario.numeroDocumento}
                         </span>
-                      </p>
+
+                        {usuario.numeroColegiatura && (
+                          <>
+                            <span className="text-muted">·</span>
+                            <span className="inline-flex items-center rounded bg-brand-soft/50 px-1.5 py-0.2 text-[0.68rem] font-semibold text-brand">
+                              {usuario.numeroColegiatura.toUpperCase().startsWith('COP')
+                                ? usuario.numeroColegiatura
+                                : `COP ${usuario.numeroColegiatura}`}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -186,28 +158,52 @@ export function UsersTable({
 
                     <div className="flex items-center gap-1.5 text-muted">
                       <Icon name="phone" size={13} className="shrink-0 text-muted" />
-                      <span className="tabular-nums">
-                        {usuario.telefono ? formatPhone(usuario.telefono) : <span className="italic text-muted">Sin teléfono</span>}
+                      <span className="tabular-nums font-medium text-ink-soft">
+                        {usuario.telefono ? (
+                          formatPhone(usuario.telefono)
+                        ) : (
+                          <span className="italic text-muted">Sin teléfono</span>
+                        )}
                       </span>
                     </div>
                   </div>
                 </td>
 
-                {/* ROLES */}
+                {/* ROL */}
                 <td>
                   <div className="flex flex-wrap gap-1.5">
                     {usuario.roles.map(rol => {
-                      const config = ROL_CONFIG[rol] ?? {
-                        label: rol,
-                        tone: 'gray' as const,
-                      }
+                      const info = rolBadgeInfo(rol)
                       return (
-                        <Badge key={rol} tone={config.tone}>
-                          {config.label}
+                        <Badge key={rol} tone={info.tone}>
+                          {info.label}
                         </Badge>
                       )
                     })}
                   </div>
+                </td>
+
+                {/* ESPECIALIDADES */}
+                <td>
+                  {odontologo && usuario.especialidades.length > 0 ? (
+                    usuario.especialidades.length === 1 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand-soft/70 px-2 py-0.5 text-[0.7rem] font-medium text-brand">
+                        <Icon name="tooth" size={10} className="shrink-0 text-brand" />
+                        {usuario.especialidades[0]}
+                      </span>
+                    ) : (
+                      <Tooltip
+                        content={`Especialidades: ${usuario.especialidades.join(', ')}`}
+                      >
+                        <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-brand/20 bg-brand-soft/70 px-2 py-0.5 text-[0.7rem] font-medium text-brand transition-colors hover:bg-brand-soft">
+                          <Icon name="tooth" size={10} className="shrink-0 text-brand" />
+                          {usuario.especialidades.length} especialidades
+                        </span>
+                      </Tooltip>
+                    )
+                  ) : (
+                    <span className="text-xs text-muted/60">-</span>
+                  )}
                 </td>
 
                 {/* ESTADO */}

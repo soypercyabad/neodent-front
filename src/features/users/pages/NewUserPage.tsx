@@ -7,9 +7,10 @@ import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documen
 import { useAuth } from '@/features/auth'
 import { EMAIL_RE } from '@/shared/lib/validation'
 import { usersApi } from '../api/usersApi'
-import { rolesApi, type RolResponse, } from '@/features/roles/api/rolesApi'
+import { rolesApi, type RolResponse } from '@/features/roles/api/rolesApi'
 import { normalizarImagenAJpeg } from '@/shared/lib/image'
 import { formatPhone, cleanPhone } from '@/shared/lib/format'
+import { rolBadgeInfo } from '../model/users.helpers'
 
 const INITIAL = {
   numeroDocumento: '', nombres: '', apellidoPaterno: '', apellidoMaterno: '',
@@ -76,7 +77,7 @@ export function NewUserPage() {
     .filter(rol => rol.activo && rol.nombre !== 'PACIENTE')
     .map(rol => ({
       value: rol.nombre,
-      label: rol.nombre,
+      label: rolBadgeInfo(rol.nombre).label,
     }))
 
   const validarNumeroDocumento = (valor: string) => {

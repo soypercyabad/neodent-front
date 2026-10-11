@@ -4,34 +4,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar, BackLink, Badge, Button, Card, Icon, InfoRow, Tooltip } from '@/shared/components/ui'
 import { apiBlob } from '@/shared/api/apiClient'
 import { useAuth } from '@/features/auth'
-import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { formatPhone } from '@/shared/lib/format'
 import { usersApi, type UsuarioInternoResponse } from '../api/usersApi'
-
-const NOMBRES_ROL: Record<string, string> = {
-  ADMIN: 'Administrador',
-  RECEPCIONISTA: 'Recepcionista',
-  ODONTOLOGO: 'Odontólogo',
-}
-
-function nombreCompleto(usuario: UsuarioInternoResponse) {
-  return [usuario.nombres, usuario.apellidoPaterno, usuario.apellidoMaterno]
-    .filter(Boolean)
-    .join(' ')
-}
-
-function estadoCuenta(usuario: UsuarioInternoResponse) {
-  if (usuario.estado === 'PENDIENTE') {
-    return { texto: 'Pendiente de activación', tono: 'amber' as const }
-  }
-  if (usuario.estado === 'BLOQUEADO') {
-    return { texto: 'Cuenta bloqueada', tono: 'red' as const }
-  }
-  if (usuario.estado === 'ACTIVO' && usuario.personalActivo) {
-    return { texto: 'Cuenta activa', tono: 'green' as const }
-  }
-  return { texto: 'Cuenta inactiva', tono: 'gray' as const }
-}
+import {
+  estadoUsuario,
+  esOdontologo as checkEsOdontologo,
+  nombreCompleto,
+  prefijoProfesional,
+  rolBadgeInfo,
+} from '../model/users.helpers'
 
 export function UserDetailPage() {
   const { id } = useParams()
@@ -43,7 +24,6 @@ export function UserDetailPage() {
   const idValido = Number.isSafeInteger(usuarioId) && usuarioId > 0
 
   const [usuario, setUsuario] = useState<UsuarioInternoResponse | null>(null)
-  const [tiposDocumento, setTiposDocumento] = useState<TipoDocumentoOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actualizacion, setActualizacion] = useState(0)
@@ -60,14 +40,11 @@ export function UserDetailPage() {
     setLoading(true)
     setError('')
 
-    Promise.all([
-      usersApi.obtener(accessToken, usuarioId),
-      documentTypesApi.listar().catch(() => [] as TipoDocumentoOption[]),
-    ])
-      .then(([userData, docsData]) => {
+    usersApi
+      .obtener(accessToken, usuarioId)
+      .then(userData => {
         if (activo) {
           setUsuario(userData)
-          if (docsData.length > 0) setTiposDocumento(docsData)
         }
       })
       .catch(err => {
@@ -109,18 +86,17 @@ export function UserDetailPage() {
     }
   }, [accessToken, usuario?.odontologoId, usuario?.fotoNombreArchivo])
 
-  const esOdontologo = usuario?.roles.includes('ODONTOLOGO') ?? false
-  const estado = usuario ? estadoCuenta(usuario) : null
-  const tipoDoc = tiposDocumento.find(t => t.id === usuario?.tipoDocumentoId)
+  const esMedico = usuario ? checkEsOdontologo(usuario) : false
+  const estado = usuario ? estadoUsuario(usuario) : null
   const documentoTexto = usuario
-    ? tipoDoc
-      ? `${tipoDoc.codigo} · ${usuario.numeroDocumento}`
+    ? usuario.tipoDocumentoCodigo
+      ? `${usuario.tipoDocumentoCodigo} · ${usuario.numeroDocumento}`
       : usuario.numeroDocumento
     : 'No registrado'
 
   return (
     <>
-      <BackLink to="/usuarios">Volver a Usuarios</BackLink>
+      <BackLink to="/usuarios">Volver a Personal</BackLink>
 
       {/* CARGA */}
       {loading && (
@@ -175,48 +151,39 @@ export function UserDetailPage() {
 
                 {estado?.texto ? (
                   <Tooltip
-                    content={estado.texto}
+                    content={`Estado: ${estado.texto}`}
                     className="absolute bottom-1 right-1"
                   >
                     <span
                       className={`block size-5 rounded-full border-2 border-surface ${
-                        estado?.tono === 'green'
+                        estado.tono === 'green'
                           ? 'bg-emerald-500'
-                          : estado?.tono === 'amber'
+                          : estado.tono === 'amber'
                             ? 'bg-amber-500'
-                            : 'bg-slate-400'
+                            : estado.tono === 'red'
+                              ? 'bg-rose-500'
+                              : 'bg-slate-400'
                       }`}
                     />
                   </Tooltip>
-                ) : (
-                  <span
-                    className={`absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface ${
-                      estado?.tono === 'green'
-                        ? 'bg-emerald-500'
-                        : estado?.tono === 'amber'
-                          ? 'bg-amber-500'
-                          : 'bg-slate-400'
-                    }`}
-                  />
-                )}
+                ) : null}
               </div>
 
               <div className="min-w-0 flex-1 text-center sm:text-left">
                 <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+                  {prefijoProfesional(usuario)}
                   {nombreCompleto(usuario)}
                 </h1>
 
-                <p className="mt-2 break-words text-sm text-muted">{usuario.correo}</p>
-
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  {usuario.roles.map(rol => (
-                    <Badge
-                      key={rol}
-                      tone={rol === 'ODONTOLOGO' ? 'green' : rol === 'ADMIN' ? 'blue' : 'gray'}
-                    >
-                      {NOMBRES_ROL[rol] ?? rol}
-                    </Badge>
-                  ))}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  {usuario.roles.map(rol => {
+                    const badge = rolBadgeInfo(rol)
+                    return (
+                      <Badge key={rol} tone={badge.tone}>
+                        {badge.label}
+                      </Badge>
+                    )
+                  })}
 
                   {estado && <Badge tone={estado.tono}>{estado.texto}</Badge>}
                 </div>
@@ -232,7 +199,7 @@ export function UserDetailPage() {
             </div>
           </Card>
 
-          {/* INFORMACIÓN REAL */}
+          {/* INFORMACIÓN DETALLADA */}
           <div className="grid items-start gap-5 lg:grid-cols-2">
             {/* CONTACTO E IDENTIDAD */}
             <Card className="p-6">
@@ -242,15 +209,19 @@ export function UserDetailPage() {
               </h2>
 
               <InfoRow label="Documento" value={documentoTexto} />
-              <InfoRow label="Teléfono" value={usuario.telefono ? formatPhone(usuario.telefono) : 'No registrado'} />
+              <InfoRow
+                label="Teléfono"
+                value={usuario.telefono ? formatPhone(usuario.telefono) : 'No registrado'}
+              />
               <InfoRow
                 label="Correo electrónico"
                 value={<span className="break-all">{usuario.correo}</span>}
               />
+              <InfoRow label="Usuario del sistema" value={`@${usuario.aliasInterno}`} />
             </Card>
 
-            {/* INFORMACIÓN PROFESIONAL O ROL */}
-            {esOdontologo ? (
+            {/* INFORMACIÓN PROFESIONAL O ROLES */}
+            {esMedico ? (
               <Card className="p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-ink">
                   <Icon name="tooth" size={20} className="text-brand" />
@@ -258,12 +229,22 @@ export function UserDetailPage() {
                 </h2>
 
                 <InfoRow
-                  label="Número de colegiatura (COP)"
-                  value={usuario.numeroColegiatura || 'No registrado'}
+                  label="Colegiatura (COP)"
+                  value={
+                    usuario.numeroColegiatura ? (
+                      <span className="inline-flex items-center rounded bg-brand-soft/50 px-2 py-0.5 text-xs font-semibold text-brand">
+                        {usuario.numeroColegiatura.toUpperCase().startsWith('COP')
+                          ? usuario.numeroColegiatura
+                          : `COP ${usuario.numeroColegiatura}`}
+                      </span>
+                    ) : (
+                      'No registrado'
+                    )
+                  }
                 />
 
                 <div className="border-t border-line pt-4 pb-1">
-                  <p className="text-[0.95rem] text-ink-soft">Especialidades</p>
+                  <p className="text-[0.95rem] text-ink-soft">Especialidades clínicas</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {usuario.especialidades.length > 0 ? (
                       usuario.especialidades.map(esp => (
@@ -286,16 +267,19 @@ export function UserDetailPage() {
             ) : (
               <Card className="p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-ink">
-                  <Icon name="lock" size={20} className="text-brand" />
-                  Acceso y funciones
+                  <Icon name="briefcase" size={20} className="text-brand" />
+                  Funciones del personal
                 </h2>
 
                 <InfoRow
-                  label="Roles asignados"
-                  value={usuario.roles.map(rol => NOMBRES_ROL[rol] ?? rol).join(', ')}
+                  label="Área / Rol"
+                  value={usuario.roles.map(rol => rolBadgeInfo(rol).label).join(', ')}
                 />
 
-                <InfoRow label="Estado de la cuenta" value={estado?.texto || 'No disponible'} />
+                <InfoRow
+                  label="Estado del personal"
+                  value={usuario.personalActivo ? 'Personal habilitado' : 'Personal suspendido'}
+                />
               </Card>
             )}
           </div>

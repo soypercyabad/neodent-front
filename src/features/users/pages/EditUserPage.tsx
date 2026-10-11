@@ -10,6 +10,7 @@ import { usersApi, type UsuarioInternoResponse } from '../api/usersApi'
 import { useNavigate, useParams } from 'react-router-dom'
 import { normalizarImagenAJpeg } from '@/shared/lib/image'
 import { formatPhone, cleanPhone } from '@/shared/lib/format'
+import { rolBadgeInfo } from '../model/users.helpers'
 
 const PHONE_RE = /^\+?\d{7,15}$/
 const FIELD_DELAY = 600
@@ -141,7 +142,7 @@ export function EditUserPage() {
     .filter(r => r.activo && r.nombre !== 'PACIENTE')
     .map(r => ({
       value: r.nombre,
-      label: r.nombre,
+      label: rolBadgeInfo(r.nombre).label,
     }))
 
   useEffect(() => {
@@ -493,7 +494,7 @@ export function EditUserPage() {
       }
 
       navigate(
-        `/usuarios/${usuarioId}`,
+        '/usuarios',
         {
           replace: true,
           state: {
