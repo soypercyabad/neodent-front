@@ -33,7 +33,7 @@ export function Table<T = string>({
   onSort,
 }: TableProps<T>) {
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto">
       <table
         className={cn(
           'w-full border-collapse text-[0.95rem]',
@@ -54,7 +54,7 @@ export function Table<T = string>({
                   scope="col"
                   onClick={isSortable && c.key ? () => onSort?.(c.key as T) : undefined}
                   className={cn(
-                    'border-y border-line bg-[#F8FAFD] px-4 py-3.5 text-[0.78rem] font-bold tracking-wider uppercase transition-colors',
+                    'border-y border-line bg-[#F8FAFD] px-4 py-3.5 text-[0.78rem] font-bold tracking-wider uppercase transition-colors whitespace-nowrap',
                     isSortable ? 'cursor-pointer select-none hover:bg-alt/80 group' : '',
                     isSorted ? 'text-brand font-extrabold bg-brand-soft/20' : 'text-muted',
                     c.align === 'center'

@@ -51,6 +51,45 @@ export interface HistorialCita {
   fechaCreacion: string
 }
 
+export interface AgendaParams {
+  page?: number
+  size?: number
+  fecha?: string
+  estado?: string
+  vista?: string
+  buscar?: string
+  odontologoId?: number
+  sedeId?: number
+  sortBy?: string
+  direction?: 'asc' | 'desc'
+}
+
+export interface CitaResumen {
+  idCita: number
+  pacienteId: number
+  pacienteNombre: string
+  pacienteTelefono: string | null
+  pacienteNumeroDocumento: string | null
+  odontologoNombre: string
+  especialidadNombre: string
+  sedeNombre: string | null
+  servicioNombre: string
+  fechaHoraInicio: string
+  fechaHoraFin: string
+  duracionMinutos: number | null
+  estado: string
+}
+
+export interface PaginaAgendaDetalle {
+  contenido: CitaResumen[]
+  pagina: number
+  tamanoPagina: number
+  totalElementos: number
+  totalPaginas: number
+  esPrimera: boolean
+  esUltima: boolean
+}
+
 export const citaDetalleApi = {
   detalle(token: string, id: number) {
     return apiRequest<DetalleCita>(
@@ -59,9 +98,29 @@ export const citaDetalleApi = {
     )
   },
 
-  agenda(token: string, fecha?: string) {
-    const query = fecha ? `?fecha=${fecha}` : ''
-    return apiRequest<DetalleCita[]>(
+  agenda(token: string, params?: AgendaParams | string) {
+    if (typeof params === 'string') {
+      const query = params ? `?fecha=${params}` : ''
+      return apiRequest<PaginaAgendaDetalle>(
+        `/api/citas/agenda-detalle${query}`,
+        { accessToken: token },
+      )
+    }
+
+    const q = new URLSearchParams()
+    if (params?.page !== undefined) q.set('page', String(params.page))
+    if (params?.size !== undefined) q.set('size', String(params.size))
+    if (params?.fecha) q.set('fecha', params.fecha)
+    if (params?.estado) q.set('estado', params.estado)
+    if (params?.vista) q.set('vista', params.vista)
+    if (params?.buscar) q.set('buscar', params.buscar)
+    if (params?.odontologoId) q.set('odontologoId', String(params.odontologoId))
+    if (params?.sedeId) q.set('sedeId', String(params.sedeId))
+    if (params?.sortBy) q.set('sortBy', params.sortBy)
+    if (params?.direction) q.set('direction', params.direction)
+
+    const query = q.toString() ? `?${q.toString()}` : ''
+    return apiRequest<PaginaAgendaDetalle>(
       `/api/citas/agenda-detalle${query}`,
       { accessToken: token },
     )

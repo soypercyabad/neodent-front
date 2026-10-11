@@ -88,7 +88,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => { if (hasModulos) setMenuOpen(true) }} />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-7 print:overflow-visible print:p-0">
+        <main className="flex-1 min-w-0 overflow-y-auto p-4 md:p-7 print:overflow-visible print:p-0">
           {shouldBlock ? (
             <section className="mx-auto flex min-h-[calc(100dvh-10rem)] w-full max-w-6xl items-center justify-center py-8 px-4">
               <div className="grid w-full items-center gap-8 lg:grid-cols-2 lg:gap-14">

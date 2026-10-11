@@ -19,24 +19,20 @@ import {
   TableFoot,
   TableState,
   Toast,
+  Tooltip,
   type Column,
   type ToastAviso,
 } from '@/shared/components/ui'
-import { apiRequest } from '@/shared/api/apiClient'
 import { useAuth } from '@/features/auth/model/useAuth'
-import { citaDetalleApi, type DetalleCita } from '../api/citaDetalleApi'
+import { citaDetalleApi, type CitaResumen } from '../api/citaDetalleApi'
 import { citaReferencia } from '../model/citaReferencia'
-import type { CreatedAppointment } from '../api/bookingApi'
-
-interface PaginaCitas {
-  contenido: CreatedAppointment[]
-  esUltima: boolean
-}
+import { bookingApi } from '../api/bookingApi'
 
 const COLUMNS: Column[] = [
   { key: 'idCita', label: 'Referencia', sortable: true },
-  { key: 'pacienteNombre', label: 'Paciente', sortable: true },
+  { key: 'pacienteNombre', label: 'Paciente y Contacto', sortable: true },
   { key: 'odontologoNombre', label: 'Especialista', sortable: true },
+  { key: 'sedeNombre', label: 'Sede' },
   { key: 'fechaHoraInicio', label: 'Fecha y hora', sortable: true },
   { key: 'estado', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
@@ -75,17 +71,38 @@ export function AppointmentsPage() {
     }
   }, [location.state])
 
-  const [citas, setCitas] = useState<DetalleCita[]>([])
+  const [citas, setCitas] = useState<CitaResumen[]>([])
+  const [totalElementos, setTotalElementos] = useState(0)
+  const [totalPaginas, setTotalPaginas] = useState(1)
   const [query, setQuery] = useState('')
   const [day, setDay] = useState('')
   const [estado, setEstado] = useState('')
   const [vista, setVista] = useState('')
+  const [filtroSede, setFiltroSede] = useState<string>('')
+  const [sedes, setSedes] = useState<Array<{ id: number; nombre: string }>>([])
   const [pagina, setPagina] = useState(1)
   const [sortColumn, setSortColumn] = useState<string>('fechaHoraInicio')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actualizacion, setActualizacion] = useState(0)
+
+  useEffect(() => {
+    if (!accessToken) return
+    let activo = true
+
+    bookingApi.sedes(accessToken)
+      .then(res => {
+        if (activo) {
+          setSedes(res.map(s => ({ id: s.id, nombre: s.nombre })))
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      activo = false
+    }
+  }, [accessToken])
 
   const handleSort = (columnKey: string) => {
     if (sortColumn === columnKey) {
@@ -111,31 +128,23 @@ export function AppointmentsPage() {
       setError('')
 
       try {
-        let resultado: DetalleCita[] = []
+        const respuesta = await citaDetalleApi.agenda(accessToken, {
+          page: Math.max(0, pagina - 1),
+          size: POR_PAGINA,
+          fecha: day || undefined,
+          estado: estado || undefined,
+          vista: vista || undefined,
+          buscar: query.trim() || undefined,
+          sedeId: filtroSede ? Number(filtroSede) : undefined,
+          sortBy: sortColumn,
+          direction: sortDirection,
+        })
 
-        if (user?.rol === 'Odontólogo') {
-          const citasPropias: CreatedAppointment[] = []
-          let pagina = 0
-          let ultima = false
-
-          while (!ultima) {
-            const respuesta = await apiRequest<PaginaCitas>(
-              `/api/citas/mi-agenda?pagina=${pagina}&tamano=50`, { accessToken }
-            )
-
-            citasPropias.push(...respuesta.contenido)
-            ultima = respuesta.esUltima || respuesta.contenido.length === 0
-            pagina++
-          }
-
-          resultado = await Promise.all(
-            citasPropias.map(c => citaDetalleApi.detalle(accessToken, c.idCita))
-          )
-        } else {
-          resultado = await citaDetalleApi.agenda(accessToken)
+        if (activo) {
+          setCitas(respuesta.contenido || [])
+          setTotalElementos(respuesta.totalElementos || 0)
+          setTotalPaginas(Math.max(1, respuesta.totalPaginas || 1))
         }
-
-        if (activo) setCitas(resultado)
       } catch (e) {
         if (activo) setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas.')
       } finally {
@@ -145,62 +154,9 @@ export function AppointmentsPage() {
 
     void cargar()
     return () => { activo = false }
-  }, [accessToken, user?.rol, actualizacion])
+  }, [accessToken, pagina, query, day, estado, vista, filtroSede, sortColumn, sortDirection, actualizacion])
 
-  const rows = useMemo(() => {
-    const buscar = query.trim().toLowerCase()
-
-    const hoy = new Date()
-    const manana = new Date(hoy)
-    manana.setDate(hoy.getDate() + 1)
-
-    const fechaHoy = hoy.toLocaleDateString('en-CA', { timeZone: 'America/Lima', })
-    const fechaManana = manana.toLocaleDateString('en-CA', { timeZone: 'America/Lima', })
-    const ahora = Date.now()
-
-    return citas
-      .filter(c => {
-        const fecha = c.fechaHoraInicio.slice(0, 10)
-
-        if (day && fecha !== day) return false
-        if (estado && c.estado !== estado) return false
-        if (vista === 'HOY' && fecha !== fechaHoy) return false
-        if (vista === 'MANANA_CONFIRMAR' && (fecha !== fechaManana || c.estado !== 'PROGRAMADA')) return false
-        if (vista === 'PROXIMAS' && (new Date(c.fechaHoraInicio).getTime() < ahora || ['ATENDIDA', 'CANCELADA', 'NO_ASISTIO'].includes(c.estado))) return false
-        if (vista === 'HISTORIAL' && !['ATENDIDA', 'CANCELADA', 'NO_ASISTIO'].includes(c.estado)) return false
-        if (!buscar) return true
-
-        return `${c.pacienteNombre} ${c.odontologoNombre} ${c.especialidadNombre ?? ''} ${c.servicioNombre} ${citaReferencia(c.idCita)} ${c.estado}`
-          .toLowerCase()
-          .includes(buscar)
-      })
-      .sort((a, b) => {
-        const dir = sortDirection === 'asc' ? 1 : -1
-        if (sortColumn === 'idCita') {
-          return (a.idCita - b.idCita) * dir
-        }
-        if (sortColumn === 'pacienteNombre') {
-          return a.pacienteNombre.localeCompare(b.pacienteNombre, 'es') * dir
-        }
-        if (sortColumn === 'odontologoNombre') {
-          return a.odontologoNombre.localeCompare(b.odontologoNombre, 'es') * dir
-        }
-        if (sortColumn === 'fechaHoraInicio') {
-          return a.fechaHoraInicio.localeCompare(b.fechaHoraInicio) * dir
-        }
-        if (sortColumn === 'estado') {
-          return a.estado.localeCompare(b.estado, 'es') * dir
-        }
-
-        if (vista === 'HISTORIAL') return b.fechaHoraInicio.localeCompare(a.fechaHoraInicio)
-        return a.fechaHoraInicio.localeCompare(b.fechaHoraInicio)
-      })
-  }, [citas, query, day, estado, vista, sortColumn, sortDirection])
-
-  const totalPaginas = Math.max(1, Math.ceil(rows.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const inicio = (paginaActual - 1) * POR_PAGINA
-  const rowsPaginadas = useMemo(() => rows.slice(inicio, inicio + POR_PAGINA), [rows, inicio])
+  const inicio = (pagina - 1) * POR_PAGINA
 
   return (
     <>
@@ -221,69 +177,87 @@ export function AppointmentsPage() {
         }
       />
 
-      <Card className="overflow-visible">
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center">
-          <SearchInput
-            placeholder="Buscar paciente, especialista o referencia..."
-            aria-label="Buscar citas"
-            value={query}
-            onChange={e => {
-              setQuery(e.target.value)
-              setPagina(1)
-            }}
-            onClear={() => {
-              setQuery('')
-              setPagina(1)
-            }}
-            className="w-full sm:min-w-[12rem] sm:flex-1"
-          />
+      <Card className="w-full min-w-0 max-w-full overflow-visible">
+        <div className="flex flex-col gap-3 border-b border-line p-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+          <div className="w-full min-w-0 2xl:max-w-md 2xl:flex-1">
+            <SearchInput
+              placeholder="Buscar paciente, especialista o referencia..."
+              aria-label="Buscar citas"
+              value={query}
+              onChange={e => {
+                setQuery(e.target.value)
+                setPagina(1)
+              }}
+              onClear={() => {
+                setQuery('')
+                setPagina(1)
+              }}
+              className="w-full"
+            />
+          </div>
 
-          <AnimatedDatePicker
-            label="Filtrar por fecha"
-            placeholder="Filtrar por fecha"
-            value={day}
-            onChange={val => {
-              setDay(val)
-              setPagina(1)
-            }}
-            className="w-full sm:w-52 sm:shrink-0"
-          />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <AnimatedDatePicker
+              label="Filtrar por fecha"
+              placeholder="Filtrar por fecha"
+              value={day}
+              onChange={val => {
+                setDay(val)
+                setPagina(1)
+              }}
+              className="w-full sm:w-auto sm:min-w-[10.5rem] flex-1 sm:flex-initial"
+            />
 
-          <AnimatedSelect
-            label="Filtrar por estado"
-            value={estado}
-            onChange={val => {
-              setEstado(val)
-              setPagina(1)
-            }}
-            options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'PROGRAMADA', label: 'Programadas' },
-              { value: 'CONFIRMADA', label: 'Confirmadas' },
-              { value: 'EN_ATENCION', label: 'En atención' },
-              { value: 'ATENDIDA', label: 'Atendidas' },
-              { value: 'CANCELADA', label: 'Canceladas' },
-              { value: 'NO_ASISTIO', label: 'No asistió' },
-            ]}
-            className="w-full sm:w-48"
-          />
+            <AnimatedSelect
+              label="Filtrar por sede"
+              value={filtroSede}
+              onChange={val => {
+                setFiltroSede(val)
+                setPagina(1)
+              }}
+              options={[
+                { value: '', label: 'Todas las sedes' },
+                ...sedes.map(s => ({ value: String(s.id), label: s.nombre })),
+              ]}
+              className="w-full sm:w-auto sm:min-w-[10.5rem] flex-1 sm:flex-initial"
+            />
 
-          <AnimatedSelect
-            label="Vista rápida"
-            value={vista}
-            onChange={val => {
-              setVista(val)
-              setPagina(1)
-            }}
-            options={[
-              { value: '', label: 'Todas las citas' },
-              { value: 'HOY', label: 'Citas de hoy' },
-              { value: 'MANANA_CONFIRMAR', label: 'Mañana por confirmar' },
-              { value: 'PROXIMAS', label: 'Próximas citas' },
-              { value: 'HISTORIAL', label: 'Historial' },
-            ]}
-            className="w-full sm:w-52"
-          />
+            <AnimatedSelect
+              label="Filtrar por estado"
+              value={estado}
+              onChange={val => {
+                setEstado(val)
+                setPagina(1)
+              }}
+              options={[
+                { value: '', label: 'Todos los estados' },
+                { value: 'PROGRAMADA', label: 'Programadas' },
+                { value: 'CONFIRMADA', label: 'Confirmadas' },
+                { value: 'EN_ATENCION', label: 'En atención' },
+                { value: 'ATENDIDA', label: 'Atendidas' },
+                { value: 'CANCELADA', label: 'Canceladas' },
+                { value: 'NO_ASISTIO', label: 'No asistió' },
+              ]}
+              className="w-full sm:w-auto sm:min-w-[10.5rem] flex-1 sm:flex-initial"
+            />
+
+            <AnimatedSelect
+              label="Vista rápida"
+              value={vista}
+              onChange={val => {
+                setVista(val)
+                setPagina(1)
+              }}
+              options={[
+                { value: '', label: 'Todas las citas' },
+                { value: 'HOY', label: 'Citas de hoy' },
+                { value: 'MANANA_CONFIRMAR', label: 'Mañana por confirmar' },
+                { value: 'PROXIMAS', label: 'Próximas citas' },
+                { value: 'HISTORIAL', label: 'Historial' },
+              ]}
+              className="w-full sm:w-auto sm:min-w-[11.5rem] flex-1 sm:flex-initial"
+            />
+          </div>
         </div>
 
         {error ? (
@@ -307,11 +281,11 @@ export function AppointmentsPage() {
                 <>
                   <TableState
                     colSpan={COLUMNS.length}
-                    empty={rows.length === 0}
+                    empty={citas.length === 0}
                     emptyLabel="No se encontraron citas con los filtros seleccionados."
                   />
 
-                  {rowsPaginadas.map((cita, index) => (
+                  {citas.map((cita, index) => (
                     <motion.tr
                       key={cita.idCita}
                       initial={{ opacity: 0 }}
@@ -326,15 +300,16 @@ export function AppointmentsPage() {
                         </span>
                       </td>
 
-                      {/* PACIENTE */}
+                      {/* PACIENTE Y CONTACTO */}
                       <td>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                           <Avatar
                             nombre={cita.pacienteNombre}
                             seed={cita.pacienteId}
                             size={36}
                             animate="hover"
                             trackCursor={false}
+                            className="mt-0.5 shrink-0"
                           />
                           <div className="min-w-0">
                             <p className="font-bold leading-tight text-ink">
@@ -343,6 +318,35 @@ export function AppointmentsPage() {
                             <p className="mt-0.5 text-xs text-muted">
                               {cita.servicioNombre}
                             </p>
+                            {cita.pacienteTelefono ? (
+                              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                                <Tooltip content={`Llamar al ${cita.pacienteTelefono}`} offset={8}>
+                                  <a
+                                    href={`tel:${cita.pacienteTelefono}`}
+                                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-muted transition-colors hover:bg-alt hover:text-ink"
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Icon name="phone" size={12} className="shrink-0 text-muted" />
+                                    <span className="text-[11px] font-medium">{cita.pacienteTelefono}</span>
+                                  </a>
+                                </Tooltip>
+
+                                <Tooltip content="Enviar WhatsApp" offset={8}>
+                                  <a
+                                    href={`https://wa.me/${cita.pacienteTelefono.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400"
+                                    onClick={e => e.stopPropagation()}
+                                    aria-label="Enviar WhatsApp"
+                                  >
+                                    <Icon name="whatsapp" size={17} />
+                                  </a>
+                                </Tooltip>
+                              </div>
+                            ) : (
+                              <span className="mt-0.5 block text-[11px] text-muted/60">Sin teléfono</span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -363,6 +367,14 @@ export function AppointmentsPage() {
                         )}
                       </td>
 
+                      {/* SEDE */}
+                      <td>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-ink">
+                          <Icon name="mapPin" size={13} className="shrink-0 text-muted" />
+                          <span>{cita.sedeNombre || 'No asignada'}</span>
+                        </div>
+                      </td>
+
                       {/* FECHA Y HORA */}
                       <td>
                         <div className="flex flex-col gap-0.5 text-xs">
@@ -371,6 +383,7 @@ export function AppointmentsPage() {
                           </span>
                           <span className="text-muted">
                             {horaFormato(cita.fechaHoraInicio)}
+                            {cita.duracionMinutos ? ` (${cita.duracionMinutos} min)` : ''}
                           </span>
                         </div>
                       </td>
@@ -402,9 +415,9 @@ export function AppointmentsPage() {
               )}
             </Table>
 
-            {rows.length > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, rows.length)} de ${rows.length} citas`}>
-                <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
+            {totalElementos > 0 && (
+              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, totalElementos)} de ${totalElementos} citas`}>
+                <Pagination page={pagina} totalPages={totalPaginas} onChange={setPagina} />
               </TableFoot>
             )}
           </>

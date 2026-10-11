@@ -8,6 +8,8 @@ export interface TooltipProps {
   children: ReactNode
   disabled?: boolean
   className?: string
+  offset?: number
+  sideOffset?: number
 }
 
 export function Tooltip({
@@ -15,6 +17,8 @@ export function Tooltip({
   children,
   disabled = false,
   className,
+  offset,
+  sideOffset,
 }: TooltipProps) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState<{ top: number; left: number; alignment: 'center' | 'right' | 'left' }>({
@@ -108,7 +112,7 @@ export function Tooltip({
               <div
                 style={{
                   position: 'fixed',
-                  top: coords.top,
+                  top: coords.top - (sideOffset ?? offset ?? 6),
                   left: coords.left,
                   transform: translateTransform,
                   zIndex: 99999,
@@ -118,11 +122,11 @@ export function Tooltip({
                 <motion.div
                   id={tooltipId}
                   role="tooltip"
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.94 }}
-                  transition={{ duration: 0.12, ease: 'easeOut' }}
-                  className="relative mb-2 whitespace-nowrap rounded-md border border-slate-700/60 bg-slate-900/95 px-2.5 py-1 text-xs font-medium text-slate-100 shadow-xl backdrop-blur-xs"
+                  initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 2, scale: 0.95 }}
+                  transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative whitespace-nowrap rounded-md border border-slate-700/60 bg-slate-900/95 px-2.5 py-1 text-xs font-medium text-slate-100 shadow-xl backdrop-blur-xs"
                 >
                   {content}
                   <div
