@@ -733,10 +733,10 @@ export function ScheduleBlocksPage() {
                           {todoElDia
                             ? `${fechaCorta(bloqueo.fechaInicio)}${
                                 bloqueo.fechaInicio.slice(0, 10) !== fechaFinVisual
-                                  ? ` – ${fechaCorta(`${fechaFinVisual}T00:00:00`)}`
+                                  ? ` - ${fechaCorta(`${fechaFinVisual}T00:00:00`)}`
                                   : ''
                               }`
-                            : `${fechaHoraCorta(bloqueo.fechaInicio)} – ${fechaHoraCorta(bloqueo.fechaFin)}`}
+                            : `${fechaHoraCorta(bloqueo.fechaInicio)} - ${fechaHoraCorta(bloqueo.fechaFin)}`}
                         </h3>
                       </div>
 
@@ -790,7 +790,7 @@ export function ScheduleBlocksPage() {
 
             {bloqueosFiltrados.length > 0 && (
               <TableFoot
-                summary={`Mostrando ${(pagina - 1) * PAGE_SIZE + 1}–${Math.min(pagina * PAGE_SIZE, bloqueosFiltrados.length)} de ${bloqueosFiltrados.length} bloqueos`}
+                summary={`Mostrando ${(pagina - 1) * PAGE_SIZE + 1}-${Math.min(pagina * PAGE_SIZE, bloqueosFiltrados.length)} de ${bloqueosFiltrados.length} bloqueos`}
               >
                 <Pagination page={pagina} totalPages={totalPaginas} onChange={setPagina} />
               </TableFoot>

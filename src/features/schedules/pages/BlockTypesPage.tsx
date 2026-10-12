@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState, type FormEvent} from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AnimatedSelect,
@@ -664,7 +664,7 @@ export function BlockTypesPage() {
 
             {/* PAGINACIÓN */}
             {filtradas.length > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}`}>
+              <TableFoot summary={`Mostrando ${inicio + 1}-${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}`}>
                 <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
               </TableFoot>
             )}

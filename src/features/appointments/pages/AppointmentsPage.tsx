@@ -98,7 +98,7 @@ export function AppointmentsPage() {
           setSedes(res.map(s => ({ id: s.id, nombre: s.nombre })))
         }
       })
-      .catch(() => {})
+      .catch(() => { })
 
     return () => {
       activo = false
@@ -417,7 +417,7 @@ export function AppointmentsPage() {
             </Table>
 
             {totalElementos > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, totalElementos)} de ${totalElementos} citas`}>
+              <TableFoot summary={`Mostrando ${inicio + 1}-${Math.min(inicio + POR_PAGINA, totalElementos)} de ${totalElementos} citas`}>
                 <Pagination page={pagina} totalPages={totalPaginas} onChange={setPagina} />
               </TableFoot>
             )}

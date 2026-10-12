@@ -363,14 +363,12 @@ export function EspecialidadesPage() {
                     {/* ESTADO Y ACCIONES */}
                     <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-line pt-3 sm:w-auto sm:justify-end sm:border-0 sm:pt-0">
 
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        especialidad.activo
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${especialidad.activo
                           ? 'bg-emerald-50 text-emerald-700'
                           : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${
-                          especialidad.activo ? 'bg-emerald-500' : 'bg-slate-400'
-                        }`} />
+                        }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${especialidad.activo ? 'bg-emerald-500' : 'bg-slate-400'
+                          }`} />
                         {especialidad.activo ? 'Activa' : 'Inactiva'}
                       </span>
 
@@ -418,7 +416,7 @@ export function EspecialidadesPage() {
 
             {/* PAGINACIÓN */}
             {filtradas.length > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}`}>
+              <TableFoot summary={`Mostrando ${inicio + 1}-${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}`}>
                 <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
               </TableFoot>
             )}

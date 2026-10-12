@@ -80,7 +80,7 @@ export function ServiciosPage() {
         setEspecialidades(listaEspecialidades)
         setSedes(listaSedes)
       })
-      .catch(() => {})
+      .catch(() => { })
 
     return () => {
       activo = false
@@ -576,21 +576,20 @@ export function ServiciosPage() {
                         <p className="text-sm font-semibold text-ink">
                           {form.sedeIds.length === 0
                             ? 'Seleccionar sedes'
-                            : `${form.sedeIds.length} ${
-                                form.sedeIds.length === 1
-                                  ? 'sede seleccionada'
-                                  : 'sedes seleccionadas'
-                              }`}
+                            : `${form.sedeIds.length} ${form.sedeIds.length === 1
+                              ? 'sede seleccionada'
+                              : 'sedes seleccionadas'
+                            }`}
                         </p>
                         <p className="mt-1 truncate text-xs text-muted">
                           {form.sedeIds.length === 0
                             ? 'Haz clic para buscar y seleccionar establecimientos'
                             : sedes
-                                .filter(sede => form.sedeIds.includes(sede.id))
-                                .slice(0, 2)
-                                .map(sede => sede.nombre)
-                                .join(' · ') +
-                              (form.sedeIds.length > 2 ? ` · +${form.sedeIds.length - 2} más` : '')}
+                              .filter(sede => form.sedeIds.includes(sede.id))
+                              .slice(0, 2)
+                              .map(sede => sede.nombre)
+                              .join(' · ') +
+                            (form.sedeIds.length > 2 ? ` · +${form.sedeIds.length - 2} más` : '')}
                         </p>
                       </div>
 
@@ -1021,7 +1020,7 @@ export function ServiciosPage() {
 
             {/* PAGINACIÓN */}
             {totalElementosFinal > 0 && (
-              <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal}`}>
+              <TableFoot summary={`Mostrando ${inicioRango}-${finRango} de ${totalElementosFinal}`}>
                 <Pagination page={pagina} totalPages={totalPaginasFinal} onChange={setPagina} />
               </TableFoot>
             )}
@@ -1035,11 +1034,10 @@ export function ServiciosPage() {
         title={confirmar?.activo ? '¿Desactivar servicio?' : '¿Activar servicio?'}
         description={
           confirmar
-            ? `El servicio "${confirmar.nombre}" ${
-                confirmar.activo
-                  ? 'dejará de estar disponible para nuevas reservas. Las citas existentes no se cancelarán.'
-                  : 'volverá a estar disponible para nuevas reservas.'
-              }`
+            ? `El servicio "${confirmar.nombre}" ${confirmar.activo
+              ? 'dejará de estar disponible para nuevas reservas. Las citas existentes no se cancelarán.'
+              : 'volverá a estar disponible para nuevas reservas.'
+            }`
             : ''
         }
         confirmLabel={procesando ? 'Procesando…' : confirmar?.activo ? 'Desactivar' : 'Activar'}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ActionsCell, AnimatedDatePicker, AnimatedSelect, Avatar,
+import {
+  ActionsCell, AnimatedDatePicker, AnimatedSelect, Avatar,
   Badge, Button, Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon,
   PageHead, Pagination, ProtectedImage, RowActions, SearchInput, TableFoot, Toast, Tooltip, type ToastAviso,
 } from '@/shared/components/ui'
@@ -8,7 +9,8 @@ import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { bookingApi, type BookingBranch } from '@/features/appointments/api/bookingApi'
-import { schedulesApi, type HorarioOdontologo,
+import {
+  schedulesApi, type HorarioOdontologo,
   type HorarioOdontologoCatalogo, type HorarioOdontologoInput,
 } from '../api/schedulesApi'
 import { ScheduleAgendaTabs } from '../components/ScheduleAgendaTabs'
@@ -802,8 +804,7 @@ export function ScheduleHistoryPage() {
                               {resumenVigencia.count} turno{resumenVigencia.count === 1 ? '' : 's'} de atención efectivo{resumenVigencia.count === 1 ? '' : 's'}
                             </strong>
                             {resumenVigencia.primerDia &&
-                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${
-                                resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
+                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
                               })`}
                           </>
                         )}
@@ -1098,7 +1099,7 @@ export function ScheduleHistoryPage() {
                         {/* HORARIO */}
                         <td className="px-4 py-3.5">
                           <span className="font-bold tabular-nums text-ink">
-                            {hora12(horario.horaInicio)} – {hora12(horario.horaFin)}
+                            {hora12(horario.horaInicio)} - {hora12(horario.horaFin)}
                           </span>
                         </td>
 
@@ -1159,7 +1160,7 @@ export function ScheduleHistoryPage() {
               summary={
                 totalElementosFinal === 0
                   ? 'No se encontraron cronogramas'
-                  : `Mostrando ${(pagina - 1) * PAGE_SIZE + 1}–${Math.min(pagina * PAGE_SIZE, totalElementosFinal)} de ${totalElementosFinal} cronogramas`
+                  : `Mostrando ${(pagina - 1) * PAGE_SIZE + 1}-${Math.min(pagina * PAGE_SIZE, totalElementosFinal)} de ${totalElementosFinal} cronogramas`
               }
             >
               {totalPaginasFinal > 1 && (

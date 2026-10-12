@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedDatePicker, AnimatedSelect, Avatar,
+import {
+  AnimatedDatePicker, AnimatedSelect, Avatar,
   Badge, Button, Card, Checkbox, ClockTimePicker,
   ConfirmDialog, Icon, PageHead, ProtectedImage, Toast, Tooltip,
   type ToastAviso,
@@ -106,14 +107,14 @@ const rangoBloqueo = (bloqueo: AgendaBlock) => {
 
     return inicioIso === finIso
       ? `${fechaCorta(inicioIso)} · Todo el día`
-      : `${fechaCorta(inicioIso)} – ${fechaCorta(finIso)} · Todo el día`
+      : `${fechaCorta(inicioIso)} - ${fechaCorta(finIso)} · Todo el día`
   }
 
   if (isoFecha(inicio) === isoFecha(fin)) {
-    return `${fechaCorta(isoFecha(inicio))} · ${hora12(inicioHora)} – ${hora12(finHora)}`
+    return `${fechaCorta(isoFecha(inicio))} · ${hora12(inicioHora)} - ${hora12(finHora)}`
   }
 
-  return `${fechaCorta(isoFecha(inicio))} ${hora12(inicioHora)} – ${fechaCorta(isoFecha(fin))} ${hora12(finHora)}`
+  return `${fechaCorta(isoFecha(inicio))} ${hora12(inicioHora)} - ${fechaCorta(isoFecha(fin))} ${hora12(finHora)}`
 }
 
 const VACIO: Formulario = {
@@ -400,7 +401,7 @@ export function SchedulesPage() {
     const espDoctor = catalogo.filter(item => String(item.odontologoId) === doctorId)
     const relacionId =
       filtroEspecialidadId &&
-      espDoctor.some(e => String(e.odontologoEspecialidadId) === filtroEspecialidadId)
+        espDoctor.some(e => String(e.odontologoEspecialidadId) === filtroEspecialidadId)
         ? filtroEspecialidadId
         : espDoctor[0]
           ? String(espDoctor[0].odontologoEspecialidadId)
@@ -776,8 +777,7 @@ export function SchedulesPage() {
                               {resumenVigencia.count} turno{resumenVigencia.count === 1 ? '' : 's'} de atención efectivo{resumenVigencia.count === 1 ? '' : 's'}
                             </strong>
                             {resumenVigencia.primerDia &&
-                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${
-                                resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
+                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
                               })`}
                           </>
                         )}
@@ -1179,66 +1179,66 @@ export function SchedulesPage() {
                             : 'No existe un turno vigente para este día.'}
                       </p>
                     </div>
-                    ) : (
-                      <div className="mt-4 space-y-2.5">
-                        {turnosFechaSeleccionada.map(horario => (
-                          <div
-                            key={horario.id}
-                            className={cn(
-                              'group rounded-xl border p-3.5 transition',
-                              bloqueoTotalFechaSeleccionada
-                                ? 'border-line bg-alt/70 opacity-70'
-                                : 'border-line bg-surface hover:border-brand/40 hover:shadow-xs',
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-sm font-extrabold text-brand tabular-nums">
-                                  {hora12(horario.horaInicio)} – {hora12(horario.horaFin)}
-                                </p>
-                                <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                                  <Icon name="mapPin" size={13} className="shrink-0 text-muted" />
-                                  <span className="truncate">{sedeNombre(horario.sedeId)}</span>
-                                </div>
-                                <p className="mt-1 text-[11px] text-muted">
-                                  Vigencia: {fechaCorta(horario.fechaInicioVigencia)} – {horario.fechaFinVigencia ? fechaCorta(horario.fechaFinVigencia) : 'Indefinida'}
-                                </p>
+                  ) : (
+                    <div className="mt-4 space-y-2.5">
+                      {turnosFechaSeleccionada.map(horario => (
+                        <div
+                          key={horario.id}
+                          className={cn(
+                            'group rounded-xl border p-3.5 transition',
+                            bloqueoTotalFechaSeleccionada
+                              ? 'border-line bg-alt/70 opacity-70'
+                              : 'border-line bg-surface hover:border-brand/40 hover:shadow-xs',
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-extrabold text-brand tabular-nums">
+                                {hora12(horario.horaInicio)} - {hora12(horario.horaFin)}
+                              </p>
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                                <Icon name="mapPin" size={13} className="shrink-0 text-muted" />
+                                <span className="truncate">{sedeNombre(horario.sedeId)}</span>
                               </div>
+                              <p className="mt-1 text-[11px] text-muted">
+                                Vigencia: {fechaCorta(horario.fechaInicioVigencia)} - {horario.fechaFinVigencia ? fechaCorta(horario.fechaFinVigencia) : 'Indefinida'}
+                              </p>
+                            </div>
 
-                              <div className="flex items-center gap-1 shrink-0">
-                                {bloqueoTotalFechaSeleccionada && <Badge tone="amber">Bloqueado</Badge>}
-                                <Tooltip content="Editar turno">
-                                  <button
-                                    type="button"
-                                    aria-label="Editar turno"
-                                    onClick={() => abrirEditar(horario)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
-                                  >
-                                    <Icon name="edit" size={15} />
-                                  </button>
-                                </Tooltip>
-                                <Tooltip content="Eliminar turno">
-                                  <button
-                                    type="button"
-                                    aria-label="Eliminar turno"
-                                    onClick={() => setConfirmar(horario)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
-                                  >
-                                    <Icon name="trash" size={15} />
-                                  </button>
-                                </Tooltip>
-                              </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {bloqueoTotalFechaSeleccionada && <Badge tone="amber">Bloqueado</Badge>}
+                              <Tooltip content="Editar turno">
+                                <button
+                                  type="button"
+                                  aria-label="Editar turno"
+                                  onClick={() => abrirEditar(horario)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
+                                >
+                                  <Icon name="edit" size={15} />
+                                </button>
+                              </Tooltip>
+                              <Tooltip content="Eliminar turno">
+                                <button
+                                  type="button"
+                                  aria-label="Eliminar turno"
+                                  onClick={() => setConfirmar(horario)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
+                                >
+                                  <Icon name="trash" size={15} />
+                                </button>
+                              </Tooltip>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-        </Card>
+          </div>
+        )}
+      </Card>
 
       <ConfirmDialog
         open={confirmar !== null}

@@ -41,6 +41,30 @@ export interface AceptacionTerminosItem {
   agenteUsuario?: string
 }
 
+export interface PaginaResponse<T> {
+  contenido: T[]
+  pagina: number
+  tamanoPagina: number
+  totalElementos: number
+  totalPaginas: number
+  esPrimera: boolean
+  esUltima: boolean
+}
+
+export interface TerminosListarParams {
+  buscar?: string
+  activo?: boolean
+  page?: number
+  size?: number
+}
+
+export interface AceptacionesListarParams {
+  buscar?: string
+  version?: string
+  page?: number
+  size?: number
+}
+
 export const legalApi = {
   getUrlDescarga(id?: number): string {
     if (id) return `${API_BASE_URL}/api/terminos-condiciones/admin/${id}/ver`
@@ -198,6 +222,44 @@ export const legalApi = {
 
   async listarAceptaciones(accessToken: string): Promise<AceptacionTerminosItem[]> {
     const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/aceptaciones`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    if (!res.ok) throw new Error('No se pudo cargar el registro de aceptaciones')
+    return res.json()
+  },
+
+  async listarVersionesPaginado(
+    accessToken: string,
+    params: TerminosListarParams = {}
+  ): Promise<PaginaResponse<TerminosCondicionesItem>> {
+    const q = new URLSearchParams()
+    if (params.buscar) q.append('buscar', params.buscar)
+    if (params.activo !== undefined) q.append('activo', String(params.activo))
+    q.append('page', String(params.page ?? 0))
+    q.append('size', String(params.size ?? 10))
+
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin?${q.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    if (!res.ok) throw new Error('No se pudo cargar la lista de versiones')
+    return res.json()
+  },
+
+  async listarAceptacionesPaginado(
+    accessToken: string,
+    params: AceptacionesListarParams = {}
+  ): Promise<PaginaResponse<AceptacionTerminosItem>> {
+    const q = new URLSearchParams()
+    if (params.buscar) q.append('buscar', params.buscar)
+    if (params.version) q.append('version', params.version)
+    q.append('page', String(params.page ?? 0))
+    q.append('size', String(params.size ?? 10))
+
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/aceptaciones?${q.toString()}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

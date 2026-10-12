@@ -499,7 +499,7 @@ export function PatientsPage() {
             loading
               ? 'Cargando pacientes…'
               : totalElementos > 0
-                ? `Mostrando ${inicio + 1}–${Math.min(inicio + PAGE_SIZE, totalElementos)} de ${totalElementos} pacientes`
+                ? `Mostrando ${inicio + 1}-${Math.min(inicio + PAGE_SIZE, totalElementos)} de ${totalElementos} pacientes`
                 : '0 pacientes'
           }
         >

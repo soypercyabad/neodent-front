@@ -135,7 +135,7 @@ export function NewAppointmentSchedulePage() {
 
   const mesInicio = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(fechaLocal(fechas[0]))
   const mesFin = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(fechaLocal(fechas[6]))
-  const periodo = mesInicio === mesFin ? mesInicio : `${mesInicio} – ${mesFin}`
+  const periodo = mesInicio === mesFin ? mesInicio : `${mesInicio} - ${mesFin}`
 
   const doctor = doctores.find(d => d.odontologoEspecialidadId === doctorId)
   const dia = agenda.find(d => d.fecha === fechaElegida)
@@ -316,25 +316,25 @@ export function NewAppointmentSchedulePage() {
           </div>
 
           <div className="flex items-center gap-3 max-sm:w-full max-sm:justify-end">
-            <Button 
+            <Button
               variant="ghost"
               disabled={reservando}
-              onClick={() => navigate(administrativo ? '/citas/nueva/datos' : '/mis-citas/nueva', 
-                  {
-                    state: {
-                      ...(administrativo
-                        ? {
-                            paciente: draft.paciente,
-                            pacienteId: draft.pacienteId,
-                            pacienteNombre: draft.pacienteNombre,
-                            pacienteDocumento: draft.pacienteDocumento,
-                          }
-                        : {}),
-                      servicioId: draft.servicioId,
-                      sedeId: draft.sedeId,
-                    },
+              onClick={() => navigate(administrativo ? '/citas/nueva/datos' : '/mis-citas/nueva',
+                {
+                  state: {
+                    ...(administrativo
+                      ? {
+                        paciente: draft.paciente,
+                        pacienteId: draft.pacienteId,
+                        pacienteNombre: draft.pacienteNombre,
+                        pacienteDocumento: draft.pacienteDocumento,
+                      }
+                      : {}),
+                    servicioId: draft.servicioId,
+                    sedeId: draft.sedeId,
                   },
-                )
+                },
+              )
               }
             >
               Regresar

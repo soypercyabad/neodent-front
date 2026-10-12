@@ -1,52 +1,113 @@
 import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ActionsCell, AnimatedSelect, Badge, Button, Card, Checkbox, ConfirmDialog,
-  Field, Icon, Input, PageHead, Pagination, RowActions, SearchInput, Table, TableFoot,
-  TableSkeletonRows, TableState, Toast, Toolbar, useTableSort,
-  type Column, type ToastAviso,
+import {
+  ActionsCell,
+  AnimatedSelect,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  ConfirmDialog,
+  Field,
+  Icon,
+  Input,
+  PageHead,
+  Pagination,
+  RowActions,
+  SearchInput,
+  Table,
+  TableFoot,
+  TableSkeletonRows,
+  TableState,
+  Tabs,
+  Toast,
+  Toolbar,
+  type Column,
+  type TabItem,
+  type ToastAviso,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
-import { legalApi, type TerminosCondicionesItem, type AceptacionTerminosItem } from '../api/legalApi'
+import {
+  legalApi,
+  type TerminosCondicionesItem,
+  type AceptacionTerminosItem,
+} from '../api/legalApi'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
+type TabType = 'versiones' | 'aceptaciones'
+
+const TABS: readonly TabItem<TabType>[] = [
+  { value: 'versiones', label: 'Gestión de Documentos' },
+  { value: 'aceptaciones', label: 'Auditoría de Aceptaciones' },
+] as const
+
 const COLUMNS_VERSIONES: Column[] = [
-  { key: 'version', label: 'Versión', sortable: true },
-  { key: 'titulo', label: 'Nombre', sortable: true },
-  { key: 'fechaCreacion', label: 'Fecha de Registro', sortable: true },
+  { key: 'version', label: 'Versión', align: 'left', sortable: true },
+  { key: 'titulo', label: 'Tipo', align: 'left', sortable: true },
+  { key: 'fechaCreacion', label: 'Fecha de Registro', align: 'left', sortable: true },
   { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
 ]
 
 const COLUMNS_ACEPTACIONES: Column[] = [
-  { key: 'nombreCompleto', label: 'Persona / Usuario', sortable: true },
-  { key: 'versionTerminos', label: 'Versión', align: 'center', sortable: true },
-  { key: 'aceptadoEn', label: 'Fecha de Aceptación', sortable: true },
-  { key: 'ip', label: 'IP', sortable: true },
+  { key: 'numeroDocumento', label: 'Documento', align: 'left' },
+  { key: 'nombreCompleto', label: 'Usuario', align: 'left' },
+  { key: 'versionTerminos', label: 'Versión Firmada', align: 'center' },
+  { key: 'dispositivo', label: 'Dispositivo', align: 'center' },
+  { key: 'ip', label: 'Dirección IP', align: 'left' },
+  { key: 'aceptadoEn', label: 'Fecha de Aceptación', align: 'left' },
 ]
 
-const POR_PAGINA_VERSIONES = 8
-const POR_PAGINA_ACEPTACIONES = 8
+const POR_PAGINA = 10
 
 type FiltroEstado = '' | 'activas' | 'inactivas'
+
+function detectarDispositivo(ua?: string | null) {
+  if (!ua || ua.trim() === '') {
+    return null
+  }
+  const uaLower = ua.toLowerCase()
+  const esApp = /okhttp|dart|flutter|dalvik|cfnetwork|neodent-app|neodentapp/i.test(uaLower)
+  if (esApp) {
+    return { tipo: 'app', label: 'App', tone: 'purple' as const, icon: 'phone' as const }
+  }
+  const esMovil = /mobile|android|iphone|ipad|ipod/i.test(uaLower)
+  if (esMovil) {
+    return { tipo: 'movil', label: 'Móvil', tone: 'blue' as const, icon: 'phone' as const }
+  }
+  return { tipo: 'escritorio', label: 'Web', tone: 'gray' as const, icon: 'globe' as const }
+}
 
 export function AdminTermsPage() {
   const { accessToken } = useAuth()
 
-  // Versiones states
+  // Tabs state
+  const [tabActual, setTabActual] = useState<TabType>('versiones')
+
+  // Versiones states (Backend Paginado)
   const [versiones, setVersiones] = useState<TerminosCondicionesItem[]>([])
   const [cargandoVersiones, setCargandoVersiones] = useState(true)
   const [errorVersiones, setErrorVersiones] = useState('')
   const [busquedaVersiones, setBusquedaVersiones] = useState('')
+  const [busquedaDebouncedVersiones, setBusquedaDebouncedVersiones] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('')
   const [paginaVersiones, setPaginaVersiones] = useState(1)
+  const [totalElementosVersiones, setTotalElementosVersiones] = useState(0)
+  const [totalPaginasVersiones, setTotalPaginasVersiones] = useState(1)
 
-  // Aceptaciones states (solo visual)
+  // Aceptaciones states (Backend Paginado)
   const [aceptaciones, setAceptaciones] = useState<AceptacionTerminosItem[]>([])
   const [cargandoAceptaciones, setCargandoAceptaciones] = useState(true)
   const [errorAceptaciones, setErrorAceptaciones] = useState('')
   const [busquedaAceptaciones, setBusquedaAceptaciones] = useState('')
+  const [busquedaDebouncedAceptaciones, setBusquedaDebouncedAceptaciones] = useState('')
   const [filtroVersionAceptacion, setFiltroVersionAceptacion] = useState('')
   const [paginaAceptaciones, setPaginaAceptaciones] = useState(1)
+  const [totalElementosAceptaciones, setTotalElementosAceptaciones] = useState(0)
+  const [totalPaginasAceptaciones, setTotalPaginasAceptaciones] = useState(1)
+
+  // Catálogo completo de versiones (para el selector de auditoría y cálculos)
+  const [catalogoVersiones, setCatalogoVersiones] = useState<string[]>([])
 
   // Toast aviso
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
@@ -68,13 +129,49 @@ export function AdminTermsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // DEBOUNCE BÚSQUEDA VERSIONES
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setBusquedaDebouncedVersiones(busquedaVersiones)
+      setPaginaVersiones(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [busquedaVersiones])
+
+  // DEBOUNCE BÚSQUEDA ACEPTACIONES
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setBusquedaDebouncedAceptaciones(busquedaAceptaciones)
+      setPaginaAceptaciones(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [busquedaAceptaciones])
+
+  // CARGAR VERSIONES PAGINADAS
   const cargarVersiones = async () => {
     if (!accessToken) return
     try {
       setCargandoVersiones(true)
       setErrorVersiones('')
-      const data = await legalApi.listarVersiones(accessToken)
-      setVersiones(data)
+
+      const activoParam =
+        filtroEstado === 'activas' ? true : filtroEstado === 'inactivas' ? false : undefined
+
+      const data = await legalApi.listarVersionesPaginado(accessToken, {
+        buscar: busquedaDebouncedVersiones.trim() || undefined,
+        activo: activoParam,
+        page: paginaVersiones - 1,
+        size: POR_PAGINA,
+      })
+
+      setVersiones(data.contenido)
+      setTotalElementosVersiones(data.totalElementos)
+      setTotalPaginasVersiones(Math.max(1, data.totalPaginas))
+
+      // Guardar lista única de versiones para selector
+      if (catalogoVersiones.length === 0 && data.contenido.length > 0) {
+        setCatalogoVersiones(Array.from(new Set(data.contenido.map(v => v.version))))
+      }
     } catch (e) {
       setErrorVersiones(e instanceof Error ? e.message : 'No se pudieron cargar las versiones.')
     } finally {
@@ -82,13 +179,23 @@ export function AdminTermsPage() {
     }
   }
 
+  // CARGAR ACEPTACIONES PAGINADAS
   const cargarAceptaciones = async () => {
     if (!accessToken) return
     try {
       setCargandoAceptaciones(true)
       setErrorAceptaciones('')
-      const data = await legalApi.listarAceptaciones(accessToken)
-      setAceptaciones(data)
+
+      const data = await legalApi.listarAceptacionesPaginado(accessToken, {
+        buscar: busquedaDebouncedAceptaciones.trim() || undefined,
+        version: filtroVersionAceptacion.trim() || undefined,
+        page: paginaAceptaciones - 1,
+        size: POR_PAGINA,
+      })
+
+      setAceptaciones(data.contenido)
+      setTotalElementosAceptaciones(data.totalElementos)
+      setTotalPaginasAceptaciones(Math.max(1, data.totalPaginas))
     } catch (e) {
       setErrorAceptaciones(e instanceof Error ? e.message : 'No se pudieron cargar las aceptaciones.')
     } finally {
@@ -96,10 +203,31 @@ export function AdminTermsPage() {
     }
   }
 
+  // Cargar catálogo de versiones completo una vez para selector de aceptaciones
   useEffect(() => {
-    cargarVersiones()
-    cargarAceptaciones()
+    if (!accessToken) return
+    legalApi.listarVersiones(accessToken)
+      .then(todas => {
+        setCatalogoVersiones(Array.from(new Set(todas.map(v => v.version))))
+      })
+      .catch(() => {
+        // Fallback silencioso
+      })
   }, [accessToken])
+
+  // REACCIONAR A CAMBIOS DE FILTROS EN VERSIONES
+  useEffect(() => {
+    if (tabActual === 'versiones') {
+      cargarVersiones()
+    }
+  }, [accessToken, tabActual, busquedaDebouncedVersiones, filtroEstado, paginaVersiones])
+
+  // REACCIONAR A CAMBIOS DE FILTROS EN ACEPTACIONES
+  useEffect(() => {
+    if (tabActual === 'aceptaciones') {
+      cargarAceptaciones()
+    }
+  }, [accessToken, tabActual, busquedaDebouncedAceptaciones, filtroVersionAceptacion, paginaAceptaciones])
 
   useEffect(() => {
     if (!aviso) return
@@ -114,7 +242,7 @@ export function AdminTermsPage() {
     setEditandoItem(null)
     setArchivoSeleccionado(null)
     setTitulo('')
-    setVersion(`v${versiones.length + 1}.0`)
+    setVersion(`v${totalElementosVersiones + 1}.0`)
     setActivarInmediato(true)
     setMostrarForm(true)
     scrollToTopOrElement()
@@ -180,7 +308,7 @@ export function AdminTermsPage() {
       return
     }
 
-    const versionLimpia = version.trim() || `v${versiones.length + 1}.0`
+    const versionLimpia = version.trim() || `v${totalElementosVersiones + 1}.0`
     const tituloLimpio = titulo.trim() || `Términos y Condiciones ${versionLimpia}`
 
     try {
@@ -296,89 +424,41 @@ export function AdminTermsPage() {
     }
   }
 
-  // Filtrado y ordenamiento de Versiones
-  const versionesFiltradas = useMemo(() => {
-    const q = busquedaVersiones.trim().toLowerCase()
-    return versiones.filter(item => {
-      if (q) {
-        const coincide =
-          item.version.toLowerCase().includes(q) ||
-          item.titulo.toLowerCase().includes(q)
-        if (!coincide) return false
-      }
-      if (filtroEstado === 'activas' && !item.activo) return false
-      if (filtroEstado === 'inactivas' && item.activo) return false
-      return true
-    })
-  }, [versiones, busquedaVersiones, filtroEstado])
-
-  const {
-    sortColumn: sortColVer,
-    sortDirection: sortDirVer,
-    handleSort: handleSortVer,
-    sortedItems: sortedVersiones,
-  } = useTableSort(versionesFiltradas, {
-    initialColumn: 'version',
-    initialDirection: 'desc',
-  })
-
-  const totalPagsVer = Math.max(1, Math.ceil(sortedVersiones.length / POR_PAGINA_VERSIONES))
-  const pagActVer = Math.min(paginaVersiones, totalPagsVer)
-  const inicioVer = (pagActVer - 1) * POR_PAGINA_VERSIONES
-  const versionesVisibles = sortedVersiones.slice(inicioVer, inicioVer + POR_PAGINA_VERSIONES)
-
-  // Filtrado y ordenamiento de Aceptaciones (solo visual)
-  const aceptacionesFiltradas = useMemo(() => {
-    const q = busquedaAceptaciones.trim().toLowerCase()
-    return aceptaciones.filter(item => {
-      if (q) {
-        const coincide =
-          item.nombreCompleto.toLowerCase().includes(q) ||
-          item.correo.toLowerCase().includes(q) ||
-          (item.numeroDocumento && item.numeroDocumento.toLowerCase().includes(q))
-        if (!coincide) return false
-      }
-      if (filtroVersionAceptacion && item.versionTerminos !== filtroVersionAceptacion) {
-        return false
-      }
-      return true
-    })
-  }, [aceptaciones, busquedaAceptaciones, filtroVersionAceptacion])
-
-  const {
-    sortColumn: sortColAcep,
-    sortDirection: sortDirAcep,
-    handleSort: handleSortAcep,
-    sortedItems: sortedAceptaciones,
-  } = useTableSort(aceptacionesFiltradas, {
-    initialColumn: 'aceptadoEn',
-    initialDirection: 'desc',
-  })
-
-  const totalPagsAcep = Math.max(1, Math.ceil(sortedAceptaciones.length / POR_PAGINA_ACEPTACIONES))
-  const pagActAcep = Math.min(paginaAceptaciones, totalPagsAcep)
-  const inicioAcep = (pagActAcep - 1) * POR_PAGINA_ACEPTACIONES
-  const aceptacionesVisibles = sortedAceptaciones.slice(inicioAcep, inicioAcep + POR_PAGINA_ACEPTACIONES)
-
   const opcionesVersionesAceptacion = useMemo(() => {
-    const setVers = new Set(versiones.map(v => v.version))
     return [
       { value: '', label: 'Todas las versiones' },
-      ...Array.from(setVers).map(v => ({ value: v, label: `Versión ${v}` })),
+      ...catalogoVersiones.map(v => ({ value: v, label: `Versión ${v}` })),
     ]
-  }, [versiones])
+  }, [catalogoVersiones])
+
+  const inicioVer = (paginaVersiones - 1) * POR_PAGINA
+  const inicioAcep = (paginaAceptaciones - 1) * POR_PAGINA
 
   return (
     <>
       <PageHead
-        title="Legales (S3)"
-        description="Gestiona los documentos oficiales de Términos y Condiciones en S3/R2 y audita las aceptaciones de pacientes."
+        title="Documentos legales"
+        description="Administra los documentos legales de la plataforma, controla sus versiones y consulta el historial de aceptación de los usuarios."
         actions={
-          <Button icon="plus" onClick={abrirNuevo} disabled={guardando || procesandoAccion}>
-            Subir versión
-          </Button>
+          tabActual === 'versiones' ? (
+            <Button icon="plus" onClick={abrirNuevo} disabled={guardando || procesandoAccion}>
+              Subir versión
+            </Button>
+          ) : undefined
         }
       />
+
+      {/* PESTAÑAS PRINCIPALES DEL MÓDULO */}
+      <div className="mb-6">
+        <Tabs<TabType>
+          items={TABS}
+          value={tabActual}
+          label="Pestañas de términos y políticas"
+          onChange={nuevaTab => {
+            setTabActual(nuevaTab)
+          }}
+        />
+      </div>
 
       {/* Notificaciones Toast flotantes en la esquina inferior derecha */}
       <Toast aviso={aviso} onClose={() => setAviso(null)} />
@@ -393,7 +473,7 @@ export function AdminTermsPage() {
             transition={{ duration: 0.2 }}
             className="mb-6 min-w-0 max-w-full"
           >
-            <Card className="border-brand/30 p-4 sm:p-6 min-w-0 max-w-full overflow-hidden">
+            <Card className="border-brand/30 p-4 sm:p-6 min-w-0 max-w-full overflow-hidden shadow-sm">
               <div className="mb-4 sm:mb-5 flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base sm:text-lg font-bold text-ink truncate">
@@ -401,8 +481,8 @@ export function AdminTermsPage() {
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-muted">
                     {editandoItem
-                      ? 'Actualiza el nombre, código o reemplaza el PDF oficial en S3.'
-                      : 'Carga el documento PDF directamente a tu almacenamiento en S3.'}
+                      ? 'Actualiza el nombre, código o reemplaza el PDF oficial en almacenamiento seguro S3.'
+                      : 'Carga el documento PDF directamente al almacenamiento S3/R2 para su publicación oficial.'}
                   </p>
                 </div>
 
@@ -494,7 +574,7 @@ export function AdminTermsPage() {
                     <div className="text-xs min-w-0 flex-1">
                       <span className="font-bold text-ink block">Activar como versión oficial</span>
                       <span className="text-muted block mt-0.5">
-                        Esta versión será la que firmen o acepten los pacientes durante su registro.
+                        Esta versión será la vigente que deberán aceptar los pacientes durante su registro digital.
                       </span>
                     </div>
                   </label>
@@ -515,235 +595,262 @@ export function AdminTermsPage() {
         )}
       </AnimatePresence>
 
-      {/* LAYOUT EN 2 PANELES: VERSIONES (IZQUIERDA) Y ACEPTACIONES (DERECHA) */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 min-w-0 max-w-full">
-        {/* PANEL IZQUIERDO: VERSIONES DE TÉRMINOS (CRUD) */}
-        <div className="xl:col-span-7 min-w-0 max-w-full">
-          <Card className="min-w-0 max-w-full overflow-hidden">
-            <div className="border-b border-line px-5 py-4">
-              <h2 className="font-bold text-ink">Versiones de Términos</h2>
+      {/* CONTENIDO SEGÚN TAB SELECCIONADA */}
+      {tabActual === 'versiones' ? (
+        <Card className="min-w-0 max-w-full overflow-hidden">
+          <div className="border-b border-line px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="font-bold text-ink">Gestión de Documentos</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Documentos registrados en S3. La versión activa no puede eliminarse ni desactivarse directamente.
+                Publica, actualiza y administra las versiones de los documentos legales disponibles para los usuarios.
               </p>
             </div>
+            <span className="text-xs font-semibold text-brand bg-brand-soft px-3 py-1 rounded-full whitespace-nowrap self-start sm:self-auto">
+              {totalElementosVersiones} {totalElementosVersiones === 1 ? 'versión registrada' : 'versiones registradas'}
+            </span>
+          </div>
 
-            <Toolbar>
-              <SearchInput
-                placeholder="Buscar por versión o nombre…"
-                value={busquedaVersiones}
-                onChange={e => {
-                  setBusquedaVersiones(e.target.value)
-                  setPaginaVersiones(1)
-                }}
-                onClear={() => {
-                  setBusquedaVersiones('')
-                  setPaginaVersiones(1)
-                }}
-                className="w-full sm:min-w-44 sm:flex-1"
-              />
+          <Toolbar>
+            <SearchInput
+              placeholder="Buscar por código de versión o nombre…"
+              value={busquedaVersiones}
+              onChange={e => setBusquedaVersiones(e.target.value)}
+              onClear={() => setBusquedaVersiones('')}
+              className="w-full sm:min-w-64 sm:flex-1"
+            />
 
-              <AnimatedSelect
-                label="Estado"
-                value={filtroEstado}
-                onChange={val => {
-                  setFiltroEstado(val as FiltroEstado)
-                  setPaginaVersiones(1)
-                }}
-                options={[
-                  { value: '', label: 'Todos los estados' },
-                  { value: 'activas', label: 'Activas' },
-                  { value: 'inactivas', label: 'Inactivas' },
-                ]}
-                className="w-full sm:w-40"
-              />
-            </Toolbar>
+            <AnimatedSelect
+              label="Estado"
+              value={filtroEstado}
+              onChange={val => {
+                setFiltroEstado(val as FiltroEstado)
+                setPaginaVersiones(1)
+              }}
+              options={[
+                { value: '', label: 'Todos los estados' },
+                { value: 'activas', label: 'Activas' },
+                { value: 'inactivas', label: 'Inactivas' },
+              ]}
+              className="w-full sm:w-44"
+            />
+          </Toolbar>
 
-            <Table
-              columns={COLUMNS_VERSIONES}
-              sortColumn={sortColVer}
-              sortDirection={sortDirVer}
-              onSort={handleSortVer}
-            >
-              {cargandoVersiones ? (
-                <TableSkeletonRows rows={POR_PAGINA_VERSIONES} cols={COLUMNS_VERSIONES.length} />
-              ) : (
-                <>
-                  <TableState
-                    colSpan={COLUMNS_VERSIONES.length}
-                    error={errorVersiones}
-                    empty={!errorVersiones && versionesFiltradas.length === 0}
-                    emptyLabel="No hay versiones de términos registradas."
-                  />
-
-                  {versionesVisibles.map(item => (
-                      <tr key={item.id}>
-                        <td>
-                          <span className="font-mono font-bold text-xs bg-brand-soft text-brand px-2 py-0.5 rounded">
-                            {item.version}
-                          </span>
-                        </td>
-
-                        <td>
-                          <div className="text-xs text-black">{item.titulo}</div>
-                        </td>
-
-                        <td className="text-xs text-muted whitespace-nowrap">
-                          {formatoFecha(item.fechaCreacion)}
-                        </td>
-
-                        <td className="text-center">
-                          <div className="flex justify-center">
-                            <Badge tone={item.activo ? 'green' : 'gray'}>
-                              {item.activo ? 'Activa' : 'Inactiva'}
-                            </Badge>
-                          </div>
-                        </td>
-
-                        <ActionsCell align="center">
-                          <RowActions
-                            actions={[
-                              {
-                                label: 'Ver documento (PDF)',
-                                icon: 'externalLink',
-                                onClick: () => handleVerDocumento(item),
-                              },
-                              {
-                                label: 'Editar versión',
-                                icon: 'edit',
-                                onClick: () => abrirEditar(item),
-                              },
-                              {
-                                label: 'Activar como oficial',
-                                icon: 'checkCircle',
-                                show: !item.activo,
-                                onClick: () => setItemActivar(item),
-                                variant: 'success',
-                              },
-                              {
-                                label: 'Eliminar de S3',
-                                icon: 'trash',
-                                show: !item.activo,
-                                onClick: () => setItemEliminar(item),
-                                variant: 'danger',
-                              },
-                            ]}
-                          />
-                        </ActionsCell>
-                      </tr>
-                    ))}
-                  </>
-              )}
-            </Table>
-
-            {versionesFiltradas.length > 0 && (
-              <TableFoot
-                summary={`Mostrando ${inicioVer + 1}–${Math.min(inicioVer + POR_PAGINA_VERSIONES, versionesFiltradas.length)} de ${versionesFiltradas.length} versiones`}
-              >
-                <Pagination page={pagActVer} totalPages={totalPagsVer} onChange={setPaginaVersiones} />
-              </TableFoot>
-            )}
-          </Card>
-        </div>
-
-        {/* PANEL DERECHO: PERSONAS QUE ACEPTARON LOS TÉRMINOS (SOLO VISUAL) */}
-        <div className="xl:col-span-5 min-w-0 max-w-full">
-          <Card className="min-w-0 max-w-full overflow-hidden">
-            <div className="border-b border-line px-5 py-4 flex items-center justify-between">
-              <div>
-                <h2 className="font-bold text-ink">Aceptaciones Registradas</h2>
-                <p className="mt-0.5 text-xs text-muted">
-                  Registro de auditoría de pacientes y usuarios que aceptaron los términos.
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-brand bg-brand-soft px-2.5 py-1 rounded-full whitespace-nowrap">
-                {aceptaciones.length} {aceptaciones.length === 1 ? 'firma' : 'firmas'}
-              </span>
-            </div>
-
-            <Toolbar>
-              <SearchInput
-                placeholder="Buscar persona o correo…"
-                value={busquedaAceptaciones}
-                onChange={e => {
-                  setBusquedaAceptaciones(e.target.value)
-                  setPaginaAceptaciones(1)
-                }}
-                onClear={() => {
-                  setBusquedaAceptaciones('')
-                  setPaginaAceptaciones(1)
-                }}
-                className="w-full sm:min-w-44 sm:flex-1"
-              />
-
-              {opcionesVersionesAceptacion.length > 2 && (
-                <AnimatedSelect
-                  label="Versión"
-                  value={filtroVersionAceptacion}
-                  onChange={val => {
-                    setFiltroVersionAceptacion(val)
-                    setPaginaAceptaciones(1)
-                  }}
-                  options={opcionesVersionesAceptacion}
-                  className="w-full sm:w-36"
+          <Table columns={COLUMNS_VERSIONES}>
+            {cargandoVersiones ? (
+              <TableSkeletonRows rows={POR_PAGINA} cols={COLUMNS_VERSIONES.length} />
+            ) : (
+              <>
+                <TableState
+                  colSpan={COLUMNS_VERSIONES.length}
+                  error={errorVersiones}
+                  empty={!errorVersiones && versiones.length === 0}
+                  emptyLabel="No hay versiones de términos registradas."
                 />
-              )}
-            </Toolbar>
 
-            <Table
-              columns={COLUMNS_ACEPTACIONES}
-              sortColumn={sortColAcep}
-              sortDirection={sortDirAcep}
-              onSort={handleSortAcep}
+                {versiones.map(item => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="font-mono font-bold text-xs bg-brand-soft text-brand px-2.5 py-1 rounded-md border border-brand/20">
+                        {item.version}
+                      </span>
+                    </td>
+
+                    <td>
+                      <div className="font-semibold text-xs text-ink">{item.titulo}</div>
+                    </td>
+
+                    <td className="text-xs text-muted whitespace-nowrap">
+                      {formatoFecha(item.fechaCreacion)}
+                    </td>
+
+                    <td className="text-center">
+                      <div className="flex justify-center">
+                        <Badge tone={item.activo ? 'green' : 'gray'}>
+                          {item.activo ? 'Vigente Oficial' : 'Inactiva'}
+                        </Badge>
+                      </div>
+                    </td>
+
+                    <ActionsCell align="center">
+                      <RowActions
+                        actions={[
+                          {
+                            label: 'Ver documento (PDF)',
+                            icon: 'externalLink',
+                            onClick: () => handleVerDocumento(item),
+                          },
+                          {
+                            label: 'Editar versión',
+                            icon: 'edit',
+                            onClick: () => abrirEditar(item),
+                          },
+                          {
+                            label: 'Activar como oficial',
+                            icon: 'checkCircle',
+                            show: !item.activo,
+                            onClick: () => setItemActivar(item),
+                            variant: 'success',
+                          },
+                          {
+                            label: 'Eliminar de S3',
+                            icon: 'trash',
+                            show: !item.activo,
+                            onClick: () => setItemEliminar(item),
+                            variant: 'danger',
+                          },
+                        ]}
+                      />
+                    </ActionsCell>
+                  </tr>
+                ))}
+              </>
+            )}
+          </Table>
+
+          {totalElementosVersiones > 0 && (
+            <TableFoot
+              summary={`Mostrando ${inicioVer + 1}-${Math.min(inicioVer + POR_PAGINA, totalElementosVersiones)} de ${totalElementosVersiones} versiones`}
             >
-              {cargandoAceptaciones ? (
-                <TableSkeletonRows rows={POR_PAGINA_ACEPTACIONES} cols={COLUMNS_ACEPTACIONES.length} />
-              ) : (
-                <>
-                  <TableState
-                    colSpan={COLUMNS_ACEPTACIONES.length}
-                    error={errorAceptaciones}
-                    empty={!errorAceptaciones && aceptacionesFiltradas.length === 0}
-                    emptyLabel="No hay aceptaciones de términos registradas."
-                  />
+              <Pagination
+                page={paginaVersiones}
+                totalPages={totalPaginasVersiones}
+                onChange={setPaginaVersiones}
+              />
+            </TableFoot>
+          )}
+        </Card>
+      ) : (
+        /* TAB DE AUDITORÍA DE ACEPTACIONES */
+        <Card className="min-w-0 max-w-full overflow-hidden">
+          <div className="border-b border-line px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="font-bold text-ink">Registro de Aceptaciones y Consentimiento</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Consulta y verifica las aceptaciones registradas por los usuarios, garantizando la trazabilidad de cada versión.
+              </p>
+            </div>
+          </div>
 
-                  {aceptacionesVisibles.map(item => (
+          <Toolbar>
+            <SearchInput
+              placeholder="Buscar por documento, nombre o correo…"
+              value={busquedaAceptaciones}
+              onChange={e => setBusquedaAceptaciones(e.target.value)}
+              onClear={() => setBusquedaAceptaciones('')}
+              className="w-full sm:min-w-64 sm:flex-1"
+            />
+
+            {opcionesVersionesAceptacion.length > 1 && (
+              <AnimatedSelect
+                label="Versión"
+                value={filtroVersionAceptacion}
+                onChange={val => {
+                  setFiltroVersionAceptacion(val)
+                  setPaginaAceptaciones(1)
+                }}
+                options={opcionesVersionesAceptacion}
+                className="w-full sm:w-48"
+              />
+            )}
+          </Toolbar>
+
+          <Table columns={COLUMNS_ACEPTACIONES}>
+            {cargandoAceptaciones ? (
+              <TableSkeletonRows rows={POR_PAGINA} cols={COLUMNS_ACEPTACIONES.length} />
+            ) : (
+              <>
+                <TableState
+                  colSpan={COLUMNS_ACEPTACIONES.length}
+                  error={errorAceptaciones}
+                  empty={!errorAceptaciones && aceptaciones.length === 0}
+                  emptyLabel="No hay consentimientos de términos registrados."
+                />
+
+                {aceptaciones.map(item => {
+                  const disp = detectarDispositivo(item.agenteUsuario)
+                  return (
                     <tr key={item.id}>
+                      {/* DOCUMENTO DE IDENTIDAD REAL */}
                       <td>
-                        <div className="font-bold text-ink">{item.nombreCompleto}</div>
-                        <div className="text-xs text-muted truncate max-w-[170px]" title={item.correo}>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-alt text-ink-soft shrink-0">
+                            <Icon name="idCard" size={15} />
+                          </span>
+                          <div>
+                            <span className="font-mono text-xs font-bold text-ink block">
+                              {item.numeroDocumento && item.numeroDocumento.trim() !== '' && item.numeroDocumento !== '-'
+                                ? item.numeroDocumento
+                                : 'No registrado'}
+                            </span>
+                            <span className="text-[10px] text-muted block">Doc. Identidad</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* TITULAR / NOMBRE COMPLETO Y CORREO */}
+                      <td>
+                        <div className="font-bold text-ink text-xs">{item.nombreCompleto}</div>
+                        <div className="text-[11px] text-muted truncate max-w-[240px]" title={item.correo}>
                           {item.correo}
                         </div>
                       </td>
 
+                      {/* VERSIÓN DE TÉRMINOS ACEPTADA */}
                       <td className="text-center whitespace-nowrap">
-                        <span className="font-mono text-xs font-semibold bg-alt text-ink-soft px-2 py-0.5 rounded border border-line">
+                        <span className="font-mono text-xs font-semibold bg-alt text-ink px-2.5 py-0.5 rounded border border-line">
                           {item.versionTerminos}
                         </span>
                       </td>
 
+                      {/* DISPOSITIVO DETECTADO (MÓVIL / ESCRITORIO O - SI NO ESTÁ REGISTRADO) */}
+                      <td className="text-center whitespace-nowrap">
+                        <div className="flex justify-center">
+                          {disp ? (
+                            <Badge tone={disp.tone} className="gap-1.5 py-0.5">
+                              <Icon name={disp.icon} size={12} />
+                              <span>{disp.label}</span>
+                            </Badge>
+                          ) : (
+                            <span className="text-muted italic">-</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* DIRECCIÓN IP */}
+                      <td className="text-xs font-mono text-ink-soft whitespace-nowrap">
+                        {item.ip ? (
+                          <span className="bg-alt/70 px-2 py-0.5 rounded border border-line/60">
+                            {item.ip}
+                          </span>
+                        ) : (
+                          <span className="text-muted italic">-</span>
+                        )}
+                      </td>
+
+                      {/* FECHA Y HORA DE ACEPTACIÓN */}
                       <td className="text-xs text-muted whitespace-nowrap">
                         {formatoFecha(item.aceptadoEn)}
                       </td>
-
-                      <td className="text-xs font-mono text-ink-soft whitespace-nowrap">
-                        {item.ip || '-'}
-                      </td>
                     </tr>
-                  ))}
-                </>
-              )}
-            </Table>
-
-            {aceptacionesFiltradas.length > 0 && (
-              <TableFoot
-                summary={`Mostrando ${inicioAcep + 1}-${Math.min(inicioAcep + POR_PAGINA_ACEPTACIONES, aceptacionesFiltradas.length)} de ${aceptacionesFiltradas.length} aceptaciones`}
-              >
-                <Pagination page={pagActAcep} totalPages={totalPagsAcep} onChange={setPaginaAceptaciones} />
-              </TableFoot>
+                  )
+                })}
+              </>
             )}
-          </Card>
-        </div>
-      </div>
+          </Table>
+
+          {totalElementosAceptaciones > 0 && (
+            <TableFoot
+              summary={`Mostrando ${inicioAcep + 1}-${Math.min(inicioAcep + POR_PAGINA, totalElementosAceptaciones)} de ${totalElementosAceptaciones} aceptaciones`}
+            >
+              <Pagination
+                page={paginaAceptaciones}
+                totalPages={totalPaginasAceptaciones}
+                onChange={setPaginaAceptaciones}
+              />
+            </TableFoot>
+          )}
+        </Card>
+      )}
 
       {/* DIÁLOGO PARA ACTIVAR COMO OFICIAL */}
       <ConfirmDialog

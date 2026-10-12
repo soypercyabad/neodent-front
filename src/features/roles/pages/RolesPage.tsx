@@ -108,7 +108,7 @@ export function RolesPage() {
     modulosApi
       .listar(accessToken)
       .then(setModulos)
-      .catch(() => {})
+      .catch(() => { })
   }, [accessToken])
 
   // CARGAR CONTEOS AGRUPADOS DESDE EL BACKEND
@@ -711,7 +711,7 @@ export function RolesPage() {
 
         {totalElementosFinal > 0 && (
           <TableFoot
-            summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal} roles`}
+            summary={`Mostrando ${inicioRango}-${finRango} de ${totalElementosFinal} roles`}
           >
             {totalPaginasFinal > 1 && (
               <Pagination
@@ -730,11 +730,10 @@ export function RolesPage() {
         title={confirmar?.activo ? '¿Desactivar rol?' : '¿Activar rol?'}
         description={
           confirmar
-            ? `Se cambiará el estado del rol "${confirmar.nombre}". ${
-                confirmar.activo
-                  ? 'Los usuarios asignados a este rol podrían perder acceso a sus módulos.'
-                  : 'El rol volverá a estar disponible para asignarse a usuarios.'
-              }`
+            ? `Se cambiará el estado del rol "${confirmar.nombre}". ${confirmar.activo
+              ? 'Los usuarios asignados a este rol podrían perder acceso a sus módulos.'
+              : 'El rol volverá a estar disponible para asignarse a usuarios.'
+            }`
             : undefined
         }
         confirmLabel={

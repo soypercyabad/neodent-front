@@ -679,7 +679,7 @@ export function ModulosPage() {
         </Table>
 
         {totalElementosFinal > 0 && (
-          <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal} módulos`}>
+          <TableFoot summary={`Mostrando ${inicioRango}-${finRango} de ${totalElementosFinal} módulos`}>
             {totalPaginasFinal > 1 && (
               <Pagination
                 totalPages={totalPaginasFinal}

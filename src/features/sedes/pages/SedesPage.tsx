@@ -629,19 +629,17 @@ export function SedesPage() {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.15) }}
-                  className={`flex min-w-0 flex-col justify-between rounded-xl border border-l-[3px] bg-surface p-4 shadow-sm transition-all hover:shadow-card ${
-                    sede.activo
+                  className={`flex min-w-0 flex-col justify-between rounded-xl border border-l-[3px] bg-surface p-4 shadow-sm transition-all hover:shadow-card ${sede.activo
                       ? 'border-line border-l-brand hover:border-brand/50'
                       : 'border-line border-l-slate-300 hover:border-slate-400'
-                  }`}
+                    }`}
                 >
                   <div>
                     {/* NOMBRE Y ESTADO */}
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
-                          sede.activo ? 'bg-brand-soft text-brand' : 'bg-alt text-muted'
-                        }`}>
+                        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${sede.activo ? 'bg-brand-soft text-brand' : 'bg-alt text-muted'
+                          }`}>
                           <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
                             stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
                             aria-hidden="true">
@@ -656,12 +654,10 @@ export function SedesPage() {
                         </div>
                       </div>
 
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        sede.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${
-                          sede.activo ? 'bg-emerald-500' : 'bg-slate-400'
-                        }`} />
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${sede.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${sede.activo ? 'bg-emerald-500' : 'bg-slate-400'
+                          }`} />
                         {sede.activo ? 'Activa' : 'Inactiva'}
                       </span>
                     </div>
@@ -705,11 +701,10 @@ export function SedesPage() {
                       type="button"
                       onClick={() => setConfirmar(sede)}
                       disabled={guardando || procesando}
-                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 ${
-                        sede.activo
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 ${sede.activo
                           ? 'border-line text-ink-soft hover:border-red-300 hover:bg-red-50 hover:text-red-700'
                           : 'border-brand text-brand hover:bg-brand-soft'
-                      }`}
+                        }`}
                     >
                       {sede.activo ? 'Desactivar' : 'Activar'}
                     </button>
@@ -731,7 +726,7 @@ export function SedesPage() {
 
             {/* PAGINACIÓN */}
             {totalElementosFinal > 0 && (
-              <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal}`}>
+              <TableFoot summary={`Mostrando ${inicioRango}-${finRango} de ${totalElementosFinal}`}>
                 <Pagination page={pagina} totalPages={totalPaginasFinal} onChange={setPagina} />
               </TableFoot>
             )}
