@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, SedesCardsSkeleton, TableFoot, Toast } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
-import { sedesApi, type Sede, type SedeInput } from '../api/sedesApi'
+import { sedesApi, type Sede, type SedeInput, type SedeResumenEstados } from '../api/sedesApi'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import ubigeoDataRaw from '@/shared/data/ubigeoPeru.json'
 
@@ -49,8 +49,19 @@ export function SedesPage() {
 
   const [sedes, setSedes] = useState<Sede[]>([])
   const [busqueda, setBusqueda] = useState('')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
+  const [buscando, setBuscando] = useState(false)
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [pagina, setPagina] = useState(1)
+  const [totalElementos, setTotalElementos] = useState(0)
+  const [totalPaginas, setTotalPaginas] = useState(1)
+  const [esBackendPaginado, setEsBackendPaginado] = useState(true)
+
+  const [conteos, setConteos] = useState<SedeResumenEstados>({
+    todas: 0,
+    activas: 0,
+    inactivas: 0,
+  })
 
   const [form, setForm] = useState<Formulario>(VACIO)
   const [editando, setEditando] = useState<number | null>(null)
@@ -142,7 +153,34 @@ export function SedesPage() {
     }))
   }
 
-  // CONSULTAR SEDES.
+  // DEBOUNCE DE BÚSQUEDA
+  useEffect(() => {
+    setBuscando(true)
+    const timer = window.setTimeout(() => {
+      setBusquedaDebounced(busqueda)
+      setPagina(1)
+      setBuscando(false)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [busqueda])
+
+  // RESUMEN DE CONTEOS POR ESTADO
+  useEffect(() => {
+    if (!accessToken) return
+    let activo = true
+
+    sedesApi.resumenEstados(accessToken, busquedaDebounced)
+      .then(res => {
+        if (activo) setConteos(res)
+      })
+      .catch(() => {
+        // Fallback silencioso si falla el conteo
+      })
+
+    return () => { activo = false }
+  }, [accessToken, busquedaDebounced, actualizacion])
+
+  // CONSULTAR SEDES PAGINADAS
   useEffect(() => {
     if (!accessToken) {
       setLoading(false)
@@ -154,15 +192,35 @@ export function SedesPage() {
     setLoading(true)
     setError('')
 
-    sedesApi.listar(accessToken)
-      .then(data => { if (activo) setSedes(data) })
+    const activoParam = filtro === 'activas' ? true : filtro === 'inactivas' ? false : undefined
+
+    sedesApi.listarPaginado(accessToken, {
+      page: pagina - 1,
+      size: POR_PAGINA,
+      buscar: busquedaDebounced,
+      activo: activoParam,
+    })
+      .then(resp => {
+        if (!activo) return
+        if (Array.isArray(resp)) {
+          setSedes(resp)
+          setTotalElementos(resp.length)
+          setTotalPaginas(Math.max(1, Math.ceil(resp.length / POR_PAGINA)))
+          setEsBackendPaginado(false)
+        } else {
+          setSedes(resp.contenido)
+          setTotalElementos(resp.totalElementos)
+          setTotalPaginas(Math.max(1, resp.totalPaginas))
+          setEsBackendPaginado(true)
+        }
+      })
       .catch(e => {
         if (activo) setError(e instanceof Error ? e.message : 'No se pudieron cargar las sedes.')
       })
       .finally(() => { if (activo) setLoading(false) })
 
     return () => { activo = false }
-  }, [accessToken, actualizacion])
+  }, [accessToken, pagina, busquedaDebounced, filtro, actualizacion])
 
   // OCULTAR NOTIFICACIONES AUTOMÁTICAMENTE.
   useEffect(() => {
@@ -241,18 +299,15 @@ export function SedesPage() {
       }
 
       const esNuevo = editando === null
-      const resultado = esNuevo
-        ? await sedesApi.crear(accessToken, data)
-        : await sedesApi.actualizar(accessToken, editando, data)
-
-      setSedes(actual => esNuevo
-        ? [...actual, resultado].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-        : actual.map(s => s.id === resultado.id ? resultado : s)
-          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-      )
+      if (esNuevo) {
+        await sedesApi.crear(accessToken, data)
+      } else {
+        await sedesApi.actualizar(accessToken, editando, data)
+      }
 
       setMostrarForm(false)
       setEditando(null)
+      setActualizacion(n => n + 1)
 
       setAviso({
         tipo: 'success',
@@ -280,8 +335,8 @@ export function SedesPage() {
     try {
       const resultado = await sedesApi.cambiarEstado(accessToken, sede.id, !sede.activo)
 
-      setSedes(actual => actual.map(s => s.id === resultado.id ? resultado : s))
       setConfirmar(null)
+      setActualizacion(n => n + 1)
 
       setAviso({
         tipo: 'success',
@@ -298,23 +353,26 @@ export function SedesPage() {
   }
 
   // BÚSQUEDA, FILTROS Y PAGINACIÓN.
-  const filtradas = sedes.filter(s => {
-    const texto = `${s.nombre} ${s.direccion} ${s.distrito ?? ''} ${s.provincia ?? ''} ${s.departamento ?? ''}`
-    const coincide = normalizar(texto).includes(normalizar(busqueda.trim()))
+  const filtradasFallback = useMemo(() => {
+    if (esBackendPaginado) return sedes
+    return sedes.filter(s => {
+      const texto = `${s.nombre} ${s.direccion} ${s.distrito ?? ''} ${s.provincia ?? ''} ${s.departamento ?? ''}`
+      const coincide = normalizar(texto).includes(normalizar(busquedaDebounced.trim()))
 
-    if (filtro === 'activas') return coincide && s.activo
-    if (filtro === 'inactivas') return coincide && !s.activo
-    return coincide
-  })
+      if (filtro === 'activas') return coincide && s.activo
+      if (filtro === 'inactivas') return coincide && !s.activo
+      return coincide
+    })
+  }, [esBackendPaginado, sedes, busquedaDebounced, filtro])
 
-  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const inicio = (paginaActual - 1) * POR_PAGINA
-  const visibles = filtradas.slice(inicio, inicio + POR_PAGINA)
+  const totalElementosFinal = esBackendPaginado ? totalElementos : filtradasFallback.length
+  const totalPaginasFinal = esBackendPaginado ? totalPaginas : Math.max(1, Math.ceil(filtradasFallback.length / POR_PAGINA))
+  const inicioRango = totalElementosFinal === 0 ? 0 : (pagina - 1) * POR_PAGINA + 1
+  const finRango = Math.min(pagina * POR_PAGINA, totalElementosFinal)
+  const visibles = esBackendPaginado ? sedes : filtradasFallback.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   const cambiarBusqueda = (valor: string) => {
     setBusqueda(valor)
-    setPagina(1)
   }
 
   const cambiarFiltro = (valor: Filtro) => {
@@ -520,7 +578,7 @@ export function SedesPage() {
           <div>
             <h2 className="font-bold text-ink">Sedes registradas</h2>
             <p className="mt-1 text-xs text-muted">
-              {sedes.length} sede{sedes.length === 1 ? '' : 's'} en el sistema
+              {conteos.todas} sede{conteos.todas === 1 ? '' : 's'} en el sistema
             </p>
           </div>
 
@@ -530,7 +588,11 @@ export function SedesPage() {
               aria-label="Buscar sede"
               value={busqueda}
               onChange={e => cambiarBusqueda(e.target.value)}
-              onClear={() => cambiarBusqueda('')}
+              onClear={() => {
+                setBusqueda('')
+                setPagina(1)
+              }}
+              loading={buscando}
               className="w-full sm:w-64"
             />
 
@@ -538,12 +600,12 @@ export function SedesPage() {
               label="Filtrar sedes por estado"
               value={filtro}
               options={[
-                { value: 'todas', label: 'Todas' },
-                { value: 'activas', label: 'Activas' },
-                { value: 'inactivas', label: 'Inactivas' },
+                { value: 'todas', label: `Todas` },
+                { value: 'activas', label: `Activas` },
+                { value: 'inactivas', label: `Inactivas` },
               ]}
               onChange={valor => cambiarFiltro(valor as Filtro)}
-              className="w-full sm:w-36 sm:shrink-0"
+              className="w-full sm:w-44 sm:shrink-0"
             />
           </div>
         </div>
@@ -659,7 +721,7 @@ export function SedesPage() {
                 <div className="rounded-xl bg-surface px-5 py-12 text-center lg:col-span-2">
                   <Icon name="search" size={28} className="mx-auto text-muted" />
                   <p className="mt-3 text-sm text-muted">
-                    {sedes.length === 0
+                    {conteos.todas === 0
                       ? 'Todavía no hay sedes registradas.'
                       : 'No se encontraron sedes con los filtros seleccionados.'}
                   </p>
@@ -668,9 +730,9 @@ export function SedesPage() {
             </div>
 
             {/* PAGINACIÓN */}
-            {filtradas.length > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}`}>
-                <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
+            {totalElementosFinal > 0 && (
+              <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal}`}>
+                <Pagination page={pagina} totalPages={totalPaginasFinal} onChange={setPagina} />
               </TableFoot>
             )}
           </>
