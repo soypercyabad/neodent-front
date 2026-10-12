@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedSelect, Button, Card, Checkbox, ConfirmDialog, Icon, PageHead, Pagination, SearchInput, ServicesCardsSkeleton, TableFoot, Toast, Toolbar, Tooltip } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { serviciosApi, type Servicio, type ServicioInput, type EspecialidadOption } from '../api/serviciosApi'
-import { sedesApi, type Sede } from '@/features/sedes/api/sedesApi'
+import { sedesApi, type SedeCatalogo } from '@/features/sedes/api/sedesApi'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
@@ -38,12 +38,17 @@ export function ServiciosPage() {
 
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [especialidades, setEspecialidades] = useState<EspecialidadOption[]>([])
-  const [sedes, setSedes] = useState<Sede[]>([])
+  const [sedes, setSedes] = useState<SedeCatalogo[]>([])
   const [busqueda, setBusqueda] = useState('')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
+  const [buscando, setBuscando] = useState(false)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [filtroEspecialidad, setFiltroEspecialidad] = useState('')
   const [filtroSede, setFiltroSede] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [totalElementos, setTotalElementos] = useState(0)
+  const [totalPaginas, setTotalPaginas] = useState(1)
+  const [esBackendPaginado, setEsBackendPaginado] = useState(true)
 
   const [form, setForm] = useState<Formulario>(VACIO)
   const [editando, setEditando] = useState<number | null>(null)
@@ -61,7 +66,39 @@ export function ServiciosPage() {
   const [mostrarSelectorSedes, setMostrarSelectorSedes] = useState(false)
   const [busquedaSede, setBusquedaSede] = useState('')
 
-  // CARGAR SERVICIOS, ESPECIALIDADES Y SEDES REALES.
+  // CARGAR ESPECIALIDADES Y SEDES (CATÁLOGO LIGERO) PARA COMBOS Y SELECTOR
+  useEffect(() => {
+    if (!accessToken) return
+    let activo = true
+
+    Promise.all([
+      serviciosApi.especialidades(accessToken),
+      sedesApi.catalogo(accessToken),
+    ])
+      .then(([listaEspecialidades, listaSedes]) => {
+        if (!activo) return
+        setEspecialidades(listaEspecialidades)
+        setSedes(listaSedes)
+      })
+      .catch(() => {})
+
+    return () => {
+      activo = false
+    }
+  }, [accessToken])
+
+  // DEBOUNCE DE BÚSQUEDA
+  useEffect(() => {
+    setBuscando(true)
+    const timer = window.setTimeout(() => {
+      setBusquedaDebounced(busqueda)
+      setPagina(1)
+      setBuscando(false)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [busqueda])
+
+  // CONSULTAR SERVICIOS PAGINADOS
   useEffect(() => {
     if (!accessToken) {
       setLoading(false)
@@ -73,19 +110,35 @@ export function ServiciosPage() {
     setLoading(true)
     setError('')
 
-    Promise.all([
-      serviciosApi.listar(accessToken),
-      serviciosApi.especialidades(accessToken),
-      sedesApi.listar(accessToken),
-    ])
-      .then(([listaServicios, listaEspecialidades, listaSedes]) => {
+    const activoParam = filtro === 'activos' ? true : filtro === 'inactivos' ? false : undefined
+    const destacadoParam = filtro === 'destacados' ? true : undefined
+
+    serviciosApi.listarPaginado(accessToken, {
+      page: pagina - 1,
+      size: POR_PAGINA,
+      buscar: busquedaDebounced || undefined,
+      especialidadId: filtroEspecialidad ? Number(filtroEspecialidad) : undefined,
+      sedeId: filtroSede ? Number(filtroSede) : undefined,
+      activo: activoParam,
+      destacado: destacadoParam,
+    })
+      .then(resp => {
         if (!activo) return
-        setServicios(listaServicios)
-        setEspecialidades(listaEspecialidades)
-        setSedes(listaSedes)
+        if (Array.isArray(resp)) {
+          setServicios(resp)
+          setTotalElementos(resp.length)
+          setTotalPaginas(Math.max(1, Math.ceil(resp.length / POR_PAGINA)))
+          setEsBackendPaginado(false)
+        } else {
+          setServicios(resp.contenido)
+          setTotalElementos(resp.totalElementos)
+          setTotalPaginas(Math.max(1, resp.totalPaginas))
+          setEsBackendPaginado(true)
+        }
       })
-      .catch((e: unknown) => {
-        if (activo) setError(e instanceof Error ? e.message : 'No se pudieron cargar los servicios.')
+      .catch(e => {
+        if (!activo) return
+        setError(e instanceof Error ? e.message : 'No se pudieron cargar los servicios.')
       })
       .finally(() => {
         if (activo) setLoading(false)
@@ -94,7 +147,7 @@ export function ServiciosPage() {
     return () => {
       activo = false
     }
-  }, [accessToken, actualizacion])
+  }, [accessToken, pagina, busquedaDebounced, filtro, filtroEspecialidad, filtroSede, actualizacion])
 
   // OCULTAR NOTIFICACIONES AUTOMÁTICAMENTE.
   useEffect(() => {
@@ -214,23 +267,15 @@ export function ServiciosPage() {
       }
 
       const esNuevo = editando === null
-      const resultado = esNuevo
-        ? await serviciosApi.crear(accessToken, data)
-        : await serviciosApi.actualizar(accessToken, editando, data)
-
-      setServicios(actual =>
-        esNuevo
-          ? [...actual, resultado].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-          : actual
-              .map(s => (s.id === resultado.id ? resultado : s))
-              .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-      )
+      if (esNuevo) {
+        await serviciosApi.crear(accessToken, data)
+      } else {
+        await serviciosApi.actualizar(accessToken, editando, data)
+      }
 
       setMostrarForm(false)
       setEditando(null)
-      setBusqueda('')
-      setFiltro('todos')
-      setPagina(1)
+      setActualizacion(n => n + 1)
 
       setAviso({
         tipo: 'success',
@@ -256,8 +301,8 @@ export function ServiciosPage() {
     try {
       const resultado = await serviciosApi.cambiarEstado(accessToken, confirmar.id, !confirmar.activo)
 
-      setServicios(actual => actual.map(s => (s.id === resultado.id ? resultado : s)))
       setConfirmar(null)
+      setActualizacion(n => n + 1)
 
       setAviso({
         tipo: 'success',
@@ -281,7 +326,7 @@ export function ServiciosPage() {
 
     try {
       const resultado = await serviciosApi.alternarDestacado(accessToken, servicio.id)
-      setServicios(actual => actual.map(s => (s.id === resultado.id ? resultado : s)))
+      setActualizacion(n => n + 1)
       setAviso({
         tipo: 'success',
         texto: resultado.destacado
@@ -308,8 +353,10 @@ export function ServiciosPage() {
   ], [sedes])
 
   // FILTROS Y PAGINACIÓN.
-  const filtrados = useMemo(() => {
-    const q = normalizar(busqueda.trim())
+  const filtradosFallback = useMemo(() => {
+    if (esBackendPaginado) return servicios
+
+    const q = normalizar(busquedaDebounced.trim())
 
     return servicios.filter(s => {
       const texto = normalizar(`${s.nombre} ${s.especialidadNombre} ${s.descripcion ?? ''}`)
@@ -329,12 +376,13 @@ export function ServiciosPage() {
 
       return true
     })
-  }, [servicios, busqueda, filtro, filtroEspecialidad, filtroSede])
+  }, [esBackendPaginado, servicios, busquedaDebounced, filtro, filtroEspecialidad, filtroSede])
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const inicio = (paginaActual - 1) * POR_PAGINA
-  const visibles = filtrados.slice(inicio, inicio + POR_PAGINA)
+  const totalElementosFinal = esBackendPaginado ? totalElementos : filtradosFallback.length
+  const totalPaginasFinal = esBackendPaginado ? totalPaginas : Math.max(1, Math.ceil(filtradosFallback.length / POR_PAGINA))
+  const inicioRango = totalElementosFinal === 0 ? 0 : (pagina - 1) * POR_PAGINA + 1
+  const finRango = Math.min(pagina * POR_PAGINA, totalElementosFinal)
+  const visibles = esBackendPaginado ? servicios : filtradosFallback.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   return (
     <>
@@ -583,7 +631,7 @@ export function ServiciosPage() {
                             {sedes
                               .filter(sede => {
                                 const texto = normalizar(
-                                  `${sede.nombre} ${sede.distrito ?? ''} ${sede.provincia ?? ''}`,
+                                  `${sede.nombre} ${sede.distrito ?? ''}`,
                                 )
                                 return texto.includes(normalizar(busquedaSede.trim()))
                               })
@@ -624,8 +672,7 @@ export function ServiciosPage() {
                                       </span>
 
                                       <span className="block truncate text-xs text-muted">
-                                        {[sede.distrito, sede.provincia].filter(Boolean).join(', ') ||
-                                          sede.direccion}
+                                        {sede.distrito ? `Distrito: ${sede.distrito}` : 'Sede clínica'}
                                       </span>
                                     </span>
 
@@ -647,7 +694,7 @@ export function ServiciosPage() {
                             {sedes.length > 0 &&
                               !sedes.some(sede =>
                                 normalizar(
-                                  `${sede.nombre} ${sede.distrito ?? ''} ${sede.provincia ?? ''}`,
+                                  `${sede.nombre} ${sede.distrito ?? ''}`,
                                 ).includes(normalizar(busquedaSede.trim())),
                               ) && (
                                 <p className="px-3 py-5 text-center text-sm text-muted">
@@ -708,7 +755,7 @@ export function ServiciosPage() {
           <div className="p-5 pb-3">
             <h2 className="font-bold text-ink">Servicios registrados</h2>
             <p className="mt-1 text-xs text-muted">
-              {servicios.length} servicio{servicios.length === 1 ? '' : 's'} en el sistema
+              {totalElementosFinal} servicio{totalElementosFinal === 1 ? '' : 's'} en el sistema
             </p>
           </div>
 
@@ -719,12 +766,12 @@ export function ServiciosPage() {
               value={busqueda}
               onChange={e => {
                 setBusqueda(e.target.value)
-                setPagina(1)
               }}
               onClear={() => {
                 setBusqueda('')
                 setPagina(1)
               }}
+              loading={buscando}
               className="w-full sm:min-w-56 sm:flex-1"
             />
 
@@ -973,9 +1020,9 @@ export function ServiciosPage() {
             </div>
 
             {/* PAGINACIÓN */}
-            {filtrados.length > 0 && (
-              <TableFoot summary={`Mostrando ${inicio + 1}–${Math.min(inicio + POR_PAGINA, filtrados.length)} de ${filtrados.length}`}>
-                <Pagination page={paginaActual} totalPages={totalPaginas} onChange={setPagina} />
+            {totalElementosFinal > 0 && (
+              <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal}`}>
+                <Pagination page={pagina} totalPages={totalPaginasFinal} onChange={setPagina} />
               </TableFoot>
             )}
           </>

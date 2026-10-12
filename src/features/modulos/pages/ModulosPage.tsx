@@ -10,7 +10,7 @@ import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { ApiError } from '@/shared/api/apiClient'
 import { cn } from '@/shared/lib/cn'
-import { modulosApi, type ModuloItem, type ModuloInput, type ModuloResumenEstados } from '../api/modulosApi'
+import { modulosApi, type ModuloItem, type ModuloInput } from '../api/modulosApi'
 
 interface IconOption {
   value: IconName
@@ -145,12 +145,6 @@ export function ModulosPage() {
   const [sortColumn, setSortColumn] = useState<string>('orden')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  const [conteos, setConteos] = useState<ModuloResumenEstados>({
-    todos: 0,
-    activos: 0,
-    inactivos: 0,
-  })
-
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const guardandoRef = useRef(false)
@@ -181,22 +175,6 @@ export function ModulosPage() {
     return () => clearTimeout(timer)
   }, [query])
 
-  // CARGAR CONTEOS RESUMEN
-  useEffect(() => {
-    if (!accessToken) return
-
-    let activo = true
-    modulosApi
-      .resumenEstados(accessToken, queryDebounced || undefined)
-      .then(res => {
-        if (activo) setConteos(res)
-      })
-      .catch(() => {})
-
-    return () => {
-      activo = false
-    }
-  }, [accessToken, queryDebounced, actualizacion])
 
   // CARGAR MÓDULOS CON PAGINACIÓN
   useEffect(() => {

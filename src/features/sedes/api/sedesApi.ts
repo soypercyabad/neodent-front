@@ -27,6 +27,7 @@ export interface SedeCatalogo {
   id: number
   nombre: string
   distrito: string | null
+  activo: boolean
 }
 
 export interface SedeResumenEstados {
