@@ -119,3 +119,116 @@ export function calcularResumenVigencia(
     esIndefinido: false,
   }
 }
+
+export const mesIsoActual = () => {
+  const date = new Date()
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
+}
+
+export const mesActual = (iso: string) => iso.slice(0, 7)
+
+export const inicioMes = (mes: string) => `${mes}-01`
+
+export const finMes = (mes: string) => {
+  const [year, month] = mes.split('-').map(Number)
+  return isoFecha(new Date(year, month, 0))
+}
+
+export const moverMes = (mes: string, delta: number) => {
+  const [year, month] = mes.split('-').map(Number)
+  const date = new Date(year, month - 1 + delta, 1)
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
+}
+
+export const nombreMes = (mes: string) => {
+  const [year, month] = mes.split('-').map(Number)
+  const value = new Intl.DateTimeFormat('es-PE', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, 1))
+
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+export const tituloMesAno = (mes: string) => {
+  const [year, month] = mes.split('-').map(Number)
+  const value = new Intl.DateTimeFormat('es-PE', {
+    month: 'long',
+  }).format(new Date(year, month - 1, 1))
+
+  const mesCapitalizado = value.charAt(0).toUpperCase() + value.slice(1)
+  return `${mesCapitalizado} - ${year}`
+}
+
+export const fechaLarga = (iso: string) => {
+  const value = new Intl.DateTimeFormat('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(fechaDesdeIso(iso))
+
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+export type EstiloBloqueo = {
+  dotColor: string
+  badgeTone: 'red' | 'amber' | 'blue' | 'green' | 'gray'
+  cardClass: string
+  textClass: string
+  nombre: string
+}
+
+export const getEstiloBloqueo = (codigo: string): EstiloBloqueo => {
+  switch (codigo) {
+    case 'FERIADO':
+      return {
+        dotColor: 'bg-rose-500',
+        badgeTone: 'red',
+        cardClass: 'border-rose-200/80 bg-rose-50/70',
+        textClass: 'text-rose-900',
+        nombre: 'Feriado',
+      }
+    case 'CAPACITACION':
+      return {
+        dotColor: 'bg-purple-500',
+        badgeTone: 'blue',
+        cardClass: 'border-purple-200/80 bg-purple-50/70',
+        textClass: 'text-purple-900',
+        nombre: 'Capacitación',
+      }
+    case 'VACACIONES':
+      return {
+        dotColor: 'bg-amber-500',
+        badgeTone: 'amber',
+        cardClass: 'border-amber-200/80 bg-amber-50/70',
+        textClass: 'text-amber-900',
+        nombre: 'Vacaciones',
+      }
+    case 'PERMISO':
+      return {
+        dotColor: 'bg-sky-500',
+        badgeTone: 'blue',
+        cardClass: 'border-sky-200/80 bg-sky-50/70',
+        textClass: 'text-sky-900',
+        nombre: 'Permiso',
+      }
+    case 'CIERRE_SEDE':
+      return {
+        dotColor: 'bg-slate-600',
+        badgeTone: 'gray',
+        cardClass: 'border-slate-300/80 bg-slate-100/80',
+        textClass: 'text-slate-900',
+        nombre: 'Cierre de sede',
+      }
+    default:
+      return {
+        dotColor: 'bg-slate-400',
+        badgeTone: 'gray',
+        cardClass: 'border-line bg-alt/60',
+        textClass: 'text-ink',
+        nombre: 'Otro bloqueo',
+      }
+  }
+}
+

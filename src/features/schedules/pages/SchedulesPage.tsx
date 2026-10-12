@@ -18,17 +18,26 @@ import {
 } from '../api/schedulesApi'
 import { blocksApi, type AgendaBlock } from '../api/blocksApi'
 import { ScheduleAgendaTabs } from '../components/ScheduleAgendaTabs'
-import { calcularResumenVigencia } from '../model/scheduleUtils'
-
-const DIAS = [
-  { value: '1', label: 'Lunes', short: 'LUN' },
-  { value: '2', label: 'Martes', short: 'MAR' },
-  { value: '3', label: 'Miércoles', short: 'MIÉ' },
-  { value: '4', label: 'Jueves', short: 'JUE' },
-  { value: '5', label: 'Viernes', short: 'VIE' },
-  { value: '6', label: 'Sábado', short: 'SÁB' },
-  { value: '7', label: 'Domingo', short: 'DOM' },
-] as const
+import {
+  DIAS,
+  calcularResumenVigencia,
+  diaSemanaIso,
+  fechaCorta,
+  fechaDesdeIso,
+  fechaLarga,
+  finMes,
+  getEstiloBloqueo,
+  hora12,
+  hoyIso,
+  inicioMes,
+  isoFecha,
+  mesActual,
+  mesIsoActual,
+  moverMes,
+  nombreMes,
+  pad,
+  tituloMesAno,
+} from '../model/scheduleUtils'
 
 type Formulario = {
   odontologoId: string
@@ -42,153 +51,10 @@ type Formulario = {
   sinFechaFin: boolean
 }
 
-const pad = (value: number) => String(value).padStart(2, '0')
-
-const isoFecha = (date: Date) =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-
-const fechaDesdeIso = (iso: string) => {
-  const [year, month, day] = iso.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-const hoyIso = () => isoFecha(new Date())
-
-const mesIsoActual = () => {
-  const date = new Date()
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
-}
-
-const mesActual = (iso: string) => iso.slice(0, 7)
-
-const inicioMes = (mes: string) => `${mes}-01`
-
-const finMes = (mes: string) => {
-  const [year, month] = mes.split('-').map(Number)
-  return isoFecha(new Date(year, month, 0))
-}
-
-const moverMes = (mes: string, delta: number) => {
-  const [year, month] = mes.split('-').map(Number)
-  const date = new Date(year, month - 1 + delta, 1)
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
-}
-
-const nombreMes = (mes: string) => {
-  const [year, month] = mes.split('-').map(Number)
-  const value = new Intl.DateTimeFormat('es-PE', {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(year, month - 1, 1))
-
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-const tituloMesAno = (mes: string) => {
-  const [year, month] = mes.split('-').map(Number)
-  const value = new Intl.DateTimeFormat('es-PE', {
-    month: 'long',
-  }).format(new Date(year, month - 1, 1))
-
-  const mesCapitalizado = value.charAt(0).toUpperCase() + value.slice(1)
-  return `${mesCapitalizado} - ${year}`
-}
-
-const diaSemanaIso = (iso: string) => {
-  const day = fechaDesdeIso(iso).getDay()
-  return day === 0 ? 7 : day
-}
-
 const nombreCompleto = (item: HorarioOdontologoCatalogo) =>
   [item.nombres, item.apellidoPaterno, item.apellidoMaterno].filter(Boolean).join(' ')
 
 const horaCorta = (hora: string) => hora.slice(0, 5)
-
-const hora12 = (hora: string) => {
-  const [hStr = '00', mStr = '00'] = hora.split(':')
-  const h = Number.parseInt(hStr, 10)
-  const m = Number.parseInt(mStr, 10)
-  return `${String(h % 12 || 12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
-}
-
-const fechaCorta = (iso: string) =>
-  new Intl.DateTimeFormat('es-PE', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(fechaDesdeIso(iso.slice(0, 10)))
-
-const fechaLarga = (iso: string) => {
-  const value = new Intl.DateTimeFormat('es-PE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(fechaDesdeIso(iso))
-
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-type EstiloBloqueo = {
-  dotColor: string
-  badgeTone: 'red' | 'amber' | 'blue' | 'green' | 'gray'
-  cardClass: string
-  textClass: string
-  nombre: string
-}
-
-const getEstiloBloqueo = (codigo: string): EstiloBloqueo => {
-  switch (codigo) {
-    case 'FERIADO':
-      return {
-        dotColor: 'bg-rose-500',
-        badgeTone: 'red',
-        cardClass: 'border-rose-200/80 bg-rose-50/70',
-        textClass: 'text-rose-900',
-        nombre: 'Feriado',
-      }
-    case 'CAPACITACION':
-      return {
-        dotColor: 'bg-purple-500',
-        badgeTone: 'blue',
-        cardClass: 'border-purple-200/80 bg-purple-50/70',
-        textClass: 'text-purple-900',
-        nombre: 'Capacitación',
-      }
-    case 'VACACIONES':
-      return {
-        dotColor: 'bg-amber-500',
-        badgeTone: 'amber',
-        cardClass: 'border-amber-200/80 bg-amber-50/70',
-        textClass: 'text-amber-900',
-        nombre: 'Vacaciones',
-      }
-    case 'PERMISO':
-      return {
-        dotColor: 'bg-sky-500',
-        badgeTone: 'blue',
-        cardClass: 'border-sky-200/80 bg-sky-50/70',
-        textClass: 'text-sky-900',
-        nombre: 'Permiso',
-      }
-    case 'CIERRE_SEDE':
-      return {
-        dotColor: 'bg-slate-600',
-        badgeTone: 'gray',
-        cardClass: 'border-slate-300/80 bg-slate-100/80',
-        textClass: 'text-slate-900',
-        nombre: 'Cierre de sede',
-      }
-    default:
-      return {
-        dotColor: 'bg-slate-400',
-        badgeTone: 'gray',
-        cardClass: 'border-line bg-alt/60',
-        textClass: 'text-ink',
-        nombre: 'Otro bloqueo',
-      }
-  }
-}
 
 const horarioAplicaFecha = (horario: HorarioOdontologo, fecha: string) => {
   if (horario.diaSemana !== diaSemanaIso(fecha)) return false
@@ -314,15 +180,13 @@ export function SchedulesPage() {
     Promise.all([
       schedulesApi.catalogoOdontologos(accessToken),
       bookingApi.sedes(accessToken),
-      schedulesApi.listar(accessToken),
       blocksApi.listar(accessToken).catch(() => [] as AgendaBlock[]),
     ])
-      .then(([catalogoData, sedesData, horariosData, bloqueosData]) => {
+      .then(([catalogoData, sedesData, bloqueosData]) => {
         if (!activo) return
 
         setCatalogo(catalogoData)
         setSedes(sedesData)
-        setHorarios(horariosData)
         setBloqueos(bloqueosData)
 
         setFiltroOdontologoId(actual =>
@@ -335,7 +199,7 @@ export function SchedulesPage() {
       })
       .catch(e => {
         if (activo) {
-          setError(e instanceof Error ? e.message : 'No se pudieron cargar los horarios.')
+          setError(e instanceof Error ? e.message : 'No se pudieron cargar los datos de la agenda.')
         }
       })
       .finally(() => {
@@ -346,6 +210,28 @@ export function SchedulesPage() {
       activo = false
     }
   }, [accessToken, actualizacion])
+
+  // Cargar únicamente los horarios correspondientes al odontólogo seleccionado
+  useEffect(() => {
+    if (!accessToken || !filtroOdontologoId) return
+    let activo = true
+
+    schedulesApi
+      .listar(accessToken, undefined, Number(filtroOdontologoId))
+      .then(horariosData => {
+        if (!activo) return
+        setHorarios(horariosData)
+      })
+      .catch(e => {
+        if (activo) {
+          console.error('Error al cargar horarios del odontólogo seleccionado:', e)
+        }
+      })
+
+    return () => {
+      activo = false
+    }
+  }, [accessToken, filtroOdontologoId, actualizacion])
 
   useEffect(() => {
     if (!fechaSeleccionada.startsWith(mesVisible)) {

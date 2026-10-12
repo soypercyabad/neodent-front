@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ActionsCell, AnimatedDatePicker, AnimatedSelect, Avatar,
   Badge, Button, Card, Checkbox, ClockTimePicker, ConfirmDialog, Icon,
-  PageHead, Pagination, ProtectedImage, RowActions, TableFoot, Toast, Tooltip, type ToastAviso,
+  PageHead, Pagination, ProtectedImage, RowActions, SearchInput, TableFoot, Toast, Tooltip, type ToastAviso,
 } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
@@ -65,7 +65,25 @@ export function ScheduleHistoryPage() {
   const [filtroSedeId, setFiltroSedeId] = useState('')
   const [filtroDia, setFiltroDia] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
+  const [buscando, setBuscando] = useState(false)
   const [pagina, setPagina] = useState(1)
+  const [sortColumn, setSortColumn] = useState<string>('fechaInicioVigencia')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [totalElementos, setTotalElementos] = useState(0)
+  const [totalPaginas, setTotalPaginas] = useState(1)
+  const [esBackendPaginado, setEsBackendPaginado] = useState(false)
+  const [conteosBackend, setConteosBackend] = useState<{
+    todos: number
+    vigentes: number
+    proximos: number
+    expirados: number
+  }>({
+    todos: 0,
+    vigentes: 0,
+    proximos: 0,
+    expirados: 0,
+  })
 
   const [form, setForm] = useState<Formulario>(FORM_INICIAL)
   const [editando, setEditando] = useState<number | null>(null)
@@ -80,7 +98,16 @@ export function ScheduleHistoryPage() {
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
   const [actualizacion, setActualizacion] = useState(0)
 
-  // CARGAR DATOS
+  // DEBOUNCE DE BÚSQUEDA (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setBusquedaDebounced(busqueda.trim())
+      setPagina(1)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [busqueda])
+
+  // CARGAR CATÁLOGOS BASE (Odontólogos y Sedes)
   useEffect(() => {
     if (!accessToken) {
       setLoading(false)
@@ -89,19 +116,66 @@ export function ScheduleHistoryPage() {
     }
 
     let activo = true
-    setLoading(true)
     setError('')
 
     Promise.all([
       schedulesApi.catalogoOdontologos(accessToken),
       bookingApi.sedes(accessToken),
-      schedulesApi.listar(accessToken),
     ])
-      .then(([catalogoData, sedesData, horariosData]) => {
+      .then(([catalogoData, sedesData]) => {
         if (!activo) return
         setCatalogo(catalogoData)
         setSedes(sedesData)
-        setHorarios(horariosData)
+      })
+      .catch(e => {
+        if (activo) {
+          setError(e instanceof Error ? e.message : 'No se pudieron cargar los catálogos.')
+        }
+      })
+
+    return () => {
+      activo = false
+    }
+  }, [accessToken, actualizacion])
+
+  // CARGAR HORARIOS CON PAGINACIÓN DESDE EL BACKEND
+  useEffect(() => {
+    if (!accessToken) return
+
+    let activo = true
+    setBuscando(true)
+
+    schedulesApi
+      .listarPaginado(accessToken, {
+        page: pagina - 1,
+        size: PAGE_SIZE,
+        buscar: busquedaDebounced || undefined,
+        sedeId: filtroSedeId ? Number(filtroSedeId) : undefined,
+        diaSemana: filtroDia ? Number(filtroDia) : undefined,
+        odontologoId: filtroOdontologoId ? Number(filtroOdontologoId) : undefined,
+        especialidadId: filtroEspecialidadId ? Number(filtroEspecialidadId) : undefined,
+        estado:
+          filtroEstado === 'vigentes'
+            ? 'VIGENTE'
+            : filtroEstado === 'proximos'
+              ? 'PROXIMO'
+              : filtroEstado === 'expirados'
+                ? 'EXPIRADO'
+                : undefined,
+        sortBy: sortColumn,
+        direction: sortDirection,
+      })
+      .then(data => {
+        if (!activo) return
+        if ('contenido' in data) {
+          setHorarios(data.contenido)
+          setTotalElementos(data.totalElementos)
+          setTotalPaginas(Math.max(1, data.totalPaginas))
+          setEsBackendPaginado(true)
+        } else {
+          setHorarios(data)
+          setEsBackendPaginado(false)
+        }
       })
       .catch(e => {
         if (activo) {
@@ -109,13 +183,62 @@ export function ScheduleHistoryPage() {
         }
       })
       .finally(() => {
-        if (activo) setLoading(false)
+        if (activo) {
+          setBuscando(false)
+          setLoading(false)
+        }
       })
 
     return () => {
       activo = false
     }
-  }, [accessToken, actualizacion])
+  }, [
+    accessToken,
+    pagina,
+    busquedaDebounced,
+    filtroSedeId,
+    filtroDia,
+    filtroOdontologoId,
+    filtroEspecialidadId,
+    filtroEstado,
+    sortColumn,
+    sortDirection,
+    actualizacion,
+  ])
+
+  // CARGAR CONTEOS POR ESTADO DESDE EL BACKEND
+  useEffect(() => {
+    if (!accessToken) return
+
+    let activo = true
+    schedulesApi
+      .resumenEstados(accessToken, {
+        buscar: busquedaDebounced || undefined,
+        sedeId: filtroSedeId ? Number(filtroSedeId) : undefined,
+        diaSemana: filtroDia ? Number(filtroDia) : undefined,
+        odontologoId: filtroOdontologoId ? Number(filtroOdontologoId) : undefined,
+        especialidadId: filtroEspecialidadId ? Number(filtroEspecialidadId) : undefined,
+      })
+      .then(res => {
+        if (!activo) return
+        setConteosBackend(res)
+      })
+      .catch(() => {
+        // Fallback en caso de error
+      })
+
+    return () => {
+      activo = false
+    }
+  }, [
+    accessToken,
+    busquedaDebounced,
+    filtroSedeId,
+    filtroDia,
+    filtroOdontologoId,
+    filtroEspecialidadId,
+    actualizacion,
+  ])
 
   // CATÁLOGO DE ODONTÓLOGOS ÚNICOS
   const listaOdontologos = useMemo(() => {
@@ -146,31 +269,25 @@ export function ScheduleHistoryPage() {
 
   const hoy = hoyIso()
 
-  // CONJUNTO BASE CON FILTROS DE ODONTÓLOGO, ESPECIALIDAD, SEDE, DÍA Y BÚSQUEDA
+  // CONJUNTO BASE CON FILTROS (Fallback cliente)
   const horariosBase = useMemo(() => {
+    if (esBackendPaginado) return horarios
+
     const matchCat = new Map<number, HorarioOdontologoCatalogo>()
     catalogo.forEach(c => matchCat.set(c.odontologoEspecialidadId, c))
 
     return horarios.filter(h => {
-      // Sede
       if (filtroSedeId && String(h.sedeId) !== filtroSedeId) return false
-
-      // Día de la semana
       if (filtroDia && String(h.diaSemana) !== filtroDia) return false
 
       const cat = matchCat.get(h.odontologoEspecialidadId)
-
-      // Odontólogo
       if (filtroOdontologoId && cat && String(cat.odontologoId) !== filtroOdontologoId) {
         return false
       }
-
-      // Especialidad
       if (filtroEspecialidadId && cat && String(cat.especialidadId) !== filtroEspecialidadId) {
         return false
       }
 
-      // Búsqueda libre
       if (busqueda.trim()) {
         const q = busqueda.toLowerCase().trim()
         const nombreDoc = cat ? nombreCompleto(cat).toLowerCase() : ''
@@ -181,7 +298,10 @@ export function ScheduleHistoryPage() {
           nombreDoc.includes(q) ||
           espNombre.includes(q) ||
           sNombre.includes(q) ||
-          diaNombre.includes(q)
+          diaNombre.includes(q) ||
+          (cat?.numeroColegiatura && cat.numeroColegiatura.toLowerCase().includes(q)) ||
+          h.horaInicio.includes(q) ||
+          h.horaFin.includes(q)
         if (!coincide) return false
       }
 
@@ -196,10 +316,15 @@ export function ScheduleHistoryPage() {
     filtroDia,
     busqueda,
     sedes,
+    esBackendPaginado,
   ])
 
-  // CONTEO POR ESTADO DINÁMICO (se adapta a los filtros seleccionados)
+  // CONTEO POR ESTADO
   const conteos = useMemo(() => {
+    if (esBackendPaginado) {
+      return conteosBackend
+    }
+
     let vigentes = 0
     let proximos = 0
     let expirados = 0
@@ -220,10 +345,11 @@ export function ScheduleHistoryPage() {
       proximos,
       expirados,
     }
-  }, [horariosBase, hoy])
+  }, [horariosBase, hoy, esBackendPaginado, conteosBackend])
 
-  // FILTRADO FINAL APLICANDO EL SELECTOR DE ESTADO
+  // FILTRADO FINAL (Fallback cliente)
   const horariosFiltrados = useMemo(() => {
+    if (esBackendPaginado) return horarios
     if (filtroEstado === 'todos') return horariosBase
 
     return horariosBase.filter(h => {
@@ -236,11 +362,7 @@ export function ScheduleHistoryPage() {
       if (filtroEstado === 'expirados') return expirado
       return true
     })
-  }, [horariosBase, filtroEstado, hoy])
-
-  // ORDENAMIENTO INTERACTIVO
-  const [sortColumn, setSortColumn] = useState<string>('fechaInicioVigencia')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  }, [horariosBase, filtroEstado, hoy, esBackendPaginado, horarios])
 
   const handleSort = (colKey: string) => {
     if (sortColumn === colKey) {
@@ -253,6 +375,7 @@ export function ScheduleHistoryPage() {
   }
 
   const horariosOrdenados = useMemo(() => {
+    if (esBackendPaginado) return horarios
     const list = [...horariosFiltrados]
     if (!sortColumn) return list
     const dir = sortDirection === 'asc' ? 1 : -1
@@ -287,14 +410,22 @@ export function ScheduleHistoryPage() {
       }
       return 0
     })
-  }, [horariosFiltrados, sortColumn, sortDirection, catalogo, sedes])
+  }, [horariosFiltrados, sortColumn, sortDirection, catalogo, sedes, esBackendPaginado, horarios])
 
-  // PAGINACIÓN
-  const totalPaginas = Math.max(1, Math.ceil(horariosOrdenados.length / PAGE_SIZE))
-  const horariosPaginados = useMemo(() => {
+  // TOTALES Y REGISTROS FINALES A MOSTRAR
+  const totalPaginasFinal = esBackendPaginado
+    ? totalPaginas
+    : Math.max(1, Math.ceil(horariosOrdenados.length / PAGE_SIZE))
+
+  const totalElementosFinal = esBackendPaginado
+    ? totalElementos
+    : horariosFiltrados.length
+
+  const horariosAMostrar = useMemo(() => {
+    if (esBackendPaginado) return horarios
     const start = (pagina - 1) * PAGE_SIZE
     return horariosOrdenados.slice(start, start + PAGE_SIZE)
-  }, [horariosOrdenados, pagina])
+  }, [esBackendPaginado, horarios, horariosOrdenados, pagina])
 
   // RESUMEN INTELIGENTE DE VIGENCIA EN FORMULARIO
   const resumenVigencia = useMemo(() => {
@@ -425,6 +556,7 @@ export function ScheduleHistoryPage() {
 
       setMostrarForm(false)
       setEditando(null)
+      setActualizacion(a => a + 1)
       setAviso({
         tipo: 'success',
         texto: esNuevo
@@ -451,6 +583,7 @@ export function ScheduleHistoryPage() {
     try {
       await schedulesApi.desactivar(accessToken, confirmar.id)
       setHorarios(actual => actual.filter(h => h.id !== confirmar.id))
+      setActualizacion(a => a + 1)
       setConfirmar(null)
       setAviso({ tipo: 'success', texto: 'Horario desactivado correctamente.' })
     } catch (err) {
@@ -793,33 +926,18 @@ export function ScheduleHistoryPage() {
               label="Día de la semana"
             />
 
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                value={busqueda}
-                onChange={e => {
-                  setBusqueda(e.target.value)
-                  setPagina(1)
-                }}
-                placeholder="Buscar por día, hora o doctor…"
-                aria-label="Buscar cronogramas"
-                className="h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-3 text-xs font-medium text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-              />
-              <Icon name="search" size={15} className="absolute left-3 text-muted pointer-events-none" />
-              {busqueda && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBusqueda('')
-                    setPagina(1)
-                  }}
-                  className="absolute right-3 text-muted hover:text-ink cursor-pointer"
-                  aria-label="Limpiar búsqueda"
-                >
-                  <Icon name="x" size={14} />
-                </button>
-              )}
-            </div>
+            <SearchInput
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              onClear={() => {
+                setBusqueda('')
+                setPagina(1)
+              }}
+              loading={buscando}
+              placeholder="Buscar por día, hora, doctor o especialidad…"
+              aria-label="Buscar cronogramas"
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -836,7 +954,7 @@ export function ScheduleHistoryPage() {
               Reintentar
             </Button>
           </div>
-        ) : horariosFiltrados.length === 0 ? (
+        ) : totalElementosFinal === 0 ? (
           <div className="p-12 text-center">
             <Icon name="clock" size={38} className="mx-auto text-muted/60" />
             <p className="mt-3 font-semibold text-ink">No se encontraron cronogramas registrados</p>
@@ -891,7 +1009,7 @@ export function ScheduleHistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/70">
-                  {horariosPaginados.map(horario => {
+                  {horariosAMostrar.map(horario => {
                     const matchDoc = catalogo.find(
                       c => c.odontologoEspecialidadId === horario.odontologoEspecialidadId,
                     )
@@ -948,7 +1066,7 @@ export function ScheduleHistoryPage() {
                               </p>
                               {matchDoc?.numeroColegiatura && (
                                 <p className="mt-0.5 text-xs text-muted">
-                                  COP: {matchDoc.numeroColegiatura}
+                                  {matchDoc.numeroColegiatura}
                                 </p>
                               )}
                             </div>
@@ -1038,12 +1156,16 @@ export function ScheduleHistoryPage() {
 
             {/* PIE DE TABLA Y PAGINACIÓN */}
             <TableFoot
-              summary={`Mostrando ${horariosFiltrados.length === 0 ? 0 : (pagina - 1) * PAGE_SIZE + 1}–${Math.min(pagina * PAGE_SIZE, horariosFiltrados.length)} de ${horariosFiltrados.length} cronogramas`}
+              summary={
+                totalElementosFinal === 0
+                  ? 'No se encontraron cronogramas'
+                  : `Mostrando ${(pagina - 1) * PAGE_SIZE + 1}–${Math.min(pagina * PAGE_SIZE, totalElementosFinal)} de ${totalElementosFinal} cronogramas`
+              }
             >
-              {totalPaginas > 1 && (
+              {totalPaginasFinal > 1 && (
                 <Pagination
                   page={pagina}
-                  totalPages={totalPaginas}
+                  totalPages={totalPaginasFinal}
                   onChange={setPagina}
                 />
               )}
