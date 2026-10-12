@@ -3,14 +3,14 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   ActionsCell, AnimatedSelect, Badge, Button, Card, ConfirmDialog,
   Icon, Input, PageHead, Pagination, RowActions, SearchInput,
-  Table, TableFoot, TableState, Toast, Toolbar, useTableSort,
+  Table, TableFoot, TableState, Toast, Toolbar,
   type Column, type IconName,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { ApiError } from '@/shared/api/apiClient'
 import { cn } from '@/shared/lib/cn'
-import { modulosApi, type ModuloItem, type ModuloInput } from '../api/modulosApi'
+import { modulosApi, type ModuloItem, type ModuloInput, type ModuloResumenEstados } from '../api/modulosApi'
 
 interface IconOption {
   value: IconName
@@ -134,8 +134,23 @@ export function ModulosPage() {
   const { accessToken, recargarPerfil } = useAuth()
   const [modulos, setModulos] = useState<ModuloItem[]>([])
   const [query, setQuery] = useState('')
+  const [queryDebounced, setQueryDebounced] = useState('')
+  const [buscando, setBuscando] = useState(false)
   const [estado, setEstado] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [totalElementos, setTotalElementos] = useState(0)
+  const [totalPaginas, setTotalPaginas] = useState(1)
+  const [esBackendPaginado, setEsBackendPaginado] = useState(true)
+
+  const [sortColumn, setSortColumn] = useState<string>('orden')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  const [conteos, setConteos] = useState<ModuloResumenEstados>({
+    todos: 0,
+    activos: 0,
+    inactivos: 0,
+  })
+
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const guardandoRef = useRef(false)
@@ -157,30 +172,96 @@ export function ModulosPage() {
   const [orden, setOrden] = useState<number>(1)
   const [actualizacion, setActualizacion] = useState(0)
 
+  // DEBOUNCE BÚSQUEDA
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQueryDebounced(query.trim())
+      setPagina(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // CARGAR CONTEOS RESUMEN
   useEffect(() => {
     if (!accessToken) return
 
     let activo = true
-    setLoading(true)
+    modulosApi
+      .resumenEstados(accessToken, queryDebounced || undefined)
+      .then(res => {
+        if (activo) setConteos(res)
+      })
+      .catch(() => {})
+
+    return () => {
+      activo = false
+    }
+  }, [accessToken, queryDebounced, actualizacion])
+
+  // CARGAR MÓDULOS CON PAGINACIÓN
+  useEffect(() => {
+    if (!accessToken) {
+      setLoading(false)
+      setError('No se encontró una sesión activa.')
+      return
+    }
+
+    let activo = true
+    setBuscando(true)
     setError('')
 
-    modulosApi.listar(accessToken)
+    const activoParam =
+      estado === 'ACTIVO' ? true : estado === 'INACTIVO' ? false : undefined
+
+    modulosApi
+      .listarPaginado(accessToken, {
+        page: pagina - 1,
+        size: POR_PAGINA,
+        buscar: queryDebounced || undefined,
+        activo: activoParam,
+        sortBy: sortColumn,
+        direction: sortDirection,
+      })
       .then(data => {
-        if (activo) setModulos(data)
+        if (!activo) return
+        if ('contenido' in data) {
+          setModulos(data.contenido)
+          setTotalElementos(data.totalElementos)
+          setTotalPaginas(Math.max(1, data.totalPaginas))
+          setEsBackendPaginado(true)
+        } else {
+          setModulos(data)
+          setTotalElementos(data.length)
+          setTotalPaginas(Math.max(1, Math.ceil(data.length / POR_PAGINA)))
+          setEsBackendPaginado(false)
+        }
       })
       .catch(e => {
-        if (activo) setError(
-          e instanceof Error ? e.message : 'No se pudieron cargar los módulos.',
-        )
+        if (activo) {
+          setError(
+            e instanceof Error ? e.message : 'No se pudieron cargar los módulos.',
+          )
+        }
       })
       .finally(() => {
-        if (activo) setLoading(false)
+        if (activo) {
+          setBuscando(false)
+          setLoading(false)
+        }
       })
 
     return () => {
       activo = false
     }
-  }, [accessToken, actualizacion])
+  }, [
+    accessToken,
+    pagina,
+    queryDebounced,
+    estado,
+    sortColumn,
+    sortDirection,
+    actualizacion,
+  ])
 
   useEffect(() => {
     if (!aviso) return
@@ -193,28 +274,20 @@ export function ModulosPage() {
     return () => window.clearTimeout(timer)
   }, [aviso])
 
-  const filtrados = useMemo(() => {
-    const q = query.trim().toLowerCase()
+  const handleSort = (colKey: string) => {
+    if (sortColumn === colKey) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(colKey)
+      setSortDirection('asc')
+    }
+    setPagina(1)
+  }
 
-    return modulos.filter(m => {
-      if (q && !`${m.codigo} ${m.nombre} ${m.ruta} ${m.descripcion ?? ''}`.toLowerCase().includes(q)) {
-        return false
-      }
-      if (estado === 'ACTIVO' && !m.activo) return false
-      if (estado === 'INACTIVO' && m.activo) return false
-      return true
-    })
-  }, [modulos, query, estado])
-
-  const { sortColumn, sortDirection, handleSort, sortedItems } = useTableSort(filtrados, {
-    initialColumn: 'orden',
-    initialDirection: 'asc',
-  })
-
-  const totalPaginas = Math.max(1, Math.ceil(sortedItems.length / POR_PAGINA))
-  const paginaActual = Math.min(pagina, totalPaginas)
-  const inicio = (paginaActual - 1) * POR_PAGINA
-  const visibles = useMemo(() => sortedItems.slice(inicio, inicio + POR_PAGINA), [sortedItems, inicio])
+  const totalElementosFinal = esBackendPaginado ? totalElementos : modulos.length
+  const totalPaginasFinal = esBackendPaginado ? totalPaginas : Math.max(1, Math.ceil(modulos.length / POR_PAGINA))
+  const inicioRango = (pagina - 1) * POR_PAGINA + 1
+  const finRango = Math.min(pagina * POR_PAGINA, totalElementosFinal)
 
   const iconosFiltrados = useMemo(() => {
     const b = busquedaIcono.trim().toLowerCase()
@@ -368,7 +441,7 @@ export function ModulosPage() {
   return (
     <>
       <PageHead
-        title="Módulos y Permisos"
+        title="Módulos de acceso"
         description="Administra los módulos del sistema, sus rutas de navegación y su disponibilidad en roles."
         actions={
           <Button icon="plus" onClick={abrirNuevo}>
@@ -521,10 +594,12 @@ export function ModulosPage() {
           <SearchInput
             placeholder="Buscar módulo por nombre, ruta o descripción…"
             value={query}
-            onChange={e => {
-              setQuery(e.target.value)
+            onChange={e => setQuery(e.target.value)}
+            onClear={() => {
+              setQuery('')
               setPagina(1)
             }}
+            loading={buscando}
             className="w-full sm:max-w-xs"
           />
 
@@ -536,11 +611,11 @@ export function ModulosPage() {
               setPagina(1)
             }}
             options={[
-              { value: '', label: 'Todos los estados' },
-              { value: 'ACTIVO', label: 'Activos' },
-              { value: 'INACTIVO', label: 'Inactivos' },
+              { value: '', label: `Todos los estados` },
+              { value: 'ACTIVO', label: `Activos` },
+              { value: 'INACTIVO', label: `Inactivos` },
             ]}
-            className="w-full sm:w-44"
+            className="w-full sm:w-52"
           />
         </Toolbar>
 
@@ -561,11 +636,11 @@ export function ModulosPage() {
               <TableState
                 colSpan={COLUMNS.length}
                 error={error && !mostrarForm ? error : null}
-                empty={!error && filtrados.length === 0}
+                empty={!error && modulos.length === 0}
                 emptyLabel="No hay módulos registrados."
               />
 
-              {visibles.map(m => (
+              {modulos.map(m => (
                 <tr key={m.id}>
                   <td className="text-center font-bold text-muted">
                     #{m.orden}
@@ -625,13 +700,17 @@ export function ModulosPage() {
           )}
         </Table>
 
-        <TableFoot summary={`Mostrando ${visibles.length} de ${filtrados.length} módulos`}>
-          <Pagination
-            totalPages={totalPaginas}
-            page={paginaActual}
-            onChange={setPagina}
-          />
-        </TableFoot>
+        {totalElementosFinal > 0 && (
+          <TableFoot summary={`Mostrando ${inicioRango}–${finRango} de ${totalElementosFinal} módulos`}>
+            {totalPaginasFinal > 1 && (
+              <Pagination
+                totalPages={totalPaginasFinal}
+                page={pagina}
+                onChange={setPagina}
+              />
+            )}
+          </TableFoot>
+        )}
       </Card>
 
       {/* Modal interactivo de selección de iconos */}
