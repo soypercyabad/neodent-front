@@ -1,10 +1,22 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
+export interface PaginaResponse<T> {
+  contenido: T[]
+  pagina: number
+  tamanoPagina: number
+  totalElementos: number
+  totalPaginas: number
+  esPrimera: boolean
+  esUltima: boolean
+}
+
 export interface ModuloResponse {
   id: number
   idModulo?: number
   codigo: string
   nombre: string
+  descripcion?: string | null
+  ruta?: string
   icono: string | null
   orden: number
   activo?: boolean
@@ -30,6 +42,24 @@ export interface RolResponse {
   modulos?: RolModuloResponse[]
 }
 
+export interface RolResumenEstados {
+  todos: number
+  activos: number
+  inactivos: number
+  sistema: number
+  personalizados: number
+}
+
+export interface RolListarParams {
+  buscar?: string
+  tipo?: string
+  activo?: boolean
+  page?: number
+  size?: number
+  sortBy?: string
+  direction?: 'asc' | 'desc'
+}
+
 export interface RolRequest {
   nombre: string
   descripcion: string | null
@@ -50,6 +80,33 @@ export const rolesApi = {
   listar(accessToken: string, activo?: boolean) {
     const query = activo === undefined ? '' : `?activo=${activo}`
     return apiRequest<RolResponse[]>(`/api/roles${query}`, { accessToken })
+  },
+
+  listarPaginado(accessToken: string, params: RolListarParams = {}) {
+    const sp = new URLSearchParams()
+    if (params.buscar) sp.set('buscar', params.buscar)
+    if (params.tipo) sp.set('tipo', params.tipo)
+    if (params.activo !== undefined) sp.set('activo', String(params.activo))
+    if (params.page !== undefined) sp.set('page', String(params.page))
+    if (params.size !== undefined) sp.set('size', String(params.size))
+    if (params.sortBy) sp.set('sortBy', params.sortBy)
+    if (params.direction) sp.set('direction', params.direction)
+
+    const qs = sp.toString()
+    return apiRequest<PaginaResponse<RolResponse> | RolResponse[]>(
+      `/api/roles${qs ? `?${qs}` : ''}`,
+      { accessToken },
+    )
+  },
+
+  resumenEstados(accessToken: string, buscar?: string) {
+    const sp = new URLSearchParams()
+    if (buscar) sp.set('buscar', buscar)
+    const qs = sp.toString()
+    return apiRequest<RolResumenEstados>(
+      `/api/roles/resumen-estados${qs ? `?${qs}` : ''}`,
+      { accessToken },
+    )
   },
 
   crear(accessToken: string, data: RolRequest) {
