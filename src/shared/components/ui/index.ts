@@ -43,7 +43,11 @@ export {
   RolesTableSkeleton,
   BlockTypesSkeleton,
   ScheduleBlocksSkeleton,
+  DashboardSkeleton,
+  PatientDashboardSkeleton,
+  LoadingBlock,
 } from './Skeleton'
+export { SessionLoadingScreen } from './SessionLoadingScreen'
 export * from './ProtectedImage'
 export { Toast, type ToastAviso, type ToastVariant } from './Toast'
 export { AnimatedTimePicker } from './AnimatedTimePicker'

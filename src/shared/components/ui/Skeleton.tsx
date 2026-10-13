@@ -470,3 +470,177 @@ export function ScheduleBlocksSkeleton({ count = 4 }: { count?: number }) {
   )
 }
 
+/**
+ * Skeleton completo para el Panel de Control / Dashboard.
+ * Muestra los 4 KPIs principales, 3 gráficos analíticos y tablas de distribución.
+ */
+export function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {/* 4 KPIs principales */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div key={idx} className="rounded-2xl border border-line bg-surface p-5 shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-4 w-28 rounded-md" />
+              <Skeleton className="size-10 rounded-xl" />
+            </div>
+            <Skeleton className="mt-4 h-8 w-28 rounded-lg" />
+            <Skeleton className="mt-2.5 h-3.5 w-36 rounded-md opacity-70" />
+          </div>
+        ))}
+      </div>
+
+      {/* 3 Gráficos Analíticos */}
+      <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, idx) => (
+          <div key={idx} className="rounded-2xl border border-line bg-surface p-5 shadow-xs flex flex-col justify-between h-80">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Skeleton className="h-5 w-36 rounded-md" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="mt-2 h-3.5 w-48 rounded-md opacity-60" />
+            </div>
+            <div className="mt-4 flex items-end gap-2 h-44 w-full pt-4">
+              <Skeleton className="h-2/3 flex-1 rounded-t-lg" />
+              <Skeleton className="h-full flex-1 rounded-t-lg" />
+              <Skeleton className="h-1/2 flex-1 rounded-t-lg" />
+              <Skeleton className="h-4/5 flex-1 rounded-t-lg" />
+              <Skeleton className="h-3/4 flex-1 rounded-t-lg" />
+              <Skeleton className="h-1/3 flex-1 rounded-t-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tablas / Listas de distribución inferior */}
+      <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs">
+          <Skeleton className="h-5 w-40 rounded-md" />
+          <Skeleton className="mt-2 h-3.5 w-52 rounded-md opacity-60" />
+          <div className="mt-5 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-2 border-b border-line/50">
+                <div className="flex items-center gap-2.5 flex-1">
+                  <Skeleton className="size-8 rounded-full" />
+                  <Skeleton className="h-4 w-32 rounded-md" />
+                </div>
+                <Skeleton className="h-4 w-16 rounded-md" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs">
+          <Skeleton className="h-5 w-44 rounded-md" />
+          <Skeleton className="mt-2 h-3.5 w-56 rounded-md opacity-60" />
+          <div className="mt-5 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-2 border-b border-line/50">
+                <Skeleton className="h-4 w-28 rounded-md" />
+                <Skeleton className="h-3 w-40 rounded-full" />
+                <Skeleton className="h-4 w-12 rounded-md" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Componente interactivo para secciones cargando de manera compacta pero atractiva.
+ */
+export function LoadingBlock({
+  message = 'Cargando información…',
+  submessage,
+  className,
+}: {
+  message?: string
+  submessage?: string
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-col items-center justify-center p-8 rounded-2xl border border-line bg-surface shadow-xs text-center', className)}>
+      <div className="relative mb-3.5">
+        <div className="size-10 rounded-full border-3 border-brand/20 border-t-brand animate-spin" />
+        <div className="absolute inset-0 size-10 rounded-full bg-brand/5 blur-sm -z-10 animate-pulse" />
+      </div>
+      <p className="text-sm font-semibold text-ink">{message}</p>
+      {submessage && <p className="text-xs text-muted mt-1">{submessage}</p>}
+    </div>
+  )
+}
+
+/**
+ * Skeleton para el Dashboard del Paciente.
+ */
+export function PatientDashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Próxima cita destacada placeholder */}
+      <div className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3 flex-1">
+            <Skeleton className="h-5 w-36 rounded-full" />
+            <Skeleton className="h-6 w-64 rounded-lg" />
+            <div className="flex flex-wrap gap-4 pt-1">
+              <Skeleton className="h-4 w-40 rounded-md" />
+              <Skeleton className="h-4 w-32 rounded-md" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-32 rounded-xl" />
+          </div>
+        </div>
+      </div>
+
+      {/* Accesos rápidos */}
+      <div className="space-y-3">
+        <Skeleton className="h-5 w-48 rounded-md" />
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-start gap-4 rounded-2xl border border-line bg-surface p-4 shadow-xs">
+              <Skeleton className="size-11 rounded-xl shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32 rounded-md" />
+                <Skeleton className="h-3 w-48 rounded-md opacity-60" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Contenido inferior: Citas y recordatorios */}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs space-y-4">
+          <Skeleton className="h-5 w-40 rounded-md" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-4 py-3 border-b border-line/60">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-10 rounded-full" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-36 rounded-md" />
+                    <Skeleton className="h-3 w-28 rounded-md opacity-60" />
+                  </div>
+                </div>
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs space-y-3">
+          <Skeleton className="h-5 w-32 rounded-md" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl opacity-70" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+

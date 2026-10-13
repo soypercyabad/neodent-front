@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import type { Role } from '@/domain/identity'
+import { SessionLoadingScreen } from '@/shared/components/ui'
 import { useAuth } from './model/useAuth'
 
 interface RequireAuthProps {
@@ -12,11 +13,7 @@ export function RequireAuth({ roles, module }: RequireAuthProps) {
   const location = useLocation()
 
   if (isLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center text-ink-soft">
-        Cargando sesión…
-      </div>
-    )
+    return <SessionLoadingScreen />
   }
 
   if (!user) {

@@ -22,6 +22,7 @@ import {
   Avatar,
   Badge,
   Card,
+  DashboardSkeleton,
   Icon,
   PageHead,
   RowActions,
@@ -544,12 +545,7 @@ export function DashboardPage() {
       />
 
       {loading ? (
-        <div className="flex h-56 items-center justify-center rounded-2xl border border-line bg-surface">
-          <div className="flex items-center gap-2.5 text-sm text-muted">
-            <Icon name="spinner" size={20} className="animate-spin text-brand" />
-            <span>Cargando indicadores en tiempo real…</span>
-          </div>
-        </div>
+        <DashboardSkeleton />
       ) : error ? (
         <div className="rounded-2xl border border-line bg-surface p-6 text-center">
           <p className="text-sm text-danger">{error}</p>

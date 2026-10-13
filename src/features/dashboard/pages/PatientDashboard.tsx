@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Badge, Button, Card, Icon } from '@/shared/components/ui'
+import { Badge, Button, Card, Icon, PatientDashboardSkeleton } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { dashboardApi, type PatientDashboardCita, type PatientDashboardData } from '../api/dashboardApi'
 
@@ -352,12 +352,7 @@ export function PatientDashboard() {
       </motion.header>
 
       {loading ? (
-        <div className="flex h-48 items-center justify-center rounded-2xl border border-line bg-surface">
-          <div className="flex items-center gap-2 text-sm text-muted">
-            <Icon name="spinner" size={18} className="animate-spin text-brand" />
-            <span>Cargando tus citas y atenciones…</span>
-          </div>
-        </div>
+        <PatientDashboardSkeleton />
       ) : error ? (
         <div className="rounded-2xl border border-line bg-surface p-6 text-center">
           <p className="text-sm text-danger">{error}</p>

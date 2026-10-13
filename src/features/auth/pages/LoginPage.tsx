@@ -1,5 +1,5 @@
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Card } from '@/shared/components/ui'
+import { Card, SessionLoadingScreen } from '@/shared/components/ui'
 import { LoginForm } from '../components/LoginForm'
 import { useAuth } from '../model/useAuth'
 import type { Credentials } from '../model/auth.types'
@@ -16,11 +16,7 @@ export function LoginPage() {
   const from: string = location.state?.from?.pathname ?? HOME
 
   if (isLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center text-ink-soft">
-        Cargando sesión...
-      </div>
-    )
+    return <SessionLoadingScreen />
   } 
 
   if (user) {
