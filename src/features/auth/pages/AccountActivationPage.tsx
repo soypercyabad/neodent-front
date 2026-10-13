@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Alert, AnimatedSelect, Button, Field, FieldCheck, FieldError, Icon, Input, OtpInput } from '@/shared/components/ui'
+import { AnimatePresence } from 'motion/react'
+import { Alert, AnimatedSelect, Button, Field, FieldCheck, FieldError, Icon, Input, OtpInput, PasswordRequirements } from '@/shared/components/ui'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { authApi } from '../api/authApi'
-import { MIN_PASSWORD } from '@/shared/lib/validation'
+import { MIN_PASSWORD, validatePassword } from '@/shared/lib/validation'
 import { ActivationCard } from '../components/ActivationCard'
 import { SecurityVerification } from '../components/SecurityVerification'
 
@@ -50,6 +51,7 @@ export function AccountActivationPage({ type }: Props) {
   const [codigo, setCodigo] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordFocused, setPasswordFocused] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -92,11 +94,11 @@ export function AccountActivationPage({ type }: Props) {
     DOCUMENT_DELAY,
   )
 
-  const passwordFormatoValido =
-    password.length >= MIN_PASSWORD && password.length <= 100
+  const passValidation = validatePassword(password)
+  const passwordFormatoValido = passValidation.isValid
 
   const confirmFormatoValido =
-    !!confirmPassword && confirmPassword === password
+    !!confirmPassword && confirmPassword === password && passwordFormatoValido
 
   const passwordConfirmado = useDelayedValid(
     passwordFormatoValido,
@@ -307,12 +309,16 @@ export function AccountActivationPage({ type }: Props) {
 
     const nextErrors: Record<string, string> = {}
 
-    if (password.length < MIN_PASSWORD || password.length > 100)
+    const passValidation = validatePassword(password)
+    if (!passValidation.isValid)
       nextErrors.password =
-        `La contraseña debe tener entre ${MIN_PASSWORD} y 100 caracteres.`
+        'La contraseña no cumple con los requisitos de seguridad requeridos.'
 
-    if (!confirmPassword || confirmPassword !== password)
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = 'Confirma tu contraseña.'
+    } else if (confirmPassword !== password) {
       nextErrors.confirmPassword = 'Las contraseñas no coinciden.'
+    }
 
     setFieldErrors(nextErrors)
 
@@ -621,6 +627,8 @@ export function AccountActivationPage({ type }: Props) {
               placeholder="Crea tu contraseña"
               value={password}
               disabled={loading}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
               onChange={event => {
                 setPassword(event.target.value)
                 clearError('password')
@@ -652,6 +660,12 @@ export function AccountActivationPage({ type }: Props) {
               }
             />
           </Field>
+
+          <AnimatePresence>
+            {(passwordFocused || password.length > 0 || fieldErrors.password) && (
+              <PasswordRequirements password={password} />
+            )}
+          </AnimatePresence>
 
           <Field
             label="Confirmar contraseña"
@@ -702,7 +716,7 @@ export function AccountActivationPage({ type }: Props) {
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || !passwordFormatoValido || !confirmFormatoValido}
             className="h-12 w-full min-w-0 justify-center"
           >
             {loading
