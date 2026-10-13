@@ -50,12 +50,12 @@ const COLUMNS_VERSIONES: Column[] = [
 ]
 
 const COLUMNS_ACEPTACIONES: Column[] = [
-  { key: 'numeroDocumento', label: 'Documento', align: 'left' },
-  { key: 'nombreCompleto', label: 'Usuario', align: 'left' },
-  { key: 'versionTerminos', label: 'Versión Firmada', align: 'center' },
+  { key: 'usuario', label: 'Usuario', align: 'left' },
+  { key: 'terminoFirmado', label: 'Documento', align: 'left' },
+  { key: 'version', label: 'Version', align: 'center' },
   { key: 'dispositivo', label: 'Dispositivo', align: 'center' },
   { key: 'ip', label: 'Dirección IP', align: 'left' },
-  { key: 'aceptadoEn', label: 'Fecha de Aceptación', align: 'left' },
+  { key: 'fechaAceptacion', label: 'Fecha de Aceptación', align: 'left' },
 ]
 
 const POR_PAGINA = 10
@@ -101,13 +101,9 @@ export function AdminTermsPage() {
   const [errorAceptaciones, setErrorAceptaciones] = useState('')
   const [busquedaAceptaciones, setBusquedaAceptaciones] = useState('')
   const [busquedaDebouncedAceptaciones, setBusquedaDebouncedAceptaciones] = useState('')
-  const [filtroVersionAceptacion, setFiltroVersionAceptacion] = useState('')
   const [paginaAceptaciones, setPaginaAceptaciones] = useState(1)
   const [totalElementosAceptaciones, setTotalElementosAceptaciones] = useState(0)
   const [totalPaginasAceptaciones, setTotalPaginasAceptaciones] = useState(1)
-
-  // Catálogo completo de versiones (para el selector de auditoría y cálculos)
-  const [catalogoVersiones, setCatalogoVersiones] = useState<string[]>([])
 
   // Toast aviso
   const [aviso, setAviso] = useState<ToastAviso | null>(null)
@@ -138,7 +134,7 @@ export function AdminTermsPage() {
     return () => window.clearTimeout(timer)
   }, [busquedaVersiones])
 
-  // DEBOUNCE BÚSQUEDA ACEPTACIONES
+  // DEBOUNCE BÚSQUEDA ACEPTACIONES (POR NÚMERO DE DOCUMENTO)
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setBusquedaDebouncedAceptaciones(busquedaAceptaciones)
@@ -167,11 +163,6 @@ export function AdminTermsPage() {
       setVersiones(data.contenido)
       setTotalElementosVersiones(data.totalElementos)
       setTotalPaginasVersiones(Math.max(1, data.totalPaginas))
-
-      // Guardar lista única de versiones para selector
-      if (catalogoVersiones.length === 0 && data.contenido.length > 0) {
-        setCatalogoVersiones(Array.from(new Set(data.contenido.map(v => v.version))))
-      }
     } catch (e) {
       setErrorVersiones(e instanceof Error ? e.message : 'No se pudieron cargar las versiones.')
     } finally {
@@ -179,7 +170,7 @@ export function AdminTermsPage() {
     }
   }
 
-  // CARGAR ACEPTACIONES PAGINADAS
+  // CARGAR ACEPTACIONES PAGINADAS (BÚSQUEDA EXCLUSIVA POR NÚMERO DE DOCUMENTO)
   const cargarAceptaciones = async () => {
     if (!accessToken) return
     try {
@@ -188,7 +179,6 @@ export function AdminTermsPage() {
 
       const data = await legalApi.listarAceptacionesPaginado(accessToken, {
         buscar: busquedaDebouncedAceptaciones.trim() || undefined,
-        version: filtroVersionAceptacion.trim() || undefined,
         page: paginaAceptaciones - 1,
         size: POR_PAGINA,
       })
@@ -203,18 +193,6 @@ export function AdminTermsPage() {
     }
   }
 
-  // Cargar catálogo de versiones completo una vez para selector de aceptaciones
-  useEffect(() => {
-    if (!accessToken) return
-    legalApi.listarVersiones(accessToken)
-      .then(todas => {
-        setCatalogoVersiones(Array.from(new Set(todas.map(v => v.version))))
-      })
-      .catch(() => {
-        // Fallback silencioso
-      })
-  }, [accessToken])
-
   // REACCIONAR A CAMBIOS DE FILTROS EN VERSIONES
   useEffect(() => {
     if (tabActual === 'versiones') {
@@ -227,7 +205,7 @@ export function AdminTermsPage() {
     if (tabActual === 'aceptaciones') {
       cargarAceptaciones()
     }
-  }, [accessToken, tabActual, busquedaDebouncedAceptaciones, filtroVersionAceptacion, paginaAceptaciones])
+  }, [accessToken, tabActual, busquedaDebouncedAceptaciones, paginaAceptaciones])
 
   useEffect(() => {
     if (!aviso) return
@@ -260,7 +238,7 @@ export function AdminTermsPage() {
 
   const handleVerDocumento = async (item: TerminosCondicionesItem) => {
     try {
-      await legalApi.abrirDocumento(item.id, accessToken || undefined)
+      await legalApi.abrirDocumento(item.id, item.urlVisualizar)
     } catch {
       setAviso({ tipo: 'error', texto: 'No se pudo abrir el documento PDF de términos y condiciones.' })
     }
@@ -423,13 +401,6 @@ export function AdminTermsPage() {
       return fechaStr
     }
   }
-
-  const opcionesVersionesAceptacion = useMemo(() => {
-    return [
-      { value: '', label: 'Todas las versiones' },
-      ...catalogoVersiones.map(v => ({ value: v, label: `Versión ${v}` })),
-    ]
-  }, [catalogoVersiones])
 
   const inicioVer = (paginaVersiones - 1) * POR_PAGINA
   const inicioAcep = (paginaAceptaciones - 1) * POR_PAGINA
@@ -605,9 +576,6 @@ export function AdminTermsPage() {
                 Publica, actualiza y administra las versiones de los documentos legales disponibles para los usuarios.
               </p>
             </div>
-            <span className="text-xs font-semibold text-brand bg-brand-soft px-3 py-1 rounded-full whitespace-nowrap self-start sm:self-auto">
-              {totalElementosVersiones} {totalElementosVersiones === 1 ? 'versión registrada' : 'versiones registradas'}
-            </span>
           </div>
 
           <Toolbar>
@@ -733,25 +701,12 @@ export function AdminTermsPage() {
 
           <Toolbar>
             <SearchInput
-              placeholder="Buscar por documento, nombre o correo…"
+              placeholder="Buscar por número de documento…"
               value={busquedaAceptaciones}
               onChange={e => setBusquedaAceptaciones(e.target.value)}
               onClear={() => setBusquedaAceptaciones('')}
-              className="w-full sm:min-w-64 sm:flex-1"
+              className="w-full sm:min-w-64 sm:max-w-md"
             />
-
-            {opcionesVersionesAceptacion.length > 1 && (
-              <AnimatedSelect
-                label="Versión"
-                value={filtroVersionAceptacion}
-                onChange={val => {
-                  setFiltroVersionAceptacion(val)
-                  setPaginaAceptaciones(1)
-                }}
-                options={opcionesVersionesAceptacion}
-                className="w-full sm:w-48"
-              />
-            )}
           </Toolbar>
 
           <Table columns={COLUMNS_ACEPTACIONES}>
@@ -770,39 +725,31 @@ export function AdminTermsPage() {
                   const disp = detectarDispositivo(item.agenteUsuario)
                   return (
                     <tr key={item.id}>
-                      {/* DOCUMENTO DE IDENTIDAD REAL */}
+                      {/* USUARIO */}
                       <td>
                         <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-alt text-ink-soft shrink-0">
-                            <Icon name="idCard" size={15} />
+                          <span className="font-mono text-xs font-bold text-ink">
+                            {item.tipoDocumento || 'DNI'}. 
+                            {item.numeroDocumento && item.numeroDocumento.trim() !== '' && item.numeroDocumento !== '-'
+                              ? item.numeroDocumento
+                              : 'No registrado'}
                           </span>
-                          <div>
-                            <span className="font-mono text-xs font-bold text-ink block">
-                              {item.numeroDocumento && item.numeroDocumento.trim() !== '' && item.numeroDocumento !== '-'
-                                ? item.numeroDocumento
-                                : 'No registrado'}
-                            </span>
-                            <span className="text-[10px] text-muted block">Doc. Identidad</span>
-                          </div>
                         </div>
                       </td>
 
-                      {/* TITULAR / NOMBRE COMPLETO Y CORREO */}
+                      {/* TÉRMINO FIRMADO */}
                       <td>
-                        <div className="font-bold text-ink text-xs">{item.nombreCompleto}</div>
-                        <div className="text-[11px] text-muted truncate max-w-[240px]" title={item.correo}>
-                          {item.correo}
-                        </div>
+                        <div className="font-semibold text-xs text-ink">{item.terminoFirmado}</div>
                       </td>
 
-                      {/* VERSIÓN DE TÉRMINOS ACEPTADA */}
+                      {/* VERSIÓN */}
                       <td className="text-center whitespace-nowrap">
-                        <span className="font-mono text-xs font-semibold bg-alt text-ink px-2.5 py-0.5 rounded border border-line">
-                          {item.versionTerminos}
+                        <span className="font-mono text-xs font-semibold bg-brand-soft text-brand px-2.5 py-0.5 rounded border border-brand/20">
+                          {item.version}
                         </span>
                       </td>
 
-                      {/* DISPOSITIVO DETECTADO (MÓVIL / ESCRITORIO O - SI NO ESTÁ REGISTRADO) */}
+                      {/* DISPOSITIVO */}
                       <td className="text-center whitespace-nowrap">
                         <div className="flex justify-center">
                           {disp ? (
@@ -827,9 +774,9 @@ export function AdminTermsPage() {
                         )}
                       </td>
 
-                      {/* FECHA Y HORA DE ACEPTACIÓN */}
+                      {/* FECHA DE ACEPTACIÓN */}
                       <td className="text-xs text-muted whitespace-nowrap">
-                        {formatoFecha(item.aceptadoEn)}
+                        {formatoFecha(item.fechaAceptacion)}
                       </td>
                     </tr>
                   )

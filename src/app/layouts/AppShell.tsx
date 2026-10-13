@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { IconButton } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
+import { TermsConsentModal } from '@/features/legal/components/TermsConsentModal'
 
 export function AppShell() {
   const { user, logout } = useAuth()
@@ -165,6 +166,9 @@ export function AppShell() {
           )}
         </main>
       </div>
+
+      {/* Modal obligatorio e ineludible de consentimiento de términos para pacientes */}
+      <TermsConsentModal />
     </div>
   )
 }

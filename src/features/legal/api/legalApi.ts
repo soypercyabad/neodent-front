@@ -30,15 +30,13 @@ export interface TerminosInfoResponse {
 
 export interface AceptacionTerminosItem {
   id: number
-  usuarioId: number
-  correo: string
-  nombreCompleto: string
+  tipoDocumento: string
   numeroDocumento: string
-  versionTerminos: string
-  tituloTerminos: string
-  aceptadoEn: string
+  terminoFirmado: string
+  version: string
   ip?: string
   agenteUsuario?: string
+  fechaAceptacion: string
 }
 
 export interface PaginaResponse<T> {
@@ -51,6 +49,17 @@ export interface PaginaResponse<T> {
   esUltima: boolean
 }
 
+export interface TerminoPendienteItem {
+  id: number
+  titulo: string
+  urlVisualizar?: string
+}
+
+export interface TerminosPendientesResponse {
+  tienePendiente: boolean
+  terminos: TerminoPendienteItem[]
+}
+
 export interface TerminosListarParams {
   buscar?: string
   activo?: boolean
@@ -60,43 +69,26 @@ export interface TerminosListarParams {
 
 export interface AceptacionesListarParams {
   buscar?: string
-  version?: string
   page?: number
   size?: number
 }
 
 export const legalApi = {
   getUrlDescarga(id?: number): string {
-    if (id) return `${API_BASE_URL}/api/terminos-condiciones/admin/${id}/ver`
+    if (id) return `${API_BASE_URL}/api/terminos-condiciones/${id}/ver`
     return `${API_BASE_URL}/api/terminos-condiciones`
   },
 
-  async abrirDocumento(id?: number, accessToken?: string): Promise<void> {
-    if (!id) {
-      window.open(`${API_BASE_URL}/api/terminos-condiciones`, '_blank')
+  abrirDocumento(id?: number, urlVisualizar?: string): void {
+    if (urlVisualizar && !urlVisualizar.includes('cloudflarestorage.com')) {
+      const finalUrl = urlVisualizar.startsWith('http') ? urlVisualizar : `${API_BASE_URL}${urlVisualizar}`
+      window.open(finalUrl, '_blank')
       return
     }
-
-    try {
-      const headers: Record<string, string> = {}
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`
-      }
-      const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/${id}/ver`, {
-        headers,
-      })
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
-
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
-      window.open(blobUrl, '_blank')
-    } catch {
-      // Fallback
-      window.open(`${API_BASE_URL}/api/terminos-condiciones/admin/${id}/ver`, '_blank')
-    }
+    const finalUrl = id
+      ? `${API_BASE_URL}/api/terminos-condiciones/${id}/ver`
+      : `${API_BASE_URL}/api/terminos-condiciones`
+    window.open(finalUrl, '_blank')
   },
 
   async obtenerInfoActivo(): Promise<TerminosInfoResponse> {
@@ -255,7 +247,6 @@ export const legalApi = {
   ): Promise<PaginaResponse<AceptacionTerminosItem>> {
     const q = new URLSearchParams()
     if (params.buscar) q.append('buscar', params.buscar)
-    if (params.version) q.append('version', params.version)
     q.append('page', String(params.page ?? 0))
     q.append('size', String(params.size ?? 10))
 
@@ -265,6 +256,43 @@ export const legalApi = {
       },
     })
     if (!res.ok) throw new Error('No se pudo cargar el registro de aceptaciones')
+    return res.json()
+  },
+
+  async verificarPendiente(accessToken: string): Promise<TerminosPendientesResponse> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/pendiente`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    if (!res.ok) {
+      return { tienePendiente: false, terminos: [] }
+    }
+    const data = await res.json()
+    const terminosList: TerminoPendienteItem[] = Array.isArray(data.terminos)
+      ? data.terminos
+      : data.terminos
+      ? [data.terminos]
+      : []
+    return {
+      tienePendiente: Boolean(data.tienePendiente && terminosList.length > 0),
+      terminos: terminosList,
+    }
+  },
+
+  async aceptarTerminos(accessToken: string, terminosId?: number): Promise<{ exito: boolean; mensaje: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/aceptar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(terminosId ? { terminosId } : {}),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      throw new Error(err?.message || 'No se pudo registrar la aceptación de los términos')
+    }
     return res.json()
   },
 }
