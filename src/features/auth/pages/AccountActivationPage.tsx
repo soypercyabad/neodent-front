@@ -4,7 +4,7 @@ import { AnimatePresence } from 'motion/react'
 import { Alert, AnimatedSelect, Button, Field, FieldCheck, FieldError, Icon, Input, OtpInput, PasswordRequirements } from '@/shared/components/ui'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { authApi } from '../api/authApi'
-import { MIN_PASSWORD, validatePassword } from '@/shared/lib/validation'
+import { validatePassword } from '@/shared/lib/validation'
 import { ActivationCard } from '../components/ActivationCard'
 import { SecurityVerification } from '../components/SecurityVerification'
 
