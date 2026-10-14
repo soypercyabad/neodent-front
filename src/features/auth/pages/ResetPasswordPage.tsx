@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Alert, Button, Card, Field, Icon, Input } from '@/shared/components/ui'
+import { Alert, Button, Card, Field, Icon, Input, PasswordRequirements } from '@/shared/components/ui'
+import { validatePassword } from '@/shared/lib/validation'
 import { authApi } from '../api/authApi'
 
 type Estado = 'validando' | 'valido' | 'invalido' | 'completado'
@@ -16,6 +17,7 @@ export function ResetPasswordPage() {
 
   const [contrasena, setContrasena] = useState('')
   const [confirmacion, setConfirmacion] = useState('')
+  const [contrasenaFocused, setContrasenaFocused] = useState(false)
 
   const [mostrarContrasena, setMostrarContrasena] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -56,8 +58,14 @@ export function ResetPasswordPage() {
 
     if (loading) return
 
-    if (contrasena.length < 8 || contrasena.length > 72) {
-      setError('La contraseña debe tener entre 8 y 72 caracteres.')
+    const passValidation = validatePassword(contrasena)
+    if (!passValidation.isValid) {
+      setError('La contraseña no cumple con los requisitos de seguridad requeridos.')
+      return
+    }
+
+    if (!confirmacion) {
+      setError('Confirma tu nueva contraseña.')
       return
     }
 
@@ -188,12 +196,20 @@ export function ResetPasswordPage() {
                   disabled={loading}
                   minLength={8}
                   maxLength={72}
+                  onFocus={() => setContrasenaFocused(true)}
+                  onBlur={() => setContrasenaFocused(false)}
                   onChange={(event) => {
                     setContrasena(event.target.value)
                     setError(null)
                   }}
                 />
               </Field>
+
+              <AnimatePresence>
+                {(contrasenaFocused || contrasena.length > 0) && (
+                  <PasswordRequirements password={contrasena} />
+                )}
+              </AnimatePresence>
 
               <Field label="Confirmar contraseña">
                 <Input
