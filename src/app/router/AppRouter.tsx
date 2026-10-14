@@ -24,6 +24,7 @@ import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { PATIENT_ROLES, STAFF_ROLES, type Role } from '@/domain/identity'
 import { SchedulesPage, ScheduleHistoryPage, ScheduleBlocksPage, BlockTypesPage } from '@/features/schedules'
 import { AdminTermsPage } from '@/features/legal'
+import { ConfiguracionRecordatoriosPage } from '@/features/notificaciones/pages/ConfiguracionRecordatoriosPage'
 
 const ADMIN_ROLES: readonly Role[] = ['Administrador']
 const ADMIN_RECEPTION_ROLES: readonly Role[] = ['Administrador', 'Recepcionista']
@@ -101,6 +102,9 @@ export function AppRouter() {
           </Route>
           <Route element={<RequireAuth module="LEGALES" roles={ADMIN_ROLES} />}>
             <Route path="/terminos-admin" element={<AdminTermsPage />} />
+          </Route>
+          <Route element={<RequireAuth roles={ADMIN_ROLES} />}>
+            <Route path="/configuracion/recordatorios" element={<ConfiguracionRecordatoriosPage />} />
           </Route>
 
           {/* Portal del paciente */}

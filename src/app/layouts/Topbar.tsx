@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { useAuth } from '@/features/auth'
-import { Avatar, Icon, IconButton, Tooltip } from '@/shared/components/ui'
+import { Avatar, IconButton, Tooltip } from '@/shared/components/ui'
+import { NotificationsDropdown } from '@/features/notificaciones/components/NotificationsDropdown'
 
 interface TopbarProps {
   onMenuClick: () => void
@@ -84,16 +85,7 @@ export function Topbar({
 
       {/* Notificaciones y perfil */}
       <div className="flex min-w-0 items-center gap-3 md:gap-4">
-        <Tooltip content="Notificaciones">
-          <button
-            type="button"
-            aria-label="Notificaciones"
-            className="relative grid size-[42px] shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-alt text-ink-soft hover:text-ink transition"
-          >
-            <Icon name="bell" size={20} />
-            <span className="absolute top-2 right-2.5 size-[7px] rounded-full bg-danger" />
-          </button>
-        </Tooltip>
+        <NotificationsDropdown />
 
         {me && (
           <Tooltip content="Ver mi perfil">

@@ -20,6 +20,7 @@ export const MODULE_NAV_MAP: Record<string, NavItem> = {
   SERVICIOS: { label: 'Servicios', icon: 'toothCracked', href: '/servicios' },
   LEGALES: { label: 'Legales', icon: 'file', href: '/terminos-admin' },
   MIS_CITAS: { label: 'Mis Citas', icon: 'citas', href: '/mis-citas' },
+  NOTIFICACIONES: { label: 'Recordatorios', icon: 'bell', href: '/configuracion/recordatorios' },
 }
 
 

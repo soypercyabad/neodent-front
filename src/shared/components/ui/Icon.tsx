@@ -121,6 +121,8 @@ const ICONS = {
   pill: <><path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z" /><line x1="8.5" y1="8.5" x2="15.5" y2="15.5" /></>,
   syringe: <><path d="M18 2l4 4M17 7l3-3M19 9l-9 9H6v-4l9-9M5 19l-3 3M14 4l6 6" /></>,
   lockOpen: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>,
+  flask: <><path d="M10 2v5.5L4.5 18A2 2 0 006.2 21h11.6a2 2 0 001.7-3L14 7.5V2" /><line x1="8.5" y1="2" x2="15.5" y2="2" /><line x1="7" y1="14" x2="17" y2="14" /></>,
+  bellOff: <><path d="M8.7 3A6 6 0 0118 8a21.3 21.3 0 00.6 5M17 17H3s3-2 3-9a6 6 0 01.3-1.8" /><path d="M10.3 21a2 2 0 003.4 0" /><line x1="2" y1="2" x2="22" y2="22" /></>,
 }
 
 export type IconName = keyof typeof ICONS
