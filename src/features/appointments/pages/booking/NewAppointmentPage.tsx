@@ -357,7 +357,6 @@ export function NewAppointmentPage() {
                                   'text-sm font-bold leading-snug transition-colors line-clamp-1',
                                   active ? 'text-brand' : 'text-ink group-hover:text-brand',
                                 )}
-                                title={branch.nombre}
                               >
                                 {branch.nombre}
                               </h3>
@@ -375,10 +374,7 @@ export function NewAppointmentPage() {
                               </div>
                             </div>
 
-                            <p
-                              className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
-                              title={branch.direccion}
-                            >
+                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3">
                               {branch.direccion}
                             </p>
                           </div>
@@ -595,7 +591,6 @@ export function NewAppointmentPage() {
                                     'flex items-center gap-1.5 text-sm font-bold leading-snug transition-colors',
                                     active ? 'text-brand' : 'text-ink group-hover:text-brand',
                                   )}
-                                  title={service.nombre}
                                 >
                                   <span className="truncate">{service.nombre}</span>
                                   {service.destacado && (
@@ -621,10 +616,7 @@ export function NewAppointmentPage() {
 
                             {/* Descripción */}
                             {service.descripcion && (
-                              <p
-                                className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3"
-                                title={service.descripcion}
-                              >
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted sm:line-clamp-3">
                                 {service.descripcion}
                               </p>
                             )}
