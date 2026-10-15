@@ -26,24 +26,36 @@ import {
   type TabItem,
   type ToastAviso,
 } from '@/shared/components/ui'
+import { cn } from '@/shared/lib/cn'
 import { useAuth } from '@/features/auth/model/useAuth'
 import {
   legalApi,
   type TerminosCondicionesItem,
   type AceptacionTerminosItem,
+  type DocumentoLegalTipo,
 } from '../api/legalApi'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 
-type TabType = 'versiones' | 'aceptaciones'
+type TabType = 'tipos' | 'versiones' | 'aceptaciones'
 
 const TABS: readonly TabItem<TabType>[] = [
-  { value: 'versiones', label: 'Gestión de Documentos' },
+  { value: 'tipos', label: 'Tipos de Documentos' },
+  { value: 'versiones', label: 'Gestión de Versiones' },
   { value: 'aceptaciones', label: 'Auditoría de Aceptaciones' },
 ] as const
 
+const COLUMNS_TIPOS: Column[] = [
+  { key: 'codigo', label: 'Código', align: 'left', sortable: true },
+  { key: 'descripcion', label: 'Descripción / Nombre Oficial', align: 'left', sortable: true },
+  { key: 'grupo', label: 'Grupo', align: 'center', sortable: true },
+  { key: 'activo', label: 'Estado', align: 'center', sortable: true },
+  { label: 'Acciones', align: 'center' },
+]
+
 const COLUMNS_VERSIONES: Column[] = [
-  { key: 'version', label: 'Versión', align: 'left', sortable: true },
-  { key: 'titulo', label: 'Tipo', align: 'left', sortable: true },
+  { key: 'tipo', label: 'Tipo de Documento', align: 'left', sortable: true },
+  { key: 'version', label: 'Versión', align: 'center', sortable: true },
+  { key: 'archivo', label: 'Archivo PDF', align: 'left' },
   { key: 'fechaCreacion', label: 'Fecha de Registro', align: 'left', sortable: true },
   { key: 'activo', label: 'Estado', align: 'center', sortable: true },
   { label: 'Acciones', align: 'center' },
@@ -82,33 +94,44 @@ export function AdminTermsPage() {
   const { accessToken } = useAuth()
 
   // Tabs state
-  const [tabActual, setTabActual] = useState<TabType>('versiones')
+  const [tabActual, setTabActual] = useState<TabType>('tipos')
 
-  // Versiones states (Backend Paginado)
+  // Toast aviso
+  const [aviso, setAviso] = useState<ToastAviso | null>(null)
+
+  /* =========================================================
+   * 1. ESTADOS PARA TIPOS DE DOCUMENTOS LEGALES (CATÁLOGO)
+   * ========================================================= */
+  const [tipos, setTipos] = useState<DocumentoLegalTipo[]>([])
+  const [cargandoTipos, setCargandoTipos] = useState(true)
+  const [errorTipos, setErrorTipos] = useState('')
+  const [busquedaTipos, setBusquedaTipos] = useState('')
+
+  // Formulario de tipos (Crear / Editar)
+  const [mostrarFormTipo, setMostrarFormTipo] = useState(false)
+  const [editandoTipo, setEditandoTipo] = useState<DocumentoLegalTipo | null>(null)
+  const [tipoCodigo, setTipoCodigo] = useState('')
+  const [tipoDescripcion, setTipoDescripcion] = useState('')
+  const [tipoGrupo, setTipoGrupo] = useState('1')
+  const [tipoActivo, setTipoActivo] = useState(true)
+  const [guardandoTipo, setGuardandoTipo] = useState(false)
+  const [tipoCambiarEstado, setTipoCambiarEstado] = useState<DocumentoLegalTipo | null>(null)
+
+  /* =========================================================
+   * 2. ESTADOS PARA VERSIONES DE DOCUMENTOS
+   * ========================================================= */
   const [versiones, setVersiones] = useState<TerminosCondicionesItem[]>([])
   const [cargandoVersiones, setCargandoVersiones] = useState(true)
   const [errorVersiones, setErrorVersiones] = useState('')
   const [busquedaVersiones, setBusquedaVersiones] = useState('')
   const [busquedaDebouncedVersiones, setBusquedaDebouncedVersiones] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('')
+  const [filtroTipoCodigo, setFiltroTipoCodigo] = useState<string>('')
   const [paginaVersiones, setPaginaVersiones] = useState(1)
   const [totalElementosVersiones, setTotalElementosVersiones] = useState(0)
   const [totalPaginasVersiones, setTotalPaginasVersiones] = useState(1)
 
-  // Aceptaciones states (Backend Paginado)
-  const [aceptaciones, setAceptaciones] = useState<AceptacionTerminosItem[]>([])
-  const [cargandoAceptaciones, setCargandoAceptaciones] = useState(true)
-  const [errorAceptaciones, setErrorAceptaciones] = useState('')
-  const [busquedaAceptaciones, setBusquedaAceptaciones] = useState('')
-  const [busquedaDebouncedAceptaciones, setBusquedaDebouncedAceptaciones] = useState('')
-  const [paginaAceptaciones, setPaginaAceptaciones] = useState(1)
-  const [totalElementosAceptaciones, setTotalElementosAceptaciones] = useState(0)
-  const [totalPaginasAceptaciones, setTotalPaginasAceptaciones] = useState(1)
-
-  // Toast aviso
-  const [aviso, setAviso] = useState<ToastAviso | null>(null)
-
-  // Expandable form state (Crear / Editar)
+  // Formulario expandible de versión (Subir / Editar)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [editandoItem, setEditandoItem] = useState<TerminosCondicionesItem | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -118,12 +141,52 @@ export function AdminTermsPage() {
   const [version, setVersion] = useState('')
   const [activarInmediato, setActivarInmediato] = useState(true)
 
-  // Confirm dialogs
+  // Metadatos de plantilla dinámica
+  const [idTipoSeleccionado, setIdTipoSeleccionado] = useState<number | undefined>(undefined)
+  const [textoPlantilla, setTextoPlantilla] = useState('Acepto los {0} de NeoDent.')
+  const [linkTexto, setLinkTexto] = useState('Términos y condiciones')
+  const [textoAgrupado, setTextoAgrupado] = useState('los {0} de NeoDent')
+
+  // Confirm dialogs para versión
   const [itemActivar, setItemActivar] = useState<TerminosCondicionesItem | null>(null)
   const [itemEliminar, setItemEliminar] = useState<TerminosCondicionesItem | null>(null)
   const [procesandoAccion, setProcesandoAccion] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* =========================================================
+   * 3. ESTADOS PARA AUDITORÍA DE ACEPTACIONES
+   * ========================================================= */
+  const [aceptaciones, setAceptaciones] = useState<AceptacionTerminosItem[]>([])
+  const [cargandoAceptaciones, setCargandoAceptaciones] = useState(true)
+  const [errorAceptaciones, setErrorAceptaciones] = useState('')
+  const [busquedaAceptaciones, setBusquedaAceptaciones] = useState('')
+  const [busquedaDebouncedAceptaciones, setBusquedaDebouncedAceptaciones] = useState('')
+  const [paginaAceptaciones, setPaginaAceptaciones] = useState(1)
+  const [totalElementosAceptaciones, setTotalElementosAceptaciones] = useState(0)
+  const [totalPaginasAceptaciones, setTotalPaginasAceptaciones] = useState(1)
+
+  // Cargar catálogo de tipos
+  const cargarTipos = async () => {
+    if (!accessToken) return
+    try {
+      setCargandoTipos(true)
+      setErrorTipos('')
+      const res = await legalApi.listarTodosLosTipos(accessToken)
+      setTipos(res)
+      if (res.length > 0 && !idTipoSeleccionado) {
+        setIdTipoSeleccionado(res[0].id)
+      }
+    } catch (e) {
+      setErrorTipos(e instanceof Error ? e.message : 'No se pudieron cargar los tipos de documentos.')
+    } finally {
+      setCargandoTipos(false)
+    }
+  }
+
+  useEffect(() => {
+    cargarTipos()
+  }, [accessToken])
 
   // DEBOUNCE BÚSQUEDA VERSIONES
   useEffect(() => {
@@ -170,7 +233,7 @@ export function AdminTermsPage() {
     }
   }
 
-  // CARGAR ACEPTACIONES PAGINADAS (BÚSQUEDA EXCLUSIVA POR NÚMERO DE DOCUMENTO)
+  // CARGAR ACEPTACIONES PAGINADAS
   const cargarAceptaciones = async () => {
     if (!accessToken) return
     try {
@@ -193,19 +256,15 @@ export function AdminTermsPage() {
     }
   }
 
-  // REACCIONAR A CAMBIOS DE FILTROS EN VERSIONES
   useEffect(() => {
-    if (tabActual === 'versiones') {
+    if (tabActual === 'tipos') {
+      cargarTipos()
+    } else if (tabActual === 'versiones') {
       cargarVersiones()
-    }
-  }, [accessToken, tabActual, busquedaDebouncedVersiones, filtroEstado, paginaVersiones])
-
-  // REACCIONAR A CAMBIOS DE FILTROS EN ACEPTACIONES
-  useEffect(() => {
-    if (tabActual === 'aceptaciones') {
+    } else if (tabActual === 'aceptaciones') {
       cargarAceptaciones()
     }
-  }, [accessToken, tabActual, busquedaDebouncedAceptaciones, paginaAceptaciones])
+  }, [accessToken, tabActual, busquedaDebouncedVersiones, filtroEstado, paginaVersiones, busquedaDebouncedAceptaciones, paginaAceptaciones])
 
   useEffect(() => {
     if (!aviso) return
@@ -216,13 +275,138 @@ export function AdminTermsPage() {
     return () => window.clearTimeout(timer)
   }, [aviso])
 
+  /* =========================================================
+   * ACCIONES PARA TIPOS DE DOCUMENTO (CATÁLOGO)
+   * ========================================================= */
+  const abrirNuevoTipo = () => {
+    setEditandoTipo(null)
+    setTipoCodigo('')
+    setTipoDescripcion('')
+    setTipoGrupo('1')
+    setTipoActivo(true)
+    setMostrarFormTipo(true)
+    scrollToTopOrElement()
+  }
+
+  const abrirEditarTipo = (t: DocumentoLegalTipo) => {
+    setEditandoTipo(t)
+    setTipoCodigo(t.codigo)
+    setTipoDescripcion(t.descripcion)
+    setTipoGrupo(String(t.grupo ?? 1))
+    setTipoActivo(t.activo)
+    setMostrarFormTipo(true)
+    scrollToTopOrElement()
+  }
+
+  const cerrarFormTipo = () => {
+    setMostrarFormTipo(false)
+    setEditandoTipo(null)
+    setTipoCodigo('')
+    setTipoDescripcion('')
+    setTipoGrupo('1')
+  }
+
+  const handleGuardarTipo = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!accessToken || guardandoTipo) return
+
+    const cod = tipoCodigo.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_')
+    const desc = tipoDescripcion.trim()
+    const grp = parseInt(tipoGrupo, 10) || 1
+
+    if (!editandoTipo && !cod) {
+      setAviso({ tipo: 'error', texto: 'El código del documento legal es obligatorio.' })
+      return
+    }
+    if (!desc) {
+      setAviso({ tipo: 'error', texto: 'La descripción del tipo de documento es obligatoria.' })
+      return
+    }
+
+    try {
+      setGuardandoTipo(true)
+      if (editandoTipo) {
+        await legalApi.editarTipo(accessToken, editandoTipo.id, {
+          descripcion: desc,
+          grupo: grp,
+          activo: tipoActivo,
+        })
+        setAviso({ tipo: 'success', texto: `Tipo de documento ${desc} actualizado exitosamente.` })
+      } else {
+        await legalApi.crearTipo(accessToken, {
+          codigo: cod,
+          descripcion: desc,
+          grupo: grp,
+          activo: tipoActivo,
+        })
+        setAviso({ tipo: 'success', texto: `Tipo de documento ${cod} creado exitosamente.` })
+      }
+      cerrarFormTipo()
+      await cargarTipos()
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo guardar el tipo de documento.' })
+    } finally {
+      setGuardandoTipo(false)
+    }
+  }
+
+  const confirmarToggleEstadoTipo = async () => {
+    if (!tipoCambiarEstado || !accessToken) return
+    try {
+      setProcesandoAccion(true)
+      await legalApi.cambiarEstadoTipo(accessToken, tipoCambiarEstado.id, !tipoCambiarEstado.activo)
+      setAviso({
+        tipo: 'success',
+        texto: `El tipo ${tipoCambiarEstado.codigo} ahora está ${!tipoCambiarEstado.activo ? 'Activo' : 'Inactivo'}.`,
+      })
+      setTipoCambiarEstado(null)
+      await cargarTipos()
+    } catch (err) {
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo actualizar el estado.' })
+      setTipoCambiarEstado(null)
+    } finally {
+      setProcesandoAccion(false)
+    }
+  }
+
+  /* =========================================================
+   * ACCIONES PARA VERSIONES DE DOCUMENTO
+   * ========================================================= */
+  const seleccionarTipo = (tipo: DocumentoLegalTipo) => {
+    setIdTipoSeleccionado(tipo.id)
+    setTitulo(tipo.descripcion)
+    if (tipo.codigo === 'POLITICA_PRIVACIDAD') {
+      setTextoPlantilla('Acepto la {0} y Tratamiento de Datos Personales de NeoDent.')
+      setLinkTexto('Política de privacidad')
+      setTextoAgrupado('la {0} de NeoDent')
+    } else if (tipo.codigo === 'TERMINOS_CONDICIONES') {
+      setTextoPlantilla('Acepto los {0} de uso de NeoDent.')
+      setLinkTexto('Términos y condiciones')
+      setTextoAgrupado('los {0} de NeoDent')
+    } else {
+      setTextoPlantilla('Acepto el {0} de NeoDent.')
+      setLinkTexto(tipo.descripcion)
+      setTextoAgrupado('el {0} de NeoDent')
+    }
+  }
+
   const abrirNuevo = () => {
     setEditandoItem(null)
     setArchivoSeleccionado(null)
-    setTitulo('')
     setVersion(`v${totalElementosVersiones + 1}.0`)
     setActivarInmediato(true)
     setMostrarForm(true)
+
+    if (tipos.length > 0) {
+      const defaultTipo = tipos[0]
+      seleccionarTipo(defaultTipo)
+    } else {
+      setTitulo('Términos y Condiciones del Servicio')
+      setTextoPlantilla('Acepto los {0} de NeoDent.')
+      setLinkTexto('Términos y condiciones')
+      setTextoAgrupado('los {0} de NeoDent')
+    }
+
     scrollToTopOrElement()
   }
 
@@ -231,14 +415,23 @@ export function AdminTermsPage() {
     setArchivoSeleccionado(null)
     setTitulo(item.titulo)
     setVersion(item.version)
+    setTextoPlantilla(item.texto || 'Acepto los {0} de NeoDent.')
+    setLinkTexto(item.linkTexto || item.titulo || 'Términos y condiciones')
+    setTextoAgrupado(item.textoAgrupado || 'los {0} de NeoDent')
     setActivarInmediato(item.activo)
+
+    const tipoEncontrado = tipos.find(t => t.codigo === item.codigoDocumento || t.descripcion === item.titulo)
+    if (tipoEncontrado) {
+      setIdTipoSeleccionado(tipoEncontrado.id)
+    }
+
     setMostrarForm(true)
     scrollToTopOrElement()
   }
 
   const handleVerDocumento = async (item: TerminosCondicionesItem) => {
     try {
-      await legalApi.abrirDocumento(item.id, item.urlVisualizar)
+      legalApi.abrirDocumento(item.id, item.urlVisualizar, item.nombreArchivo || item.titulo)
     } catch {
       setAviso({ tipo: 'error', texto: 'No se pudo abrir el documento PDF de términos y condiciones.' })
     }
@@ -250,6 +443,9 @@ export function AdminTermsPage() {
     setArchivoSeleccionado(null)
     setTitulo('')
     setVersion('')
+    setTextoPlantilla('Acepto los {0} de NeoDent.')
+    setLinkTexto('Términos y condiciones')
+    setTextoAgrupado('los {0} de NeoDent')
   }
 
   const cerrarForm = () => {
@@ -287,7 +483,7 @@ export function AdminTermsPage() {
     }
 
     const versionLimpia = version.trim() || `v${totalElementosVersiones + 1}.0`
-    const tituloLimpio = titulo.trim() || `Términos y Condiciones ${versionLimpia}`
+    const tituloLimpio = titulo.trim() || `Documento Legal ${versionLimpia}`
 
     try {
       guardandoRef.current = true
@@ -313,6 +509,10 @@ export function AdminTermsPage() {
           versionLimpia,
           activarInmediato,
           accessToken,
+          idTipoSeleccionado,
+          textoPlantilla,
+          linkTexto,
+          textoAgrupado
         )
         setAviso({
           tipo: 'success',
@@ -339,7 +539,7 @@ export function AdminTermsPage() {
       await legalApi.cambiarEstado(itemActivar.id, true, accessToken)
       setAviso({
         tipo: 'success',
-        texto: `Versión ${itemActivar.version} activada como la oficial para los pacientes.`,
+        texto: `La versión ${itemActivar.version} (${itemActivar.titulo}) ahora es la versión Activa. Cualquier otra versión de este tipo ha sido desactivada.`,
       })
       setItemActivar(null)
       cargarVersiones()
@@ -360,7 +560,7 @@ export function AdminTermsPage() {
     if (itemEliminar.activo) {
       setAviso({
         tipo: 'error',
-        texto: 'No se puede eliminar la versión oficial activa.',
+        texto: 'No se puede eliminar la versión activa. Para eliminarla, primero activa otra versión de este tipo.',
       })
       setItemEliminar(null)
       return
@@ -402,16 +602,33 @@ export function AdminTermsPage() {
     }
   }
 
+  const tiposFiltrados = tipos.filter(t => {
+    const q = busquedaTipos.trim().toLowerCase()
+    if (!q) return true
+    return t.codigo.toLowerCase().includes(q) || t.descripcion.toLowerCase().includes(q)
+  })
+
+  const versionesFiltradas = versiones.filter(item => {
+    if (!filtroTipoCodigo) return true
+    return item.codigoDocumento === filtroTipoCodigo
+  })
+
   const inicioVer = (paginaVersiones - 1) * POR_PAGINA
   const inicioAcep = (paginaAceptaciones - 1) * POR_PAGINA
+
+  const tipoActual = tipos.find(t => t.id === idTipoSeleccionado)
 
   return (
     <>
       <PageHead
         title="Documentos legales"
-        description="Administra los documentos legales de la plataforma, controla sus versiones y consulta el historial de aceptación de los usuarios."
+        description="Administra los tipos de documentos y contratos, sus versiones activas y consulta el registro de aceptación de los usuarios."
         actions={
-          tabActual === 'versiones' ? (
+          tabActual === 'tipos' ? (
+            <Button icon="plus" onClick={abrirNuevoTipo} disabled={guardandoTipo || procesandoAccion}>
+              Nuevo tipo
+            </Button>
+          ) : tabActual === 'versiones' ? (
             <Button icon="plus" onClick={abrirNuevo} disabled={guardando || procesandoAccion}>
               Subir versión
             </Button>
@@ -424,288 +641,788 @@ export function AdminTermsPage() {
         <Tabs<TabType>
           items={TABS}
           value={tabActual}
-          label="Pestañas de términos y políticas"
+          label="Pestañas de documentos y contratos legales"
           onChange={nuevaTab => {
             setTabActual(nuevaTab)
           }}
         />
       </div>
 
-      {/* Notificaciones Toast flotantes en la esquina inferior derecha */}
+      {/* Notificaciones Toast flotantes */}
       <Toast aviso={aviso} onClose={() => setAviso(null)} />
 
-      {/* FORMULARIO EXPANDIBLE DE SUBIDA / EDICIÓN */}
-      <AnimatePresence>
-        {mostrarForm && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="mb-6 min-w-0 max-w-full"
-          >
-            <Card className="border-brand/30 p-4 sm:p-6 min-w-0 max-w-full overflow-hidden shadow-sm">
-              <div className="mb-4 sm:mb-5 flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base sm:text-lg font-bold text-ink truncate">
-                    {editandoItem ? `Editar versión ${editandoItem.version}` : 'Subir nueva versión de términos'}
-                  </h2>
-                  <p className="mt-1 text-xs sm:text-sm text-muted">
-                    {editandoItem
-                      ? 'Actualiza el nombre, código o reemplaza el PDF oficial en almacenamiento seguro S3.'
-                      : 'Carga el documento PDF directamente al almacenamiento S3/R2 para su publicación oficial.'}
-                  </p>
-                </div>
+      {/* =========================================================
+       * TAB 1: TIPOS DE DOCUMENTOS LEGALES (CATÁLOGO)
+       * ========================================================= */}
+      {tabActual === 'tipos' && (
+        <>
+          {/* FORMULARIO DE TIPO DE DOCUMENTO */}
+          <AnimatePresence>
+            {mostrarFormTipo && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="mb-6 min-w-0 max-w-full"
+              >
+                <Card className="border border-brand/30 shadow-md overflow-hidden">
+                  {/* Encabezado con contraste visual */}
+                  <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Icon name="file" size={18} />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-ink">
+                          {editandoTipo ? `Editar tipo: ${editandoTipo.codigo}` : 'Registrar nuevo tipo de contrato o documento'}
+                        </h2>
+                        <p className="text-xs text-muted">
+                          Define el identificador y nombre oficial del contrato para versionarlo.
+                        </p>
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  aria-label="Cerrar formulario"
-                  onClick={cerrarForm}
-                  disabled={guardando}
-                  className="rounded-lg p-1.5 sm:p-2 text-muted transition hover:bg-alt shrink-0"
-                >
-                  <Icon name="x" size={20} />
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      aria-label="Cerrar formulario"
+                      onClick={cerrarFormTipo}
+                      disabled={guardandoTipo}
+                      className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </div>
 
-              <form onSubmit={handleGuardar} className="grid gap-4 min-w-0 max-w-full">
-                <label className="block min-w-0 max-w-full">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Documento PDF {editandoItem ? '(Opcional para reemplazar)' : <span className="text-danger">*</span>}
-                  </span>
+                  {/* Cuerpo con secciones diferenciadas */}
+                  <form onSubmit={handleGuardarTipo} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                    {/* Panel 1: Parámetros del Catálogo */}
+                    <div className="rounded-xl border border-line bg-alt/30 p-4">
+                      <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3 flex items-center gap-1.5">
+                        <Icon name="lock" size={14} />
+                        1. Identificación y Agrupación
+                      </div>
 
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    ref={fileInputRef}
-                    onChange={handleSeleccionarArchivo}
-                    className="hidden"
-                    id="terminos-pdf-input"
+                      <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
+                        <Field
+                          label="Código del tipo de documento *"
+                          hint="Identificador único en mayúsculas (ej. TERMINOS_CONDICIONES)."
+                        >
+                          <Input
+                            icon="lock"
+                            required
+                            placeholder="Ej. CONTRATO_SERVICIO"
+                            value={tipoCodigo}
+                            onChange={e => setTipoCodigo(e.target.value.toUpperCase())}
+                            disabled={Boolean(editandoTipo) || guardandoTipo}
+                          />
+                        </Field>
+
+                        <Field
+                          label="Grupo de consentimiento"
+                          hint="Permite agrupar contratos en un mismo paso de aceptación."
+                        >
+                          <Input
+                            type="number"
+                            min="1"
+                            max="99"
+                            placeholder="1"
+                            value={tipoGrupo}
+                            onChange={e => setTipoGrupo(e.target.value)}
+                            disabled={guardandoTipo}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+
+                    {/* Panel 2: Nombre descriptivo */}
+                    <div className="rounded-xl border border-line bg-alt/30 p-4">
+                      <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3 flex items-center gap-1.5">
+                        <Icon name="edit" size={14} />
+                        2. Nombre Oficial
+                      </div>
+
+                      <Field
+                        label="Descripción / Nombre oficial *"
+                        hint="Nombre visible para el paciente y en los reportes de auditoría."
+                      >
+                        <Input
+                          icon="file"
+                          required
+                          placeholder="Ej. Contrato de Prestación de Servicios Odontológicos"
+                          value={tipoDescripcion}
+                          onChange={e => setTipoDescripcion(e.target.value)}
+                          disabled={guardandoTipo}
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Panel 3: Estado */}
+                    <div className="rounded-xl border border-brand/20 bg-brand-soft/20 p-4 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-ink block">Estado del tipo de documento</span>
+                        <span className="text-[11px] text-muted block">Habilita o deshabilita este contrato en la plataforma.</span>
+                      </div>
+                      <Checkbox
+                        checked={tipoActivo}
+                        onChange={e => setTipoActivo(e.target.checked)}
+                        label={tipoActivo ? 'Activo' : 'Inactivo'}
+                      />
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-3 border-t border-line">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={cerrarFormTipo}
+                        disabled={guardandoTipo}
+                        className="w-full sm:w-auto"
+                      >
+                        Cancelar
+                      </Button>
+
+                      <Button
+                        type="submit"
+                        disabled={guardandoTipo}
+                        className="w-full sm:w-auto"
+                      >
+                        {guardandoTipo ? 'Guardando…' : editandoTipo ? 'Actualizar tipo' : 'Crear tipo'}
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Card className="min-w-0 max-w-full overflow-hidden">
+            <div className="mb-4">
+              <h2 className="text-base font-bold text-ink">Catálogo de Tipos de Documentos y Contratos</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Define los tipos de contratos legales disponibles. Cada tipo mantiene su historial de versiones, teniendo estrictamente una versión activa a la vez.
+              </p>
+            </div>
+
+            <Toolbar>
+              <SearchInput
+                placeholder="Buscar por código o descripción…"
+                value={busquedaTipos}
+                onChange={e => setBusquedaTipos(e.target.value)}
+                onClear={() => setBusquedaTipos('')}
+                className="w-full sm:min-w-64 sm:flex-1"
+              />
+            </Toolbar>
+
+            <Table columns={COLUMNS_TIPOS}>
+              {cargandoTipos ? (
+                <TableSkeletonRows rows={3} cols={COLUMNS_TIPOS.length} />
+              ) : (
+                <>
+                  <TableState
+                    colSpan={COLUMNS_TIPOS.length}
+                    error={errorTipos}
+                    empty={!errorTipos && tiposFiltrados.length === 0}
+                    emptyLabel="No hay tipos de documentos registrados."
                   />
 
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line hover:border-brand/50 hover:bg-brand-soft/20 cursor-pointer p-3 sm:p-4 transition-colors text-center min-w-0 max-w-full overflow-hidden"
-                  >
-                    <Icon name="file" size={26} className="text-brand shrink-0" />
-                    {archivoSeleccionado ? (
-                      <div className="min-w-0 max-w-full px-2">
-                        <span className="text-sm font-bold text-ink block truncate max-w-[260px] sm:max-w-md mx-auto">{archivoSeleccionado.name}</span>
-                        <span className="text-xs text-brand font-medium block mt-0.5">Archivo seleccionado listo para subir</span>
+                  {tiposFiltrados.map(tipo => (
+                    <tr key={tipo.id}>
+                      <td className="font-mono font-semibold text-xs text-ink whitespace-nowrap">
+                        <Badge tone="blue" className="font-mono text-xs uppercase">
+                          {tipo.codigo}
+                        </Badge>
+                      </td>
+
+                      <td className="font-medium text-ink">
+                        {tipo.descripcion}
+                      </td>
+
+                      <td className="text-center font-mono text-xs text-muted">
+                        {tipo.grupo ?? 1}
+                      </td>
+
+                      <td className="text-center">
+                        <div className="flex justify-center">
+                          <Badge tone={tipo.activo ? 'green' : 'gray'}>
+                            {tipo.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </div>
+                      </td>
+
+                      <ActionsCell align="center">
+                        <RowActions
+                          actions={[
+                            {
+                              label: 'Editar tipo',
+                              icon: 'edit',
+                              onClick: () => abrirEditarTipo(tipo),
+                            },
+                            {
+                              label: tipo.activo ? 'Desactivar tipo' : 'Activar tipo',
+                              icon: tipo.activo ? 'xCircle' : 'checkCircle',
+                              onClick: () => setTipoCambiarEstado(tipo),
+                              variant: tipo.activo ? 'danger' : 'success',
+                              danger: tipo.activo,
+                              dividerBefore: true,
+                            },
+                          ]}
+                        />
+                      </ActionsCell>
+                    </tr>
+                  ))}
+                </>
+              )}
+            </Table>
+          </Card>
+        </>
+      )}
+
+      {/* =========================================================
+       * TAB 2: GESTIÓN DE VERSIONES DE DOCUMENTOS
+       * ========================================================= */}
+      {tabActual === 'versiones' && (
+        <>
+          {/* FORMULARIO DE SUBIDA / EDICIÓN DE VERSIÓN */}
+          <AnimatePresence>
+            {mostrarForm && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="mb-6 min-w-0 max-w-full"
+              >
+                <Card className="border border-brand/30 shadow-md overflow-hidden">
+                  {/* Encabezado con contraste de color */}
+                  <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Icon name="file" size={18} />
                       </div>
-                    ) : editandoItem ? (
-                      <div className="min-w-0 max-w-full px-2">
-                        <span className="text-xs font-bold text-brand hover:underline block break-all text-center">
-                          Archivo actual: {editandoItem.nombreArchivo}
-                        </span>
-                        <span className="text-[11px] text-muted block mt-0.5">Haz clic aquí si deseas subir un PDF de reemplazo</span>
+                      <div>
+                        <h2 className="text-base font-bold text-ink">
+                          {editandoItem ? `Editar versión: ${editandoItem.version}` : 'Subir nueva versión de documento legal'}
+                        </h2>
+                        <p className="text-xs text-muted">
+                          Solo puede haber una versión activa por cada tipo. Al activar una versión, la anterior se desactiva automáticamente.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      aria-label="Cerrar formulario"
+                      onClick={cerrarForm}
+                      disabled={guardando}
+                      className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleGuardar} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                    {/* SECCIÓN 1: SELECCIÓN DEL TIPO DE DOCUMENTO */}
+                    {!editandoItem ? (
+                      <div className="rounded-xl border border-line bg-alt/30 p-4">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-line/60">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Tipo de Contrato o Documento <span className="text-danger">*</span>
+                            </h3>
+                          </div>
+                          {tipoActual && (
+                            <Badge tone="blue" className="font-mono text-[11px]">
+                              Seleccionado: {tipoActual.codigo}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {tipos.length === 0 ? (
+                          <div className="text-xs text-danger font-medium p-2">
+                            No hay tipos de documentos registrados. Ve a la pestaña &ldquo;Tipos de Documentos&rdquo; para crear uno.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {tipos.map(t => {
+                              const isSelected = idTipoSeleccionado === t.id
+                              return (
+                                <div
+                                  key={t.id}
+                                  onClick={() => seleccionarTipo(t)}
+                                  className={cn(
+                                    'flex flex-col text-left p-3 rounded-xl border cursor-pointer transition-all',
+                                    isSelected
+                                      ? 'border-brand bg-brand-soft/50 shadow-xs ring-2 ring-brand'
+                                      : 'border-line hover:border-brand/40 bg-surface'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between gap-1.5 mb-1">
+                                    <span className="font-mono text-xs font-bold text-ink uppercase">
+                                      {t.codigo}
+                                    </span>
+                                    {isSelected ? (
+                                      <span className="flex items-center gap-1 text-[11px] font-bold text-brand">
+                                        <Icon name="check" size={13} />
+                                        Elegido
+                                      </span>
+                                    ) : (
+                                      <Badge tone={t.activo ? 'green' : 'gray'}>
+                                        {t.activo ? 'Activo' : 'Inactivo'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-ink-soft line-clamp-2">{t.descripcion}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="min-w-0 max-w-full px-2">
-                        <span className="text-xs font-bold text-brand hover:underline block">
-                          Haz clic aquí para seleccionar el archivo PDF
-                        </span>
-                        <span className="text-[11px] text-muted block mt-0.5">Tamaño máximo permitido: 10 MB</span>
+                      /* INFORMACIÓN DEL TIPO CUANDO SE EDITA */
+                      <div className="rounded-xl border border-brand/30 bg-brand-soft/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-semibold text-muted block">Tipo de documento asociado:</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge tone="blue" className="font-mono text-xs uppercase">
+                              {editandoItem.codigoDocumento || 'LEGAL'}
+                            </Badge>
+                            <span className="text-sm font-bold text-ink">{editandoItem.titulo}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <span className="text-[11px] text-muted block">Archivo en almacenamiento:</span>
+                          <span className="text-xs font-mono font-semibold text-ink">{editandoItem.nombreArchivo}</span>
+                        </div>
                       </div>
                     )}
-                  </div>
-                </label>
 
-                <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
-                  <Field label="Código de versión *">
-                    <Input
-                      icon="lock"
-                      required
-                      placeholder="Ej. v1.1 o v2.0"
-                      value={version}
-                      onChange={e => setVersion(e.target.value)}
-                      disabled={guardando}
-                    />
-                  </Field>
-
-                  <Field label="Nombre del documento *">
-                    <Input
-                      icon="file"
-                      required
-                      placeholder="Ej. Términos y Condiciones 2026"
-                      value={titulo}
-                      onChange={e => setTitulo(e.target.value)}
-                      disabled={guardando}
-                    />
-                  </Field>
-                </div>
-
-                <div className="rounded-xl border border-line bg-alt/40 p-3 sm:p-3.5 min-w-0 max-w-full">
-                  <label className="flex items-start sm:items-center gap-2.5 cursor-pointer">
-                    <Checkbox
-                      checked={activarInmediato}
-                      onChange={e => setActivarInmediato(e.target.checked)}
-                      disabled={guardando}
-                    />
-                    <div className="text-xs min-w-0 flex-1">
-                      <span className="font-bold text-ink block">Activar como versión oficial</span>
-                      <span className="text-muted block mt-0.5">
-                        Esta versión será la vigente que deberán aceptar los pacientes durante su registro digital.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 border-t border-line pt-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando} className="w-full sm:w-auto">
-                    Cancelar
-                  </Button>
-
-                  <Button type="submit" disabled={guardando || (!editandoItem && !archivoSeleccionado)} className="w-full sm:w-auto">
-                    {guardando ? 'Guardando en S3…' : editandoItem ? 'Guardar cambios' : 'Subir y guardar en S3'}
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* CONTENIDO SEGÚN TAB SELECCIONADA */}
-      {tabActual === 'versiones' ? (
-        <Card className="min-w-0 max-w-full overflow-hidden">
-          <div className="border-b border-line px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h2 className="font-bold text-ink">Gestión de Documentos</h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Publica, actualiza y administra las versiones de los documentos legales disponibles para los usuarios.
-              </p>
-            </div>
-          </div>
-
-          <Toolbar>
-            <SearchInput
-              placeholder="Buscar por código de versión o nombre…"
-              value={busquedaVersiones}
-              onChange={e => setBusquedaVersiones(e.target.value)}
-              onClear={() => setBusquedaVersiones('')}
-              className="w-full sm:min-w-64 sm:flex-1"
-            />
-
-            <AnimatedSelect
-              label="Estado"
-              value={filtroEstado}
-              onChange={val => {
-                setFiltroEstado(val as FiltroEstado)
-                setPaginaVersiones(1)
-              }}
-              options={[
-                { value: '', label: 'Todos los estados' },
-                { value: 'activas', label: 'Activas' },
-                { value: 'inactivas', label: 'Inactivas' },
-              ]}
-              className="w-full sm:w-44"
-            />
-          </Toolbar>
-
-          <Table columns={COLUMNS_VERSIONES}>
-            {cargandoVersiones ? (
-              <TableSkeletonRows rows={POR_PAGINA} cols={COLUMNS_VERSIONES.length} />
-            ) : (
-              <>
-                <TableState
-                  colSpan={COLUMNS_VERSIONES.length}
-                  error={errorVersiones}
-                  empty={!errorVersiones && versiones.length === 0}
-                  emptyLabel="No hay versiones de términos registradas."
-                />
-
-                {versiones.map(item => (
-                  <tr key={item.id}>
-                    <td>
-                      <span className="font-mono font-bold text-xs bg-brand-soft text-brand px-2.5 py-1 rounded-md border border-brand/20">
-                        {item.version}
-                      </span>
-                    </td>
-
-                    <td>
-                      <div className="font-semibold text-xs text-ink">{item.titulo}</div>
-                    </td>
-
-                    <td className="text-xs text-muted whitespace-nowrap">
-                      {formatoFecha(item.fechaCreacion)}
-                    </td>
-
-                    <td className="text-center">
-                      <div className="flex justify-center">
-                        <Badge tone={item.activo ? 'green' : 'gray'}>
-                          {item.activo ? 'Vigente Oficial' : 'Inactiva'}
-                        </Badge>
+                    {/* SECCIÓN 2: ARCHIVO PDF OFICIAL */}
+                    <div className="rounded-xl border border-line bg-alt/30 p-4">
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                          Archivo PDF Oficial {editandoItem ? '(Opcional)' : <span className="text-danger">*</span>}
+                        </h3>
                       </div>
-                    </td>
 
-                    <ActionsCell align="center">
-                      <RowActions
-                        actions={[
-                          {
-                            label: 'Ver documento (PDF)',
-                            icon: 'externalLink',
-                            onClick: () => handleVerDocumento(item),
-                          },
-                          {
-                            label: 'Editar versión',
-                            icon: 'edit',
-                            onClick: () => abrirEditar(item),
-                          },
-                          {
-                            label: 'Activar como oficial',
-                            icon: 'checkCircle',
-                            show: !item.activo,
-                            onClick: () => setItemActivar(item),
-                            variant: 'success',
-                          },
-                          {
-                            label: 'Eliminar de S3',
-                            icon: 'trash',
-                            show: !item.activo,
-                            onClick: () => setItemEliminar(item),
-                            variant: 'danger',
-                          },
-                        ]}
+                      <label className="block min-w-0 max-w-full">
+                        <input
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          ref={fileInputRef}
+                          onChange={handleSeleccionarArchivo}
+                          className="hidden"
+                          id="terminos-pdf-input"
+                        />
+
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className={cn(
+                            'flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 transition-colors text-center cursor-pointer min-w-0 max-w-full overflow-hidden',
+                            archivoSeleccionado
+                              ? 'border-brand bg-brand-soft/40'
+                              : 'border-line hover:border-brand/50 bg-surface hover:bg-hover'
+                          )}
+                        >
+                          <Icon name="file" size={28} className="text-brand shrink-0" />
+                          {archivoSeleccionado ? (
+                            <div className="min-w-0 max-w-full px-2">
+                              <span className="text-sm font-bold text-ink block truncate max-w-[280px] sm:max-w-md mx-auto">
+                                {archivoSeleccionado.name}
+                              </span>
+                              <span className="text-xs text-brand font-semibold block mt-0.5">
+                                Archivo listo para subir ({Math.round(archivoSeleccionado.size / 1024)} KB)
+                              </span>
+                            </div>
+                          ) : editandoItem ? (
+                            <div className="min-w-0 max-w-full px-2">
+                              <span className="text-xs font-bold text-brand hover:underline block break-all text-center">
+                                Archivo actual: {editandoItem.nombreArchivo}
+                              </span>
+                              <span className="text-[11px] text-muted block mt-0.5">
+                                Haz clic aquí si deseas subir un PDF de reemplazo
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="min-w-0 max-w-full px-2">
+                              <span className="text-xs font-bold text-brand hover:underline block">
+                                Haz clic aquí para seleccionar el archivo PDF oficial
+                              </span>
+                              <span className="text-[11px] text-muted block mt-0.5">Formato PDF hasta 10 MB</span>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* SECCIÓN 3: VERSIÓN E IDENTIFICADOR */}
+                    <div className="rounded-xl border border-line bg-alt/30 p-4">
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                          Identificación de la Versión
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
+                        <Field
+                          label="Código de versión *"
+                          hint="Número de versión para auditoría (ej. 1.0, 1.1)."
+                        >
+                          <Input
+                            icon="lock"
+                            required
+                            placeholder="Ej. 1.0 o 2.0"
+                            value={version}
+                            onChange={e => setVersion(e.target.value)}
+                            disabled={guardando}
+                          />
+                        </Field>
+
+                        <Field
+                          label="Nombre descriptivo del documento *"
+                          hint="Nombre visible en la interfaz para los pacientes."
+                        >
+                          <Input
+                            icon="file"
+                            required
+                            placeholder="Ej. Términos y Condiciones del Servicio"
+                            value={titulo}
+                            onChange={e => setTitulo(e.target.value)}
+                            disabled={guardando}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 4: PLANTILLA DINÁMICA DE CONSENTIMIENTO */}
+                    <div className="rounded-xl border border-line bg-alt/30 p-4">
+                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-line/60">
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">4</span>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                            Textos Dinámicos de Consentimiento
+                          </h3>
+                        </div>
+                        <span className="text-xs text-brand font-medium">Usa {'{0}'} para incrustar el enlace</span>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
+                        <Field
+                          label="Plantilla del consentimiento (usa {0})"
+                          hint="El texto {0} se sustituirá por el enlace al documento."
+                        >
+                          <Input
+                            icon="file"
+                            placeholder="Ej. Acepto los {0} de NeoDent."
+                            value={textoPlantilla}
+                            onChange={e => setTextoPlantilla(e.target.value)}
+                            disabled={guardando}
+                          />
+                        </Field>
+
+                        <Field
+                          label="Texto del enlace clickable {0}"
+                          hint="Palabra o frase que abrirá el PDF."
+                        >
+                          <Input
+                            icon="file"
+                            placeholder="Ej. Términos y condiciones"
+                            value={linkTexto}
+                            onChange={e => setLinkTexto(e.target.value)}
+                            disabled={guardando}
+                          />
+                        </Field>
+                      </div>
+
+                      <div className="mt-4">
+                        <Field
+                          label="Texto agrupado (leyenda al pie del modal de consentimiento)"
+                          hint="Aparece al pie del modal de firma de consentimientos."
+                        >
+                          <Input
+                            icon="file"
+                            placeholder="Ej. los {0} de NeoDent"
+                            value={textoAgrupado}
+                            onChange={e => setTextoAgrupado(e.target.value)}
+                            disabled={guardando}
+                          />
+                        </Field>
+                      </div>
+
+                      {/* VISTA PREVIA EN VIVO */}
+                      <div className="rounded-xl border border-brand/30 bg-surface shadow-xs p-4 mt-4">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-brand uppercase tracking-wider mb-2.5">
+                          <Icon name="eye" size={15} />
+                          Vista previa en vivo (así lo verá el paciente):
+                        </div>
+
+                        <div className="bg-alt/40 rounded-lg p-3.5 border border-line">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-4 h-4 rounded border-2 border-brand bg-brand flex items-center justify-center shrink-0 mt-0.5">
+                              <Icon name="check" size={11} className="text-white" />
+                            </div>
+                            <div className="text-xs text-ink font-medium leading-relaxed">
+                              {(() => {
+                                const template = textoPlantilla || 'Acepto los {0} de NeoDent.'
+                                const link = linkTexto || 'Términos y condiciones'
+                                if (template.includes('{0}')) {
+                                  const parts = template.split('{0}')
+                                  return (
+                                    <>
+                                      {parts[0]}
+                                      <span className="text-brand font-bold underline cursor-pointer">
+                                        {link}
+                                      </span>
+                                      {parts[1]}
+                                    </>
+                                  )
+                                }
+                                return <span>{template}</span>
+                              })()}
+                            </div>
+                          </div>
+
+                          {textoAgrupado && (
+                            <div className="mt-2.5 text-[11px] text-muted border-t border-line/60 pt-2 pl-6">
+                              Pie de página: Al dar clic en el botón aceptas{' '}
+                              {textoAgrupado.replace('{0}', linkTexto || 'el documento')}.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 5: PUBLICACIÓN Y ESTADO */}
+                    <div className="rounded-xl border border-brand/20 bg-brand-soft/20 p-4">
+                      <Checkbox
+                        checked={activarInmediato}
+                        onChange={e => setActivarInmediato(e.target.checked)}
+                        label="Marcar como versión Activa"
                       />
-                    </ActionsCell>
-                  </tr>
-                ))}
-              </>
-            )}
-          </Table>
+                      <p className="mt-1 text-xs text-muted pl-6">
+                        Al activar esta versión, reemplazará cualquier versión activa previa de este mismo tipo (regla de una sola versión activa por tipo).
+                      </p>
+                    </div>
 
-          {totalElementosVersiones > 0 && (
-            <TableFoot
-              summary={`Mostrando ${inicioVer + 1}-${Math.min(inicioVer + POR_PAGINA, totalElementosVersiones)} de ${totalElementosVersiones} versiones`}
-            >
-              <Pagination
-                page={paginaVersiones}
-                totalPages={totalPaginasVersiones}
-                onChange={setPaginaVersiones}
-              />
-            </TableFoot>
-          )}
-        </Card>
-      ) : (
-        /* TAB DE AUDITORÍA DE ACEPTACIONES */
-        <Card className="min-w-0 max-w-full overflow-hidden">
-          <div className="border-b border-line px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h2 className="font-bold text-ink">Registro de Aceptaciones y Consentimiento</h2>
+                    {/* BOTONES */}
+                    <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2 border-t border-line">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={cerrarForm}
+                        disabled={guardando}
+                        className="w-full sm:w-auto"
+                      >
+                        Cancelar
+                      </Button>
+
+                      <Button
+                        type="submit"
+                        disabled={guardando}
+                        className="w-full sm:w-auto"
+                      >
+                        {guardando
+                          ? 'Guardando en S3…'
+                          : editandoItem
+                          ? 'Actualizar versión'
+                          : 'Publicar versión'}
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Card className="min-w-0 max-w-full overflow-hidden">
+            <div className="mb-4">
+              <h2 className="text-base font-bold text-ink">Versiones de Documentos Legales</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Consulta y verifica las aceptaciones registradas por los usuarios, garantizando la trazabilidad de cada versión.
+                Publica y administra las versiones de cada documento legal. Solo una versión puede estar Activa por tipo.
               </p>
             </div>
+
+            <Toolbar>
+              <SearchInput
+                placeholder="Buscar por versión o nombre de documento…"
+                value={busquedaVersiones}
+                onChange={e => setBusquedaVersiones(e.target.value)}
+                onClear={() => setBusquedaVersiones('')}
+                className="w-full sm:min-w-64 sm:flex-1"
+              />
+
+              {tipos.length > 0 && (
+                <AnimatedSelect
+                  label="Tipo"
+                  value={filtroTipoCodigo}
+                  onChange={val => setFiltroTipoCodigo(val)}
+                  options={[
+                    { value: '', label: 'Todos los tipos' },
+                    ...tipos.map(t => ({
+                      value: t.codigo,
+                      label: `${t.codigo}`,
+                    })),
+                  ]}
+                  className="w-full sm:w-48"
+                />
+              )}
+
+              <AnimatedSelect
+                label="Estado"
+                value={filtroEstado}
+                onChange={val => {
+                  setFiltroEstado(val as FiltroEstado)
+                  setPaginaVersiones(1)
+                }}
+                options={[
+                  { value: '', label: 'Todos los estados' },
+                  { value: 'activas', label: 'Activos' },
+                  { value: 'inactivas', label: 'Inactivos' },
+                ]}
+                className="w-full sm:w-36"
+              />
+            </Toolbar>
+
+            <Table columns={COLUMNS_VERSIONES}>
+              {cargandoVersiones ? (
+                <TableSkeletonRows rows={POR_PAGINA} cols={COLUMNS_VERSIONES.length} />
+              ) : (
+                <>
+                  <TableState
+                    colSpan={COLUMNS_VERSIONES.length}
+                    error={errorVersiones}
+                    empty={!errorVersiones && versionesFiltradas.length === 0}
+                    emptyLabel="No hay versiones de documentos registradas."
+                  />
+
+                  {versionesFiltradas.map(item => (
+                    <tr key={item.id}>
+                      {/* COLUMNA 1: TIPO DE DOCUMENTO */}
+                      <td className="font-medium text-ink">
+                        <div className="text-xs font-bold text-ink mb-0.5">{item.titulo}</div>
+                        <span className="font-mono text-[11px] text-muted">
+                          {item.codigoDocumento || 'LEGAL'}
+                        </span>
+                      </td>
+
+                      {/* COLUMNA 2: VERSIÓN (LIMPIA, SIN BADGE EXTRAÑO) */}
+                      <td className="text-center">
+                        <span className="font-mono text-xs font-bold text-ink">
+                          {item.version}
+                        </span>
+                      </td>
+
+                      {/* COLUMNA 3: ARCHIVO PDF (COLUMNA DEDICADA) */}
+                      <td>
+                        {item.nombreArchivo ? (
+                          <div
+                            onClick={() => handleVerDocumento(item)}
+                            className="flex items-center gap-1.5 font-mono text-xs text-muted hover:text-brand cursor-pointer transition-colors"
+                            title="Haz clic para ver el documento PDF"
+                          >
+                            <Icon name="file" size={14} className="text-brand shrink-0" />
+                            <span className="truncate max-w-[210px] underline underline-offset-2">
+                              {item.nombreArchivo}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted italic">Sin archivo</span>
+                        )}
+                      </td>
+
+                      {/* COLUMNA 4: FECHA DE REGISTRO */}
+                      <td className="text-xs text-muted whitespace-nowrap">
+                        {formatoFecha(item.fechaCreacion)}
+                      </td>
+
+                      {/* COLUMNA 5: ESTADO */}
+                      <td className="text-center">
+                        <div className="flex justify-center">
+                          <Badge tone={item.activo ? 'green' : 'gray'}>
+                            {item.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </div>
+                      </td>
+
+                      {/* COLUMNA 6: ACCIONES */}
+                      <ActionsCell align="center">
+                        <RowActions
+                          actions={[
+                            {
+                              label: 'Ver documento (PDF)',
+                              icon: 'externalLink',
+                              onClick: () => handleVerDocumento(item),
+                            },
+                            {
+                              label: 'Editar versión',
+                              icon: 'edit',
+                              onClick: () => abrirEditar(item),
+                            },
+                            {
+                              label: 'Activar versión',
+                              icon: 'checkCircle',
+                              show: !item.activo,
+                              onClick: () => setItemActivar(item),
+                              variant: 'success',
+                              dividerBefore: true,
+                            },
+                            {
+                              label: 'Eliminar de S3',
+                              icon: 'trash',
+                              show: !item.activo,
+                              onClick: () => setItemEliminar(item),
+                              variant: 'danger',
+                              danger: true,
+                              dividerBefore: true,
+                            },
+                          ]}
+                        />
+                      </ActionsCell>
+                    </tr>
+                  ))}
+                </>
+              )}
+            </Table>
+
+            {totalElementosVersiones > 0 && (
+              <TableFoot
+                summary={`Mostrando ${inicioVer + 1}-${Math.min(inicioVer + POR_PAGINA, totalElementosVersiones)} de ${totalElementosVersiones} versiones`}
+              >
+                <Pagination
+                  page={paginaVersiones}
+                  totalPages={totalPaginasVersiones}
+                  onChange={setPaginaVersiones}
+                />
+              </TableFoot>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* =========================================================
+       * TAB 3: AUDITORÍA DE ACEPTACIONES
+       * ========================================================= */}
+      {tabActual === 'aceptaciones' && (
+        <Card className="min-w-0 max-w-full overflow-hidden">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-ink">Auditoría de Aceptaciones</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Historial de aceptación de documentos legales por parte de los usuarios, incluyendo trazabilidad de dispositivo e IP.
+            </p>
           </div>
 
           <Toolbar>
             <SearchInput
-              placeholder="Buscar por número de documento…"
+              placeholder="Buscar por DNI o número de documento…"
               value={busquedaAceptaciones}
               onChange={e => setBusquedaAceptaciones(e.target.value)}
               onClear={() => setBusquedaAceptaciones('')}
-              className="w-full sm:min-w-64 sm:max-w-md"
+              className="w-full sm:min-w-64 sm:flex-1"
             />
           </Toolbar>
 
@@ -718,63 +1435,46 @@ export function AdminTermsPage() {
                   colSpan={COLUMNS_ACEPTACIONES.length}
                   error={errorAceptaciones}
                   empty={!errorAceptaciones && aceptaciones.length === 0}
-                  emptyLabel="No hay consentimientos de términos registrados."
+                  emptyLabel="No hay registros de aceptación disponibles."
                 />
 
                 {aceptaciones.map(item => {
                   const disp = detectarDispositivo(item.agenteUsuario)
                   return (
                     <tr key={item.id}>
-                      {/* USUARIO */}
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-ink">
-                            {item.tipoDocumento || 'DNI'}. 
-                            {item.numeroDocumento && item.numeroDocumento.trim() !== '' && item.numeroDocumento !== '-'
-                              ? item.numeroDocumento
-                              : 'No registrado'}
-                          </span>
+                      <td className="whitespace-nowrap">
+                        <div className="text-xs font-mono font-semibold text-ink">
+                          {item.tipoDocumento} {item.numeroDocumento}
                         </div>
                       </td>
 
-                      {/* TÉRMINO FIRMADO */}
-                      <td>
-                        <div className="font-semibold text-xs text-ink">{item.terminoFirmado}</div>
+                      <td className="font-medium text-ink">
+                        {item.terminoFirmado}
                       </td>
 
-                      {/* VERSIÓN */}
-                      <td className="text-center whitespace-nowrap">
-                        <span className="font-mono text-xs font-semibold bg-brand-soft text-brand px-2.5 py-0.5 rounded border border-brand/20">
-                          {item.version}
-                        </span>
+                      <td className="text-center font-mono text-xs font-semibold text-brand">
+                        {item.version}
                       </td>
 
-                      {/* DISPOSITIVO */}
-                      <td className="text-center whitespace-nowrap">
-                        <div className="flex justify-center">
-                          {disp ? (
-                            <Badge tone={disp.tone} className="gap-1.5 py-0.5">
-                              <Icon name={disp.icon} size={12} />
-                              <span>{disp.label}</span>
+                      <td className="text-center">
+                        {disp ? (
+                          <div className="flex justify-center" title={item.agenteUsuario || ''}>
+                            <Badge tone={disp.tone}>
+                              <span className="flex items-center gap-1">
+                                <Icon name={disp.icon} size={12} />
+                                {disp.label}
+                              </span>
                             </Badge>
-                          ) : (
-                            <span className="text-muted italic">-</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* DIRECCIÓN IP */}
-                      <td className="text-xs font-mono text-ink-soft whitespace-nowrap">
-                        {item.ip ? (
-                          <span className="bg-alt/70 px-2 py-0.5 rounded border border-line/60">
-                            {item.ip}
-                          </span>
+                          </div>
                         ) : (
-                          <span className="text-muted italic">-</span>
+                          <span className="text-xs text-muted">-</span>
                         )}
                       </td>
 
-                      {/* FECHA DE ACEPTACIÓN */}
+                      <td className="font-mono text-xs text-muted whitespace-nowrap">
+                        {item.ip || 'No registrada'}
+                      </td>
+
                       <td className="text-xs text-muted whitespace-nowrap">
                         {formatoFecha(item.fechaAceptacion)}
                       </td>
@@ -799,16 +1499,39 @@ export function AdminTermsPage() {
         </Card>
       )}
 
-      {/* DIÁLOGO PARA ACTIVAR COMO OFICIAL */}
+      {/* DIÁLOGO PARA CAMBIAR ESTADO DE TIPO DE DOCUMENTO */}
       <ConfirmDialog
-        open={itemActivar !== null}
-        title="¿Activar versión como oficial?"
+        open={tipoCambiarEstado !== null}
+        title={tipoCambiarEstado?.activo ? '¿Desactivar tipo de documento?' : '¿Activar tipo de documento?'}
         description={
-          itemActivar
-            ? `La versión ${itemActivar.version} (${itemActivar.titulo}) se convertirá en la oficial vigente para todos los pacientes al registrarse.`
+          tipoCambiarEstado
+            ? tipoCambiarEstado.activo
+              ? `¿Estás seguro de desactivar el tipo ${tipoCambiarEstado.codigo}? Las versiones existentes se conservarán pero no se podrán crear nuevas versiones mientras esté inactivo.`
+              : `¿Deseas activar el tipo ${tipoCambiarEstado.codigo} para permitir la gestión y publicación de versiones?`
             : ''
         }
-        confirmLabel={procesandoAccion ? 'Activando…' : 'Activar como oficial'}
+        confirmLabel={
+          procesandoAccion
+            ? 'Guardando…'
+            : tipoCambiarEstado?.activo
+            ? 'Sí, desactivar'
+            : 'Sí, activar'
+        }
+        cancelLabel="Cancelar"
+        onConfirm={confirmarToggleEstadoTipo}
+        onCancel={() => setTipoCambiarEstado(null)}
+      />
+
+      {/* DIÁLOGO PARA ACTIVAR VERSIÓN */}
+      <ConfirmDialog
+        open={itemActivar !== null}
+        title="¿Activar versión de documento legal?"
+        description={
+          itemActivar
+            ? `La versión ${itemActivar.version} (${itemActivar.titulo}) se convertirá en la versión activa para este tipo de documento. Cualquier versión anterior de este mismo tipo pasará automáticamente a estar inactiva.`
+            : ''
+        }
+        confirmLabel={procesandoAccion ? 'Activando…' : 'Activar versión'}
         cancelLabel="Cancelar"
         onConfirm={confirmarActivar}
         onCancel={() => setItemActivar(null)}

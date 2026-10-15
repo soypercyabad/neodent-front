@@ -118,7 +118,8 @@ export function AppointmentDetailPage() {
 
   const volver = esPaciente ? '/mis-citas' : '/citas'
 
-  const citaId = Number(id)
+  const rawId = id?.toUpperCase().startsWith('ND-') ? id.slice(3) : id
+  const citaId = Number(rawId)
   const idValido =
     Number.isSafeInteger(citaId) &&
     citaId > 0
@@ -433,6 +434,58 @@ export function AppointmentDetailPage() {
             </div>
           </Card>
 
+          {/* BANNER DE CITA CANCELADA O NO ASISTIÓ */}
+          {cita.estado?.toUpperCase() === 'CANCELADA' && (
+            <Card className="border border-red-200 bg-red-50/80 p-5 shadow-sm">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-600">
+                  <Icon name="xCircle" size={22} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-red-900">
+                    Cita cancelada
+                  </h3>
+                  <p className="mt-1 text-sm text-red-700">
+                    Esta cita fue cancelada y no se llevará a cabo en la fecha programada.
+                  </p>
+                  <div className="mt-3 rounded-lg border border-red-200/80 bg-white/90 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-red-800">
+                      Motivo de la cancelación
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-ink">
+                      {cita.motivo?.trim() || 'No se especificó un motivo para la cancelación.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {cita.estado?.toUpperCase() === 'NO_ASISTIO' && (
+            <Card className="border border-amber-200 bg-amber-50/80 p-5 shadow-sm">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
+                  <Icon name="user" size={22} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-amber-900">
+                    Cita marcada como no asistió
+                  </h3>
+                  {cita.motivo && (
+                    <div className="mt-3 rounded-lg border border-amber-200/80 bg-white/90 p-3.5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                        Motivo / Observación
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-ink">
+                        {cita.motivo}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* ACCIONES (solo si hay acciones disponibles) */}
           {!esPaciente && tieneAcciones && (
             <Card className="p-5">
@@ -565,6 +618,15 @@ export function AppointmentDetailPage() {
                     titulo="Especialidad"
                     valor={cita.especialidadNombre}
                   />
+
+                  {cita.motivo && (
+                    <div className="sm:col-span-2">
+                      <Dato
+                        titulo={cita.estado?.toUpperCase() === 'CANCELADA' ? 'Motivo de cancelación' : 'Motivo registrado'}
+                        valor={cita.motivo}
+                      />
+                    </div>
+                  )}
                 </dl>
               </Card>
 

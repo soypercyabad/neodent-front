@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { useAuth } from '@/features/auth'
 import { Icon } from '@/shared/components/ui/Icon'
@@ -34,10 +34,11 @@ export function NotificationsDropdown() {
   const [noLeidasTotal, setNoLeidasTotal] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const cargarNotificaciones = async () => {
+  const cargarNotificaciones = useCallback(async (mostrarLoader = false) => {
     if (!accessToken || !user) return
-    setLoading(true)
+    if (mostrarLoader) setLoading(true)
     try {
       const data = await notificacionesApi.getMisNotificaciones(accessToken, 0, 15)
       setNotificaciones(data.notificaciones || [])
@@ -45,26 +46,39 @@ export function NotificationsDropdown() {
     } catch {
       // Silencioso para no interrumpir navegación general
     } finally {
-      setLoading(false)
+      if (mostrarLoader) setLoading(false)
     }
-  }
+  }, [accessToken, user])
 
-  const cargadoRef = useRef(false)
-
-  // Cargar una única vez al iniciar sesión
+  // Cargar notificaciones al cambiar de ruta (ej. volver al Dashboard o navegar por el portal)
   useEffect(() => {
     if (!accessToken || !user) {
-      cargadoRef.current = false
       setNotificaciones([])
       setNoLeidasTotal(0)
       return
     }
 
-    if (!cargadoRef.current) {
-      cargadoRef.current = true
-      cargarNotificaciones()
+    cargarNotificaciones(false)
+  }, [accessToken, user?.id, location.pathname, cargarNotificaciones])
+
+  // Polling periódico cada 60s y refresco cuando el usuario vuelve a enfocar la pestaña
+  useEffect(() => {
+    if (!accessToken || !user) return
+
+    const handleFocus = () => {
+      cargarNotificaciones(false)
     }
-  }, [accessToken, user?.id])
+
+    window.addEventListener('focus', handleFocus)
+    const intervalId = window.setInterval(() => {
+      cargarNotificaciones(false)
+    }, 60000)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      window.clearInterval(intervalId)
+    }
+  }, [accessToken, user, cargarNotificaciones])
 
   // Cerrar al hacer click afuera o presionar Escape
   useEffect(() => {
@@ -87,7 +101,13 @@ export function NotificationsDropdown() {
   }, [open])
 
   const toggleOpen = () => {
-    setOpen(prev => !prev)
+    setOpen(prev => {
+      const nuevo = !prev
+      if (nuevo) {
+        cargarNotificaciones(notificaciones.length === 0)
+      }
+      return nuevo
+    })
   }
 
   const handleMarcarTodas = async () => {

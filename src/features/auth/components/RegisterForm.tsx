@@ -7,9 +7,9 @@ import { ApiError } from '@/shared/api/apiClient'
 import { EMAIL_RE, validatePassword } from '@/shared/lib/validation'
 import { formatPhone, cleanPhone } from '@/shared/lib/format'
 import { authApi } from '../api/authApi'
+import { legalApi } from '@/features/legal/api/legalApi'
 import type { RegisterInput } from '../model/auth.types'
 import { SecurityVerification } from './SecurityVerification'
-import { legalApi } from '@/features/legal'
 
 type Errors = Partial<Record<keyof RegisterInput, string>>
 type DocumentStatus = 'idle' | 'waiting' | 'checking' | 'valid' | 'conflict' | 'error'
@@ -71,6 +71,25 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
   const [documentoValidado, setDocumentoValidado] = useState<string | null>(null)
   const [documentError, setDocumentError] = useState<string | null>(null)
   const [datosAutocompletados, setDatosAutocompletados] = useState(false)
+  const [terminosInfo, setTerminosInfo] = useState<{
+    texto?: string
+    linkTexto?: string
+    nombreArchivo?: string
+  } | null>(null)
+
+  useEffect(() => {
+    legalApi.obtenerInfoActivo()
+      .then(info => {
+        if (info) {
+          setTerminosInfo({
+            texto: info.texto,
+            linkTexto: info.linkTexto,
+            nombreArchivo: info.nombreArchivo,
+          })
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const documentoActual = useRef('')
   const ultimoDocumentoConsultado = useRef<string | null>(null)
@@ -589,17 +608,30 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
         <Checkbox checked={values.aceptaTerminos}
           onChange={e => update('aceptaTerminos', e.target.checked)}
           label={
-            <>Estoy de acuerdo con los{' '}
-              <a
-                href={legalApi.getUrlDescarga()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-brand hover:underline inline-flex items-center gap-1"
-                title="Abrir Términos y Condiciones oficiales"
-              >
-                Términos y condiciones
-              </a>
-            </>
+            (() => {
+              const template = terminosInfo?.texto || 'Estoy de acuerdo con los {0}'
+              const linkText = terminosInfo?.linkTexto || 'Términos y condiciones'
+              const filename = terminosInfo?.nombreArchivo || 'terminos_y_condiciones_2026.pdf'
+              const partes = template.includes('{0}')
+                ? template.split('{0}')
+                : ['Estoy de acuerdo con los ', '']
+
+              return (
+                <>
+                  {partes[0]}
+                  <a
+                    href={`/terminos/${encodeURIComponent(filename)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    title={`Abrir ${filename}`}
+                  >
+                    {linkText}
+                  </a>
+                  {partes[1] || ''}
+                </>
+              )
+            })()
           } />
         {errors.aceptaTerminos && (
           <p className="mt-1 text-xs text-danger">{errors.aceptaTerminos}</p>

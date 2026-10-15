@@ -49,7 +49,7 @@ export {
 } from './Skeleton'
 export { SessionLoadingScreen } from './SessionLoadingScreen'
 export * from './ProtectedImage'
-export { Toast, type ToastAviso, type ToastVariant } from './Toast'
+export { Toast, ToastContainer, toast, useToast, type ToastAviso, type ToastItem, type ToastVariant } from './Toast'
 export { AnimatedTimePicker } from './AnimatedTimePicker'
 export { ClockTimePicker } from './ClockTimePicker'
 export { Tooltip, type TooltipProps } from './Tooltip'

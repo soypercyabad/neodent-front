@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button, Checkbox, Icon } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
-import { legalApi, type TerminoPendienteItem } from '../api/legalApi'
+import { legalApi, sanitizarNombreSlug, type TerminoPendienteItem } from '../api/legalApi'
 
 export function TermsConsentModal() {
   const { accessToken, user } = useAuth()
@@ -106,9 +106,12 @@ export function TermsConsentModal() {
           {/* LISTA DINÁMICA DE DOCUMENTOS PENDIENTES */}
           <div className="space-y-3 pt-1">
             {pendientes.map(doc => {
-              const url = doc.urlVisualizar && doc.urlVisualizar.startsWith('http')
-                ? doc.urlVisualizar
-                : (doc.urlVisualizar || legalApi.getUrlDescarga(doc.id))
+              const filename = doc.nombreArchivo || sanitizarNombreSlug(doc.titulo)
+              const template = doc.texto || 'Acepto los {0} de NeoDent.'
+              const linkText = doc.linkTexto || doc.titulo || 'Términos y condiciones'
+              const partes = template.includes('{0}')
+                ? template.split('{0}')
+                : ['Acepto los ', ' de NeoDent.']
 
               return (
                 <label key={doc.id} className="flex items-start gap-3 cursor-pointer select-text">
@@ -122,29 +125,35 @@ export function TermsConsentModal() {
                     />
                   </div>
                   <span className="text-xs sm:text-sm font-medium text-ink leading-snug">
-                    Acepto los{' '}
+                    {partes[0]}
                     <a
-                      href={url}
+                      href={`/terminos/${encodeURIComponent(filename)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-bold text-brand underline decoration-brand/60 hover:decoration-brand inline"
-                      title={`Abrir documento de ${doc.titulo}`}
+                      title={`Abrir ${filename}`}
                     >
-                      {doc.titulo || 'Términos y condiciones'}
-                    </a>{' '}
-                    de NeoDent.
+                      {linkText}
+                    </a>
+                    {partes[1] || ''}
                   </span>
                 </label>
               )
             })}
           </div>
 
-          {/* PÁRRAFO DESCRIPTIVO / DESCARGO LEGAL */}
+          {/* PÁRRAFO DESCRIPTIVO DINÁMICO */}
           <p className="text-[11px] sm:text-xs text-muted leading-relaxed">
-            Al dar clic en el botón aceptas los términos y condiciones de tu atención como paciente, y en especial declaras tomar conocimiento, aceptar y cumplir los derechos y obligaciones del documento,{' '}
-            {pendientes.length > 1
-              ? 'cuyas copias se encuentran en los enlaces de arriba, asumiendo la responsabilidad de descargarlos y leerlos.'
-              : 'cuya copia se encuentra en el enlace de arriba, asumiendo la responsabilidad de descargarlo y leerlo.'}
+            Al dar clic en el botón confirmas haber leído y aceptado{' '}
+            {pendientes.map((doc, idx) => {
+              const linkText = doc.linkTexto || doc.titulo || 'documento'
+              const textoAgr = doc.textoAgrupado
+                ? doc.textoAgrupado.replace('{0}', linkText)
+                : `los ${linkText}`
+              const prefijo = idx === 0 ? '' : idx === pendientes.length - 1 ? ' y ' : ', '
+              return `${prefijo}${textoAgr}`
+            })}
+            , asumiendo la responsabilidad de descargarlos y revisarlos.
           </p>
 
           {/* MENSAJE DE ERROR SI OCURRE */}

@@ -1,11 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+import { API_URL } from '@/shared/api/config'
+
+const API_BASE_URL = API_URL || import.meta.env.VITE_API_URL || ''
 
 export interface TerminosCondicionesItem {
   id: number
+  codigoDocumento?: string
   titulo: string
   version: string
   nombreArchivo: string
   claveS3: string
+  texto?: string
+  linkTexto?: string
+  textoAgrupado?: string
   tamanoBytes: number
   activo: boolean
   urlVisualizar: string
@@ -14,12 +20,24 @@ export interface TerminosCondicionesItem {
   fechaActualizacion: string
 }
 
+export interface DocumentoLegalTipo {
+  id: number
+  codigo: string
+  descripcion: string
+  grupo?: number
+  activo: boolean
+}
+
 export interface TerminosInfoResponse {
   id?: number | null
+  codigoDocumento?: string
   titulo: string
   version: string
   nombreArchivo: string
   claveS3: string
+  texto?: string
+  linkTexto?: string
+  textoAgrupado?: string
   tamanoBytes: number
   activo: boolean
   urlVisualizar: string
@@ -51,7 +69,13 @@ export interface PaginaResponse<T> {
 
 export interface TerminoPendienteItem {
   id: number
+  codigo?: string
   titulo: string
+  version?: string
+  nombreArchivo?: string
+  texto?: string
+  linkTexto?: string
+  textoAgrupado?: string
   urlVisualizar?: string
 }
 
@@ -73,22 +97,95 @@ export interface AceptacionesListarParams {
   size?: number
 }
 
+export function sanitizarNombreSlug(titulo?: string): string {
+  if (!titulo) return 'terminos_y_condiciones_2026.pdf'
+  const limpio = titulo
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return (limpio || 'terminos_y_condiciones') + '.pdf'
+}
+
 export const legalApi = {
   getUrlDescarga(id?: number): string {
     if (id) return `${API_BASE_URL}/api/terminos-condiciones/${id}/ver`
     return `${API_BASE_URL}/api/terminos-condiciones`
   },
 
-  abrirDocumento(id?: number, urlVisualizar?: string): void {
-    if (urlVisualizar && !urlVisualizar.includes('cloudflarestorage.com')) {
-      const finalUrl = urlVisualizar.startsWith('http') ? urlVisualizar : `${API_BASE_URL}${urlVisualizar}`
-      window.open(finalUrl, '_blank')
-      return
+  abrirDocumento(_id?: number, _urlVisualizar?: string, nombreArchivo?: string): void {
+    const filename = nombreArchivo || 'terminos_y_condiciones.pdf'
+    window.open(`/terminos/${encodeURIComponent(filename)}`, '_blank')
+  },
+
+  async listarTipos(): Promise<DocumentoLegalTipo[]> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/tipos`)
+    if (!res.ok) return []
+    return res.json()
+  },
+
+  async listarTodosLosTipos(accessToken: string): Promise<DocumentoLegalTipo[]> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/tipos`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return this.listarTipos()
+    return res.json()
+  },
+
+  async crearTipo(
+    accessToken: string,
+    data: { codigo: string; descripcion: string; grupo?: number; activo?: boolean }
+  ): Promise<DocumentoLegalTipo> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/tipos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      throw new Error(err?.message || 'No se pudo crear el tipo de documento legal')
     }
-    const finalUrl = id
-      ? `${API_BASE_URL}/api/terminos-condiciones/${id}/ver`
-      : `${API_BASE_URL}/api/terminos-condiciones`
-    window.open(finalUrl, '_blank')
+    return res.json()
+  },
+
+  async editarTipo(
+    accessToken: string,
+    id: number,
+    data: { descripcion?: string; grupo?: number; activo?: boolean }
+  ): Promise<DocumentoLegalTipo> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/tipos/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      throw new Error(err?.message || 'No se pudo actualizar el tipo de documento')
+    }
+    return res.json()
+  },
+
+  async cambiarEstadoTipo(accessToken: string, id: number, activo: boolean): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin/tipos/${id}/estado`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ activo }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      throw new Error(err?.message || 'No se pudo cambiar el estado del tipo de documento')
+    }
   },
 
   async obtenerInfoActivo(): Promise<TerminosInfoResponse> {
@@ -112,13 +209,21 @@ export const legalApi = {
     titulo: string,
     version: string,
     activar: boolean,
-    accessToken: string
+    accessToken: string,
+    idTipoDocumento?: number,
+    texto?: string,
+    linkTexto?: string,
+    textoAgrupado?: string
   ): Promise<TerminosCondicionesItem> {
     const formData = new FormData()
     formData.append('archivo', archivo)
     if (titulo) formData.append('titulo', titulo)
     if (version) formData.append('version', version)
     formData.append('activar', String(activar))
+    if (idTipoDocumento) formData.append('idTipoDocumento', String(idTipoDocumento))
+    if (texto) formData.append('texto', texto)
+    if (linkTexto) formData.append('linkTexto', linkTexto)
+    if (textoAgrupado) formData.append('textoAgrupado', textoAgrupado)
 
     const res = await fetch(`${API_BASE_URL}/api/terminos-condiciones/admin`, {
       method: 'POST',

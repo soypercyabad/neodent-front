@@ -18,7 +18,7 @@ export const MODULE_NAV_MAP: Record<string, NavItem> = {
   SEDES: { label: 'Sedes', icon: 'location', href: '/sedes' },
   ESPECIALIDADES: { label: 'Especialidades', icon: 'tooth', href: '/especialidades' },
   SERVICIOS: { label: 'Servicios', icon: 'toothCracked', href: '/servicios' },
-  LEGALES: { label: 'Legales', icon: 'file', href: '/terminos-admin' },
+  LEGALES: { label: 'Documentos Legales', icon: 'file', href: '/documentos-legales' },
   MIS_CITAS: { label: 'Mis Citas', icon: 'citas', href: '/mis-citas' },
   NOTIFICACIONES: { label: 'Recordatorios', icon: 'bell', href: '/configuracion/recordatorios' },
 }

@@ -41,10 +41,12 @@ export function AppRouter() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verificar-correo" element={<VerifyEmailPage />} />
         <Route path="/activar-cuenta-pendiente" element={<RestartVerificationPage />} />
-        <Route path="/terminos" element={<TermsPage />} />
         <Route path="/activar-personal" element={<AccountActivationPage type="staff" />} />
         <Route path="/activate-account" element={<AccountActivationPage type="patient" />} />
       </Route>
+
+      {/* VISOR DIRECTO DE DOCUMENTO LEGAL (PANTALLA COMPLETA) */}
+      <Route path="/terminos/:filename" element={<TermsPage />} />
 
       {/* RUTAS PROTEGIDAS CON APPSHELL */}
       <Route element={<RequireAuth />}>
@@ -101,7 +103,7 @@ export function AppRouter() {
             <Route path="/servicios" element={<ServiciosPage />} />
           </Route>
           <Route element={<RequireAuth module="LEGALES" roles={ADMIN_ROLES} />}>
-            <Route path="/terminos-admin" element={<AdminTermsPage />} />
+            <Route path="/documentos-legales" element={<AdminTermsPage />} />
           </Route>
           <Route element={<RequireAuth roles={ADMIN_ROLES} />}>
             <Route path="/configuracion/recordatorios" element={<ConfiguracionRecordatoriosPage />} />

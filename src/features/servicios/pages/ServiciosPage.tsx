@@ -60,7 +60,6 @@ export function ServiciosPage() {
   const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
-  const [formError, setFormError] = useState('')
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [actualizacion, setActualizacion] = useState(0)
   const [mostrarSelectorSedes, setMostrarSelectorSedes] = useState(false)
@@ -159,7 +158,6 @@ export function ServiciosPage() {
   const abrirNuevo = () => {
     setForm({ ...VACIO })
     setEditando(null)
-    setFormError('')
     setMostrarForm(true)
     scrollToTopOrElement()
     setMostrarSelectorSedes(true)
@@ -178,7 +176,6 @@ export function ServiciosPage() {
     })
 
     setEditando(servicio.id)
-    setFormError('')
     setMostrarForm(true)
     scrollToTopOrElement()
     setMostrarSelectorSedes(true)
@@ -189,7 +186,6 @@ export function ServiciosPage() {
     if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
-    setFormError('')
   }
 
   const handlePrecioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,7 +225,6 @@ export function ServiciosPage() {
     if (!accessToken || guardandoRef.current || procesando) return
     guardandoRef.current = true
     setGuardando(true)
-    setFormError('')
     setAviso(null)
 
     try {
@@ -283,7 +278,6 @@ export function ServiciosPage() {
       })
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo guardar el servicio.'
-      setFormError(mensaje)
       setAviso({ tipo: 'error', texto: mensaje })
     } finally {
       guardandoRef.current = false
@@ -728,11 +722,6 @@ export function ServiciosPage() {
                   )}
                 </div>
 
-                {formError && (
-                  <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger sm:col-span-2">
-                    {formError}
-                  </p>
-                )}
 
                 <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-5 sm:col-span-2">
                   <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>

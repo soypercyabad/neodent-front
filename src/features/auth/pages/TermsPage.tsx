@@ -1,133 +1,126 @@
-import { Link } from 'react-router-dom'
-import { motion } from 'motion/react'
-import { Button, Card, Icon } from '@/shared/components/ui'
-import { useAuth } from '@/features/auth'
-import { legalApi } from '@/features/legal'
+import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { API_URL } from '@/shared/api/config'
+import { Icon } from '@/shared/components/ui'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 
 export function TermsPage() {
-  const { user } = useAuth()
-  const s3Url = legalApi.getUrlDescarga()
-  const isAdmin = user?.rol === 'Administrador'
+  const { filename } = useParams<{ filename: string }>()
+
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [is404, setIs404] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!filename) {
+      setIs404(true)
+      setLoading(false)
+      return
+    }
+
+    document.title = `${filename} - NeoDent`
+
+    let objetoUrl: string | null = null
+    let activo = true
+
+    const cargarPdf = async () => {
+      setLoading(true)
+      setError(null)
+      setIs404(false)
+
+      try {
+        const endpoint = `${API_URL}/api/terminos-condiciones/archivo/${encodeURIComponent(filename)}`
+        const res = await fetch(endpoint)
+
+        if (res.status === 404) {
+          if (activo) {
+            setIs404(true)
+            setLoading(false)
+          }
+          return
+        }
+
+        if (!res.ok) {
+          throw new Error('No se pudo cargar el documento de términos y condiciones.')
+        }
+
+        const blob = await res.blob()
+        if (!activo) return
+
+        objetoUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+        setPdfUrl(objetoUrl)
+      } catch (err) {
+        if (!activo) return
+        setError(err instanceof Error ? err.message : 'Error al cargar el documento.')
+      } finally {
+        if (activo) setLoading(false)
+      }
+    }
+
+    cargarPdf()
+
+    return () => {
+      activo = false
+      if (objetoUrl) {
+        URL.revokeObjectURL(objetoUrl)
+      }
+    }
+  }, [filename])
+
+  if (is404 || !filename) {
+    return <NotFoundPage />
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col items-center justify-center bg-slate-900 text-white">
+        <Icon name="spinner" size={34} className="animate-spin text-brand" />
+        <p className="mt-4 text-sm font-semibold tracking-wide text-slate-200">
+          Cargando documento oficial...
+        </p>
+      </div>
+    )
+  }
+
+  if (error || !pdfUrl) {
+    return (
+      <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
+        <div className="grid size-14 place-items-center rounded-2xl bg-red-500/10 text-red-400 border border-red-500/20">
+          <Icon name="xCircle" size={28} />
+        </div>
+        <h2 className="mt-4 text-lg font-bold text-slate-100">
+          No se pudo visualizar el documento
+        </h2>
+        <p className="mt-1.5 max-w-md text-xs sm:text-sm text-slate-400">
+          {error || 'El archivo solicitado no está disponible en este momento.'}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            className="px-5 py-2.5 text-sm font-semibold rounded-xl border border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700 transition cursor-pointer"
+            onClick={() => window.location.reload()}
+          >
+            Reintentar
+          </button>
+          <Link
+            to="/"
+            className="px-5 py-2.5 text-sm font-semibold rounded-xl bg-brand text-white hover:bg-brand-dark transition inline-flex items-center cursor-pointer"
+          >
+            Volver al inicio
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="mx-auto w-full max-w-4xl py-6"
-    >
-      <Card className="p-6 sm:p-10">
-        <header className="border-b border-border pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-subtle px-3 py-1 text-xs font-semibold text-brand">
-                <Icon name="file" size={13} />
-                Documento Legal Oficial
-              </span>
-              <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-ink">
-                Términos y Condiciones del Servicio
-              </h1>
-              <p className="mt-1 text-sm text-ink-muted">
-                NeoDent Clínicas Odontológicas • Última actualización: Octubre 2026
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {isAdmin && (
-                <Link to="/terminos-admin">
-                  <Button variant="outline" className="gap-2">
-                    <Icon name="edit" size={15} />
-                    Administrar (S3)
-                  </Button>
-                </Link>
-              )}
-
-              <a
-                href={s3Url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex"
-              >
-                <Button variant="primary" className="gap-2 shadow-sm">
-                  <Icon name="externalLink" size={15} />
-                  Abrir documento oficial (PDF)
-                </Button>
-              </a>
-            </div>
-          </div>
-        </header>
-
-        <div className="mt-8 space-y-6 text-sm leading-relaxed text-ink-soft">
-          <section>
-            <h2 className="text-base font-bold text-ink flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">1</span>
-              Aceptación de los Términos
-            </h2>
-            <p className="mt-2 text-ink-muted">
-              Al registrarse en la plataforma web de NeoDent Clínicas Odontológicas y marcar la casilla de verificación correspondiente, el usuario declara haber leído, comprendido y aceptado en su totalidad los presentes Términos y Condiciones, así como nuestra Política de Privacidad y Tratamiento de Datos Personales.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-bold text-ink flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">2</span>
-              Registro, Cuenta y Seguridad
-            </h2>
-            <p className="mt-2 text-ink-muted">
-              El usuario es el único responsable de mantener la confidencialidad de sus credenciales de acceso y de su código de verificación (OTP). Toda actividad realizada desde su cuenta será atribuible a dicho usuario. La clínica implementa mecanismos de autenticación de dos factores (2FA) para proteger la información médica y personal de cada paciente.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-bold text-ink flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">3</span>
-              Agendamiento y Cancelación de Citas Odontológicas
-            </h2>
-            <p className="mt-2 text-ink-muted">
-              Las citas médicas reservadas a través del portal están sujetas a la disponibilidad del especialista y de los consultorios. En caso de no poder asistir, el paciente se compromete a reprogramar o cancelar su cita con al menos 24 horas de anticipación a través del sistema o comunicándose directamente con la recepción.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-bold text-ink flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">4</span>
-              Protección de Datos Personales (Ley N° 29733)
-            </h2>
-            <p className="mt-2 text-ink-muted">
-              En cumplimiento de la Ley N° 29733 (Ley de Protección de Datos Personales de la República del Perú) y su Reglamento, los datos personales y de salud proporcionados serán tratados de forma estrictamente confidencial en nuestro banco de datos de historias clínicas, utilizándose exclusivamente para fines asistenciales, de recordatorio de citas y gestión de servicios odontológicos.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-bold text-ink flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">5</span>
-              Consentimiento Informado
-            </h2>
-            <p className="mt-2 text-ink-muted">
-              Todo procedimiento clínico, quirúrgico o tratamiento odontológico requiere previamente de una evaluación presencial y la suscripción del consentimiento informado respectivo emitido por el odontólogo colegiado a cargo.
-            </p>
-          </section>
-        </div>
-
-        <footer className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-6">
-          <Link to="/registro">
-            <Button variant="outline" className="gap-2">
-              <Icon name="arrowLeft" size={15} />
-              Volver al registro
-            </Button>
-          </Link>
-
-          <a
-            href={s3Url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-medium text-brand hover:underline inline-flex items-center gap-1"
-          >
-            <Icon name="externalLink" size={13} />
-            Descargar archivo original en PDF (S3)
-          </a>
-        </footer>
-      </Card>
-    </motion.div>
+    <div className="fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-slate-900">
+      <iframe
+        src={`${pdfUrl}#toolbar=1&navpanes=0`}
+        className="h-full w-full border-0"
+        title={filename}
+      />
+    </div>
   )
 }

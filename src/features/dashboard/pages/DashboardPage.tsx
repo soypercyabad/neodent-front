@@ -1156,7 +1156,7 @@ export function DashboardPage() {
                     .map(m => (
                       <QuickLink
                         key={m.idModulo}
-                        href={m.codigo === 'PERSONAL' ? '/usuarios' : m.codigo === 'ROLES' ? '/roles' : m.codigo === 'SEDES' ? '/sedes' : m.codigo === 'SERVICIOS' ? '/servicios' : m.codigo === 'ESPECIALIDADES' ? '/especialidades' : m.codigo === 'LEGALES' ? '/terminos-admin' : m.codigo === 'PACIENTES' ? '/pacientes' : m.codigo === 'CITAS' ? '/citas' : m.codigo === 'HORARIOS' ? '/horarios' : '/dashboard'}
+                        href={m.codigo === 'PERSONAL' ? '/usuarios' : m.codigo === 'ROLES' ? '/roles' : m.codigo === 'SEDES' ? '/sedes' : m.codigo === 'SERVICIOS' ? '/servicios' : m.codigo === 'ESPECIALIDADES' ? '/especialidades' : m.codigo === 'LEGALES' ? '/documentos-legales' : m.codigo === 'PACIENTES' ? '/pacientes' : m.codigo === 'CITAS' ? '/citas' : m.codigo === 'HORARIOS' ? '/horarios' : '/dashboard'}
                         label={m.nombre}
                         description={`Acceso al módulo de ${m.nombre}`}
                         icon="file"

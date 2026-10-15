@@ -12,15 +12,17 @@ export function LoginPage() {
   const { user, login, isLoading } = useAuth()  
   const navigate = useNavigate()
   const location = useLocation()
+  const searchParams = new URLSearchParams(location.search)
+  const redirectParam = searchParams.get('redirect')
 
-  const from: string = location.state?.from?.pathname ?? HOME
+  const from: string = redirectParam || location.state?.from?.pathname || HOME
 
   if (isLoading) {
     return <SessionLoadingScreen />
   } 
 
   if (user) {
-    return <Navigate to={HOME} replace />
+    return <Navigate to={from} replace />
   }
 
   const handleSubmit = async (credentials: Credentials) => {

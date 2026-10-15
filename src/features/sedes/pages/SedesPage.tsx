@@ -73,7 +73,6 @@ export function SedesPage() {
   const guardandoRef = useRef(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
-  const [formError, setFormError] = useState('')
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const [actualizacion, setActualizacion] = useState(0)
 
@@ -233,7 +232,6 @@ export function SedesPage() {
   const abrirNuevo = () => {
     setForm({ ...VACIO })
     setEditando(null)
-    setFormError('')
     setMostrarForm(true)
     scrollToTopOrElement()
   }
@@ -262,7 +260,6 @@ export function SedesPage() {
     })
 
     setEditando(sede.id)
-    setFormError('')
     setMostrarForm(true)
     scrollToTopOrElement()
   }
@@ -271,7 +268,6 @@ export function SedesPage() {
     if (guardandoRef.current) return
     setMostrarForm(false)
     setEditando(null)
-    setFormError('')
   }
 
   // GUARDAR SEDE.
@@ -280,7 +276,6 @@ export function SedesPage() {
     if (!accessToken || guardandoRef.current) return
     guardandoRef.current = true
     setGuardando(true)
-    setFormError('')
     setAviso(null)
 
     try {
@@ -316,7 +311,6 @@ export function SedesPage() {
 
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo guardar la sede.'
-      setFormError(mensaje)
       setAviso({ tipo: 'error', texto: mensaje })
     } finally {
       guardandoRef.current = false
@@ -554,11 +548,6 @@ export function SedesPage() {
                   </label>
                 </div>
 
-                {formError && (
-                  <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger">
-                    {formError}
-                  </p>
-                )}
 
                 <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
                   <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>Cancelar</Button>

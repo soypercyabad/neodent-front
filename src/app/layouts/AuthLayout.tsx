@@ -4,6 +4,10 @@ export function AuthLayout() {
   const { pathname } = useLocation()
   const esRegistro = pathname === '/registro'
 
+  const containerClass = esRegistro
+    ? 'w-full max-w-[580px]'
+    : 'w-full max-w-[440px]'
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-10">
       <div className="mb-6 text-center">
@@ -16,7 +20,7 @@ export function AuthLayout() {
         </h1>
       </div>
 
-      <div className={esRegistro ? 'w-full max-w-[580px]' : 'w-full max-w-[440px]'}>
+      <div className={containerClass}>
         <Outlet />
       </div>
 
