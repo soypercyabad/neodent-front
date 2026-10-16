@@ -13,6 +13,7 @@ export interface AnimatedDatePickerProps {
   min?: string
   max?: string
   align?: 'left' | 'right'
+  position?: 'auto' | 'top' | 'bottom'
   defaultViewDate?: string
   todayDate?: string
   trailing?: ReactNode
@@ -61,15 +62,40 @@ export function AnimatedDatePicker({
   min,
   max,
   align = 'right',
+  position = 'auto',
   defaultViewDate,
   todayDate,
   trailing,
 }: AnimatedDatePickerProps) {
   const [open, setOpen] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
   const [showMonthMenu, setShowMonthMenu] = useState(false)
   const [showYearMenu, setShowYearMenu] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
+
+  const checkPosition = () => {
+    if (position === 'top') {
+      setOpenUpward(true)
+      return
+    }
+    if (position === 'bottom') {
+      setOpenUpward(false)
+      return
+    }
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const popoverHeight = 350
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+
+    // Si abajo no hay espacio suficiente y arriba hay más espacio que abajo:
+    if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
+      setOpenUpward(true)
+    } else {
+      setOpenUpward(false)
+    }
+  }
 
   // Determinar fecha de hoy en tiempo real (según reloj local del usuario)
   const hoyStr = todayDate || getLocalTodayIso()
@@ -99,6 +125,20 @@ export function AnimatedDatePicker({
       setShowYearMenu(false)
     }
   }, [open, value, defaultViewDate, hoyStr])
+
+  // Recalcular posición al abrir o al cambiar tamaño/scroll
+  useEffect(() => {
+    if (open) {
+      checkPosition()
+      const handleReposition = () => checkPosition()
+      window.addEventListener('resize', handleReposition)
+      window.addEventListener('scroll', handleReposition, true)
+      return () => {
+        window.removeEventListener('resize', handleReposition)
+        window.removeEventListener('scroll', handleReposition, true)
+      }
+    }
+  }, [open, position])
 
   // Años disponibles para selección rápida en el calendario
   const maxYear = max ? parseInt(max.split('-')[0], 10) : hoyY + 5
@@ -231,7 +271,10 @@ export function AnimatedDatePicker({
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
         onClick={() => {
-          if (!disabled) setOpen(actual => !actual)
+          if (!disabled) {
+            if (!open) checkPosition()
+            setOpen(actual => !actual)
+          }
         }}
         className={cn(
           'flex w-full items-center justify-between gap-3 rounded-control border bg-surface px-3 py-2.5 text-left text-sm transition-colors duration-200',
@@ -291,17 +334,18 @@ export function AnimatedDatePicker({
         </div>
       </button>
 
-      {/* POPOVER DEL CALENDARIO: alineado a la derecha para no recortarse */}
+      {/* POPOVER DEL CALENDARIO: alineación inteligente para no recortarse */}
       <AnimatePresence>
         {open && (
           <motion.div
             id={popoverId}
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -5, scale: 0.98 }}
+            exit={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.17, ease: 'easeOut' }}
             className={cn(
-              'absolute top-full z-50 mt-2 w-72 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-line bg-surface p-4 shadow-xl',
+              'absolute z-50 w-72 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-line bg-surface p-4 shadow-xl',
+              openUpward ? 'bottom-full mb-2' : 'top-full mt-2',
               align === 'left' ? 'left-0' : 'left-0 sm:left-auto sm:right-0',
             )}
           >

@@ -124,9 +124,9 @@ const VACIO: Formulario = {
   diaSemana: '1',
   horaInicio: '08:00',
   horaFin: '13:00',
-  fechaInicioVigencia: inicioMes(mesIsoActual()),
-  fechaFinVigencia: finMes(mesIsoActual()),
-  sinFechaFin: false,
+  fechaInicioVigencia: hoyIso(),
+  fechaFinVigencia: '',
+  sinFechaFin: true,
 }
 
 export function SchedulesPage() {
@@ -407,7 +407,7 @@ export function SchedulesPage() {
           ? String(espDoctor[0].odontologoEspecialidadId)
           : ''
     const sedeId = filtroSede || (sedes[0] ? String(sedes[0].id) : '')
-    const inicio = fechaBase || inicioMes(mesVisible)
+    const inicio = fechaBase || hoyIso()
 
     setForm({
       ...VACIO,
@@ -418,8 +418,8 @@ export function SchedulesPage() {
       horaInicio: '08:00',
       horaFin: '13:00',
       fechaInicioVigencia: inicio,
-      fechaFinVigencia: finMes(mesVisible),
-      sinFechaFin: false,
+      fechaFinVigencia: '',
+      sinFechaFin: true,
     })
 
     setEditando(null)
@@ -630,6 +630,7 @@ export function SchedulesPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Odontólogo</span>
                       <AnimatedSelect
                         value={form.odontologoId}
                         options={opcionesOdontologos}
@@ -650,6 +651,7 @@ export function SchedulesPage() {
                       />
                     </div>
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Especialidad</span>
                       <AnimatedSelect
                         value={form.odontologoEspecialidadId}
                         options={opcionesEspecialidadesFormulario}
@@ -661,6 +663,7 @@ export function SchedulesPage() {
                       />
                     </div>
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Sede</span>
                       <AnimatedSelect
                         value={form.sedeId}
                         options={opcionesSedes}
@@ -682,11 +685,12 @@ export function SchedulesPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Día de la semana</span>
                       <AnimatedSelect
                         value={form.diaSemana}
                         options={DIAS.map(dia => ({ value: dia.value, label: dia.label }))}
                         onChange={value => setForm(actual => ({ ...actual, diaSemana: value }))}
-                        label="Día de atención"
+                        label="Día de la semana"
                         disabled={guardando}
                       />
                     </div>
@@ -735,17 +739,20 @@ export function SchedulesPage() {
                           }))
                         }
                         label="Inicio de vigencia"
+                        position="top"
                         disabled={guardando}
                       />
                     </div>
                     <div>
                       <span className="mb-1.5 block text-xs font-bold text-ink">Vigente hasta</span>
                       <AnimatedDatePicker
-                        value={form.fechaFinVigencia}
+                        value={form.sinFechaFin ? '' : form.fechaFinVigencia}
                         onChange={value => setForm(actual => ({ ...actual, fechaFinVigencia: value }))}
                         min={form.fechaInicioVigencia || undefined}
                         label="Fin de vigencia"
+                        position="top"
                         disabled={guardando || form.sinFechaFin}
+                        placeholder={form.sinFechaFin ? 'Indefinido' : 'dd/mm/aaaa'}
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -757,16 +764,35 @@ export function SchedulesPage() {
                             sinFechaFin: event.target.checked,
                             fechaFinVigencia: event.target.checked
                               ? ''
-                              : actual.fechaFinVigencia || finMes(mesVisible),
+                              : actual.fechaFinVigencia || finMes(actual.fechaInicioVigencia.slice(0, 7)),
                           }))
                         }
-                        label="Mantener este horario sin fecha final"
+                        label="Mantener este horario sin fecha final (indefinido)"
                         disabled={guardando}
                       />
+                      <p className="mt-1 text-[11px] text-muted">
+                        El turno se programará semanalmente de forma continua hasta que sea modificado o desactivado.
+                      </p>
                     </div>
                   </div>
 
-                  {resumenVigencia && !form.sinFechaFin && (
+                  {form.sinFechaFin && (
+                    <div className="mt-3 rounded-xl border border-line/80 bg-surface p-3.5 text-xs flex items-start gap-2.5 text-ink-soft">
+                      <Icon name="check" size={16} className="mt-0.5 shrink-0 text-success" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink">Turno semanal permanente</p>
+                        <p className="mt-0.5 text-muted">
+                          Se programará cada{' '}
+                          <strong className="text-brand">
+                            {DIAS.find(d => String(d.value) === String(form.diaSemana))?.label}
+                          </strong>{' '}
+                          a partir del <strong>{fechaCorta(form.fechaInicioVigencia)}</strong> de forma indefinida.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {resumenVigencia && !form.sinFechaFin && form.fechaFinVigencia && !resumenVigencia.esIndefinido && (
                     <div className="mt-3 rounded-lg border border-line bg-surface p-3 text-xs">
                       {resumenVigencia.aviso && (
                         <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-amber-900">

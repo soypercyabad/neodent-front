@@ -14,7 +14,7 @@ import {
   type HorarioOdontologoCatalogo, type HorarioOdontologoInput,
 } from '../api/schedulesApi'
 import { ScheduleAgendaTabs } from '../components/ScheduleAgendaTabs'
-import { DIAS, calcularResumenVigencia, fechaCorta, hora12, hoyIso } from '../model/scheduleUtils'
+import { DIAS, calcularResumenVigencia, fechaCorta, finMes, hora12, hoyIso } from '../model/scheduleUtils'
 
 type EstadoFiltro = 'todos' | 'vigentes' | 'proximos' | 'expirados'
 
@@ -452,17 +452,24 @@ export function ScheduleHistoryPage() {
 
   // ABRIR FORMULARIO NUEVO
   const abrirNuevo = () => {
-    const defaultDoc = listaOdontologos[0] ? String(listaOdontologos[0].odontologoId) : ''
+    const defaultDoc =
+      filtroOdontologoId ||
+      (listaOdontologos[0] ? String(listaOdontologos[0].odontologoId) : '')
     const espList = catalogo.filter(c => String(c.odontologoId) === defaultDoc)
-    const defaultEsp = espList[0] ? String(espList[0].odontologoEspecialidadId) : ''
-    const defaultSede = sedes[0] ? String(sedes[0].id) : ''
+    const defaultEsp =
+      filtroEspecialidadId && espList.some(e => String(e.odontologoEspecialidadId) === filtroEspecialidadId)
+        ? filtroEspecialidadId
+        : espList[0]
+          ? String(espList[0].odontologoEspecialidadId)
+          : ''
+    const defaultSede = filtroSedeId || (sedes[0] ? String(sedes[0].id) : '')
 
     setForm({
       ...FORM_INICIAL,
       odontologoId: defaultDoc,
       odontologoEspecialidadId: defaultEsp,
       sedeId: defaultSede,
-      diaSemana: '1',
+      diaSemana: filtroDia || '1',
       horaInicio: '08:00',
       horaFin: '13:00',
       fechaInicioVigencia: hoyIso(),
@@ -625,7 +632,7 @@ export function ScheduleHistoryPage() {
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
+              className="relative z-10 w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-brand/20 bg-brand-soft/30 px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -662,6 +669,7 @@ export function ScheduleHistoryPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Odontólogo</span>
                       <AnimatedSelect
                         value={form.odontologoId}
                         options={listaOdontologos.map(item => ({
@@ -683,6 +691,7 @@ export function ScheduleHistoryPage() {
                       />
                     </div>
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Especialidad</span>
                       <AnimatedSelect
                         value={form.odontologoEspecialidadId}
                         options={opcionesEspecialidadesForm}
@@ -694,6 +703,7 @@ export function ScheduleHistoryPage() {
                       />
                     </div>
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Sede</span>
                       <AnimatedSelect
                         value={form.sedeId}
                         options={sedes.map(s => ({ value: String(s.id), label: s.nombre }))}
@@ -715,11 +725,12 @@ export function ScheduleHistoryPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Día de la semana</span>
                       <AnimatedSelect
                         value={form.diaSemana}
                         options={DIAS.map(d => ({ value: d.value, label: d.label }))}
                         onChange={value => setForm(actual => ({ ...actual, diaSemana: value }))}
-                        label="Día de atención"
+                        label="Día de la semana"
                         disabled={guardando}
                       />
                     </div>
@@ -768,17 +779,20 @@ export function ScheduleHistoryPage() {
                           }))
                         }
                         label="Inicio de vigencia"
+                        position="top"
                         disabled={guardando}
                       />
                     </div>
                     <div>
                       <span className="mb-1.5 block text-xs font-bold text-ink">Vigente hasta</span>
                       <AnimatedDatePicker
-                        value={form.fechaFinVigencia}
+                        value={form.sinFechaFin ? '' : form.fechaFinVigencia}
                         onChange={value => setForm(actual => ({ ...actual, fechaFinVigencia: value }))}
                         min={form.fechaInicioVigencia || undefined}
                         label="Fin de vigencia"
+                        position="top"
                         disabled={guardando || form.sinFechaFin}
+                        placeholder={form.sinFechaFin ? 'Indefinido' : 'dd/mm/aaaa'}
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -788,16 +802,37 @@ export function ScheduleHistoryPage() {
                           setForm(actual => ({
                             ...actual,
                             sinFechaFin: event.target.checked,
-                            fechaFinVigencia: event.target.checked ? '' : actual.fechaFinVigencia,
+                            fechaFinVigencia: event.target.checked
+                              ? ''
+                              : actual.fechaFinVigencia || finMes(actual.fechaInicioVigencia.slice(0, 7)),
                           }))
                         }
                         label="Mantener este horario sin fecha final (indefinido)"
                         disabled={guardando}
                       />
+                      <p className="mt-1 text-[11px] text-muted">
+                        El turno se programará semanalmente de forma continua hasta que sea modificado o desactivado.
+                      </p>
                     </div>
                   </div>
 
-                  {resumenVigencia && !form.sinFechaFin && (
+                  {form.sinFechaFin && (
+                    <div className="mt-3 rounded-xl border border-line/80 bg-surface p-3.5 text-xs flex items-start gap-2.5 text-ink-soft">
+                      <Icon name="check" size={16} className="mt-0.5 shrink-0 text-success" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink">Turno semanal permanente</p>
+                        <p className="mt-0.5 text-muted">
+                          Se programará cada{' '}
+                          <strong className="text-brand">
+                            {DIAS.find(d => String(d.value) === String(form.diaSemana))?.label}
+                          </strong>{' '}
+                          a partir del <strong>{fechaCorta(form.fechaInicioVigencia)}</strong> de forma indefinida.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {resumenVigencia && !form.sinFechaFin && form.fechaFinVigencia && !resumenVigencia.esIndefinido && (
                     <div className="mt-3 rounded-lg border border-line bg-surface p-3 text-xs">
                       {resumenVigencia.aviso && (
                         <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-amber-900">

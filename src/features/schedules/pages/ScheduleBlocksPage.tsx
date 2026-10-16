@@ -431,6 +431,9 @@ export function ScheduleBlocksPage() {
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-bold text-ink">
+                        Tipo de excepción <span className="text-danger">*</span>
+                      </span>
                       <AnimatedSelect
                         value={form.tipoBloqueoId}
                         options={tipos.map(tipo => ({
@@ -457,6 +460,9 @@ export function ScheduleBlocksPage() {
 
                     {tipoSeleccionado?.permiteOdontologo && (
                       <div className="min-w-0">
+                        <span className="mb-1.5 block text-xs font-bold text-ink">
+                          Odontólogo {tipoSeleccionado.requiereOdontologo ? <span className="text-danger">*</span> : <span className="font-normal text-muted">(opcional)</span>}
+                        </span>
                         <AnimatedSelect
                           value={form.odontologoId}
                           options={[
@@ -475,6 +481,9 @@ export function ScheduleBlocksPage() {
 
                     {tipoSeleccionado?.permiteSede && (
                       <div className="min-w-0">
+                        <span className="mb-1.5 block text-xs font-bold text-ink">
+                          Sede {tipoSeleccionado.requiereSede ? <span className="text-danger">*</span> : <span className="font-normal text-muted">(opcional)</span>}
+                        </span>
                         <AnimatedSelect
                           value={form.sedeId}
                           options={[
