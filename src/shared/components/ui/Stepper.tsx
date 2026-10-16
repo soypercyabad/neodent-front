@@ -24,7 +24,7 @@ export function Stepper({ steps, current }: StepperProps) {
         const active = i === current
         const done = i < current
         return (
-          <li key={step.label} className="min-w-0 flex-1" title={`${step.label}: ${step.title}`}>
+          <li key={step.label} className="min-w-0 flex-1">
             <div
               className={cn(
                 'h-1 rounded-full transition-colors',

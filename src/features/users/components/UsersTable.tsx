@@ -151,7 +151,7 @@ export function UsersTable({
                   <div className="flex flex-col gap-1 text-xs">
                     <div className="flex items-center gap-1.5 text-ink-soft">
                       <Icon name="mail" size={13} className="shrink-0 text-muted" />
-                      <span className="max-w-56 truncate" title={usuario.correo}>
+                      <span className="max-w-56 truncate">
                         {usuario.correo}
                       </span>
                     </div>

@@ -167,7 +167,6 @@ export function AnimatedSelect({
             'block min-w-0 flex-1 truncate text-left',
             !seleccionada && 'text-muted',
           )}
-          title={seleccionada?.label}
         >
           {seleccionada?.label ?? placeholder ?? label ?? 'Seleccionar'}
         </span>
@@ -229,7 +228,7 @@ export function AnimatedSelect({
                         : 'text-ink hover:bg-alt',
                   )}
                 >
-                  <span className="min-w-0 flex-1 truncate" title={opcion.label}>
+                  <span className="min-w-0 flex-1 truncate">
                     {opcion.label}
                   </span>
 

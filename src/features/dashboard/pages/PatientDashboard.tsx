@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Badge, Button, Card, Icon, PatientDashboardSkeleton } from '@/shared/components/ui'
+import { Badge, Button, Card, Icon, PatientDashboardSkeleton, Tooltip } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
 import { dashboardApi, type PatientDashboardCita, type PatientDashboardData } from '../api/dashboardApi'
 
@@ -137,9 +137,11 @@ function NextAppointment({ cita }: { cita: PatientDashboardCita | null }) {
 
             <div className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-white/70">Odontólogo</p>
-              <p className="mt-1 text-sm font-bold truncate" title={cita.odontologo}>
-                {cita.odontologo}
-              </p>
+              <Tooltip content={cita.odontologo} side="top">
+                <p className="mt-1 text-sm font-bold truncate cursor-default">
+                  {cita.odontologo}
+                </p>
+              </Tooltip>
             </div>
           </div>
 

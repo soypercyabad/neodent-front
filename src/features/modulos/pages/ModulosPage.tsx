@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   ActionsCell, AnimatedSelect, Badge, Button, Card, ConfirmDialog,
   Icon, Input, PageHead, Pagination, RowActions, SearchInput,
-  Table, TableFoot, TableState, Toast, Toolbar,
+  Table, TableFoot, TableState, Toast, Toolbar, Tooltip,
   type Column, type IconName,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
@@ -893,7 +893,7 @@ export function ModulosPage() {
                     )}
                   </td>
 
-                  <td className="max-w-xs truncate text-xs text-muted" title={m.descripcion ?? ''}>
+                  <td className="max-w-xs truncate text-xs text-muted">
                     {m.descripcion || '-'}
                   </td>
 
@@ -976,23 +976,24 @@ export function ModulosPage() {
                 {iconosFiltrados.map(opt => {
                   const isSelected = icono === opt.value
                   return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      title={opt.label}
-                      onClick={() => {
-                        setIcono(opt.value)
-                        setMostrarIconPicker(false)
-                      }}
-                      className={cn(
-                        'grid size-12 place-items-center rounded-xl border transition cursor-pointer select-none',
-                        isSelected
-                          ? 'border-brand bg-brand text-white shadow-xs ring-2 ring-brand/30'
-                          : 'border-line bg-surface text-ink-soft hover:border-brand/40 hover:bg-alt hover:text-brand'
-                      )}
-                    >
-                      <Icon name={opt.value} className="size-5" />
-                    </button>
+                    <Tooltip key={opt.value} content={opt.label} side="top">
+                      <button
+                        type="button"
+                        aria-label={opt.label}
+                        onClick={() => {
+                          setIcono(opt.value)
+                          setMostrarIconPicker(false)
+                        }}
+                        className={cn(
+                          'grid size-12 place-items-center rounded-xl border transition cursor-pointer select-none',
+                          isSelected
+                            ? 'border-brand bg-brand text-white shadow-xs ring-2 ring-brand/30'
+                            : 'border-line bg-surface text-ink-soft hover:border-brand/40 hover:bg-alt hover:text-brand'
+                        )}
+                      >
+                        <Icon name={opt.value} className="size-5" />
+                      </button>
+                    </Tooltip>
                   )
                 })}
               </div>

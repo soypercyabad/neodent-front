@@ -389,8 +389,7 @@ export function EspecialidadesPage() {
                       <div className="min-w-0">
                         <h3 className="text-sm font-bold text-ink">{especialidad.nombre}</h3>
 
-                        <p className="mt-0.5 line-clamp-2 break-words text-xs leading-relaxed text-muted"
-                          title={especialidad.descripcion ?? undefined}>
+                        <p className="mt-0.5 line-clamp-2 break-words text-xs leading-relaxed text-muted">
                           {especialidad.descripcion || 'Sin descripción registrada.'}
                         </p>
                       </div>

@@ -215,7 +215,6 @@ export function MyAppointmentsPage() {
                     <button
                       type="button"
                       aria-label={`Ver detalle de la cita ${citaReferencia(cita.idCita)}`}
-                      title="Ver detalle"
                       onClick={() => navigate(`/mis-citas/${cita.idCita}`)}
                       className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink-soft transition hover:border-brand hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >

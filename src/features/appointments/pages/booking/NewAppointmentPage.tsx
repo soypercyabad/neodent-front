@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Button, Icon, SearchInput, Skeleton, Toast, type ToastAviso } from '@/shared/components/ui'
+import { Button, Icon, SearchInput, Skeleton, Toast, Tooltip, type ToastAviso } from '@/shared/components/ui'
 import { cn } from '@/shared/lib/cn'
 import { useAuth } from '@/features/auth/model/useAuth'
 import { BookingLayout } from '../../components/booking/BookingLayout'
@@ -594,9 +594,11 @@ export function NewAppointmentPage() {
                                 >
                                   <span className="truncate">{service.nombre}</span>
                                   {service.destacado && (
-                                    <span title="Servicio destacado" className="inline-flex shrink-0 text-amber-500">
-                                      <Icon name="starFilled" size={13} />
-                                    </span>
+                                    <Tooltip content="Servicio destacado" side="top">
+                                      <span className="inline-flex shrink-0 text-amber-500 cursor-default">
+                                        <Icon name="starFilled" size={13} />
+                                      </span>
+                                    </Tooltip>
                                   )}
                                 </h3>
                               </div>

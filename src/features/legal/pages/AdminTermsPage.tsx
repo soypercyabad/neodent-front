@@ -22,6 +22,7 @@ import {
   Tabs,
   Toast,
   Toolbar,
+  Tooltip,
   type Column,
   type TabItem,
   type ToastAviso,
@@ -1324,16 +1325,17 @@ export function AdminTermsPage() {
                       {/* COLUMNA 3: ARCHIVO PDF (COLUMNA DEDICADA) */}
                       <td>
                         {item.nombreArchivo ? (
-                          <div
-                            onClick={() => handleVerDocumento(item)}
-                            className="flex items-center gap-1.5 font-mono text-xs text-muted hover:text-brand cursor-pointer transition-colors"
-                            title="Haz clic para ver el documento PDF"
-                          >
-                            <Icon name="file" size={14} className="text-brand shrink-0" />
-                            <span className="truncate max-w-[210px] underline underline-offset-2">
-                              {item.nombreArchivo}
-                            </span>
-                          </div>
+                          <Tooltip content="Ver documento PDF" side="top">
+                            <div
+                              onClick={() => handleVerDocumento(item)}
+                              className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-brand cursor-pointer transition-colors"
+                            >
+                              <Icon name="file" size={14} className="text-brand shrink-0" />
+                              <span className="truncate max-w-[210px] underline underline-offset-2">
+                                {item.nombreArchivo}
+                              </span>
+                            </div>
+                          </Tooltip>
                         ) : (
                           <span className="text-xs text-muted italic">Sin archivo</span>
                         )}
@@ -1462,14 +1464,27 @@ export function AdminTermsPage() {
 
                       <td className="text-center">
                         {disp ? (
-                          <div className="flex justify-center" title={item.agenteUsuario || ''}>
-                            <Badge tone={disp.tone}>
-                              <span className="flex items-center gap-1">
-                                <Icon name={disp.icon} size={12} />
-                                {disp.label}
-                              </span>
-                            </Badge>
-                          </div>
+                          item.agenteUsuario ? (
+                            <Tooltip content={item.agenteUsuario} side="top">
+                              <div className="flex justify-center cursor-default">
+                                <Badge tone={disp.tone}>
+                                  <span className="flex items-center gap-1">
+                                    <Icon name={disp.icon} size={12} />
+                                    {disp.label}
+                                  </span>
+                                </Badge>
+                              </div>
+                            </Tooltip>
+                          ) : (
+                            <div className="flex justify-center">
+                              <Badge tone={disp.tone}>
+                                <span className="flex items-center gap-1">
+                                  <Icon name={disp.icon} size={12} />
+                                  {disp.label}
+                                </span>
+                              </Badge>
+                            </div>
+                          )
                         ) : (
                           <span className="text-xs text-muted">-</span>
                         )}

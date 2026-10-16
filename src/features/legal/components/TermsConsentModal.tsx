@@ -131,7 +131,6 @@ export function TermsConsentModal() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-bold text-brand underline decoration-brand/60 hover:decoration-brand inline"
-                      title={`Abrir ${filename}`}
                     >
                       {linkText}
                     </a>

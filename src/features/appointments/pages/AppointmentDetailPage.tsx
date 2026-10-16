@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   Icon,
   Toast,
+  Tooltip,
   type ToastAviso,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth/model/useAuth'
@@ -423,12 +424,11 @@ export function AppointmentDetailPage() {
                   <p className="text-xs font-medium text-slate-400">
                     Especialista
                   </p>
-                  <p
-                    className="mt-1 truncate text-sm font-bold text-white sm:text-base"
-                    title={`Dr(a). ${cita.odontologoNombre}`}
-                  >
-                    Dr(a). {cita.odontologoNombre}
-                  </p>
+                  <Tooltip content={`Dr(a). ${cita.odontologoNombre}`} side="top">
+                    <p className="mt-1 truncate text-sm font-bold text-white sm:text-base cursor-default">
+                      Dr(a). {cita.odontologoNombre}
+                    </p>
+                  </Tooltip>
                 </div>
               </div>
             </div>

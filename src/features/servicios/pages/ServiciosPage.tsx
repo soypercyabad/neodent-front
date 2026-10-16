@@ -877,10 +877,7 @@ export function ServiciosPage() {
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <h3
-                          className="text-sm font-bold leading-snug text-ink"
-                          title={servicio.nombre}
-                        >
+                        <h3 className="text-sm font-bold leading-snug text-ink">
                           {servicio.nombre}
                         </h3>
 
@@ -915,10 +912,7 @@ export function ServiciosPage() {
                     </div>
 
                     {/* DESCRIPCIÓN */}
-                    <p
-                      className="mt-2 line-clamp-1 text-xs leading-relaxed text-muted"
-                      title={servicio.descripcion ?? undefined}
-                    >
+                    <p className="mt-2 line-clamp-1 text-xs leading-relaxed text-muted">
                       {servicio.descripcion || 'Sin descripción registrada.'}
                     </p>
 

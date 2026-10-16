@@ -51,7 +51,7 @@ export function Topbar({
               size={42}
               iconSize={22}
               aria-label={desktopCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
-              title={desktopCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
+              tooltip={desktopCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
               onClick={onToggleDesktop}
             />
           </div>

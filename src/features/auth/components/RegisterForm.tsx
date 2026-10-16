@@ -624,7 +624,6 @@ export function RegisterForm({ onSubmit, initialValues }: RegisterFormProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
-                    title={`Abrir ${filename}`}
                   >
                     {linkText}
                   </a>
