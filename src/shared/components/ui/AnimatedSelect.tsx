@@ -131,7 +131,7 @@ export function AnimatedSelect({
   return (
     <div
       ref={contenedorRef}
-      className={cn('relative w-full min-w-0 max-w-full', className)}
+      className={cn('relative w-full min-w-0 max-w-full', abierto && 'z-30', className)}
     >
       <button
         ref={botonRef}
@@ -194,8 +194,8 @@ export function AnimatedSelect({
             transition={{ duration: 0.17, ease: 'easeOut' }}
             style={{ maxHeight: alturaMaxima }}
             className={cn(
-              'absolute left-0 right-0 z-50 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto',
-              'rounded-xl border border-line bg-surface p-1.5 shadow-xl',
+              'absolute left-0 right-0 z-[100] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto',
+              'rounded-xl border border-line bg-surface p-1.5 shadow-2xl shadow-ink/20',
               abrirArriba ? 'bottom-full mb-2' : 'top-full mt-2',
             )}
           >

@@ -15,9 +15,11 @@ export interface ModuloItem {
   codigo: string
   nombre: string
   descripcion: string | null
-  ruta: string
+  ruta: string | null
   icono: string
   orden: number
+  idModuloPadre?: number | null
+  nombreModuloPadre?: string | null
   activo: boolean
 }
 
@@ -25,9 +27,10 @@ export interface ModuloInput {
   codigo: string
   nombre: string
   descripcion: string | null
-  ruta: string
+  ruta: string | null
   icono: string
   orden: number
+  idModuloPadre?: number | null
 }
 
 export interface ModuloResumenEstados {

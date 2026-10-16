@@ -102,6 +102,7 @@ const COLUMNS: Column[] = [
   { key: 'orden', label: 'Orden', align: 'center', sortable: true },
   { label: 'Ícono', align: 'center' },
   { key: 'nombre', label: 'Nombre', sortable: true },
+  { key: 'padre', label: 'Módulo Padre / Tipo', align: 'center' },
   { key: 'ruta', label: 'Ruta (URL)', sortable: true },
   { key: 'descripcion', label: 'Descripción' },
   { key: 'activo', label: 'Estado', align: 'center', sortable: true },
@@ -164,7 +165,18 @@ export function ModulosPage() {
   const [rutaSlug, setRutaSlug] = useState('')
   const [icono, setIcono] = useState<IconName>('file')
   const [orden, setOrden] = useState<number>(1)
+  const [idModuloPadre, setIdModuloPadre] = useState<number | null>(null)
+  const [tipoModulo, setTipoModulo] = useState<'PRINCIPAL' | 'AGRUPADOR' | 'SUBMODULO'>('PRINCIPAL')
   const [actualizacion, setActualizacion] = useState(0)
+  const [todosLosModulos, setTodosLosModulos] = useState<ModuloItem[]>([])
+
+  // Cargar lista completa de módulos para resolución de padres y opciones
+  useEffect(() => {
+    if (!accessToken) return
+    modulosApi.listar(accessToken)
+      .then(data => setTodosLosModulos(data))
+      .catch(() => { })
+  }, [accessToken, actualizacion])
 
   // DEBOUNCE BÚSQUEDA
   useEffect(() => {
@@ -277,9 +289,35 @@ export function ModulosPage() {
 
   const codigoCalculado = useMemo(() => normalizarCodigo(nombre), [nombre])
 
+  const mapaModulos = useMemo(() => {
+    const map: Record<number, ModuloItem> = {}
+    for (const m of todosLosModulos) {
+      map[m.id] = m
+    }
+    return map
+  }, [todosLosModulos])
+
+  const opcionesModulosPadre = useMemo(() => {
+    // Solo módulos principales que NO tengan ruta (exclusivamente contenedores agrupadores)
+    const posiblesPadres = todosLosModulos.filter(
+      m =>
+        (!m.idModuloPadre || m.idModuloPadre === null) &&
+        (!m.ruta || m.ruta.trim() === '') &&
+        m.id !== editando?.id &&
+        m.activo
+    )
+    return [
+      { value: '', label: 'Seleccionar módulo agrupador...' },
+      ...posiblesPadres.map(p => ({
+        value: String(p.id),
+        label: p.nombre,
+      })),
+    ]
+  }, [todosLosModulos, editando])
+
   const handleNombreChange = (val: string) => {
     setNombre(val)
-    if (!editando) {
+    if (!editando && tipoModulo !== 'AGRUPADOR') {
       if (!rutaSlug || rutaSlug === normalizarSlug(nombre)) {
         setRutaSlug(normalizarSlug(val))
       }
@@ -294,6 +332,8 @@ export function ModulosPage() {
     setIcono('file')
     const maxOrden = modulos.reduce((max, m) => Math.max(max, m.orden), 0)
     setOrden(maxOrden + 1)
+    setIdModuloPadre(null)
+    setTipoModulo('PRINCIPAL')
     setError('')
     setMostrarForm(true)
     scrollToTopOrElement()
@@ -303,9 +343,17 @@ export function ModulosPage() {
     setEditando(mod)
     setNombre(mod.nombre)
     setDescripcion(mod.descripcion ?? '')
-    setRutaSlug(mod.ruta.replace(/^\/+/, ''))
+    setRutaSlug(mod.ruta ? mod.ruta.replace(/^\/+/, '') : '')
     setIcono((mod.icono as IconName) || 'file')
     setOrden(mod.orden)
+    setIdModuloPadre(mod.idModuloPadre ?? null)
+    if (mod.idModuloPadre != null) {
+      setTipoModulo('SUBMODULO')
+    } else if (!mod.ruta || mod.ruta.trim() === '') {
+      setTipoModulo('AGRUPADOR')
+    } else {
+      setTipoModulo('PRINCIPAL')
+    }
     setError('')
     setMostrarForm(true)
     scrollToTopOrElement()
@@ -329,9 +377,24 @@ export function ModulosPage() {
       return
     }
 
-    if (!slugLimpio) {
-      setError('La ruta de navegación es obligatoria.')
+    // Regla 1: Módulo principal requiere link obligatorio
+    if (tipoModulo === 'PRINCIPAL' && !slugLimpio) {
+      setError('La ruta de navegación (URL) es obligatoria para un módulo principal.')
       return
+    }
+
+    // Regla 2: Módulo agrupador no lleva link (ruta = null)
+
+    // Regla 3: Submódulo requiere seleccionar padre agrupador y link obligatorio
+    if (tipoModulo === 'SUBMODULO') {
+      if (!idModuloPadre) {
+        setError('Debes seleccionar el módulo agrupador al que pertenecerá este submódulo.')
+        return
+      }
+      if (!slugLimpio) {
+        setError('La ruta de navegación (URL) es obligatoria para un submódulo.')
+        return
+      }
     }
 
     if (!orden || orden < 1) {
@@ -343,9 +406,10 @@ export function ModulosPage() {
       codigo: codFinal,
       nombre: nombre.trim(),
       descripcion: descripcion.trim() || null,
-      ruta: `/${slugLimpio}`,
+      ruta: tipoModulo === 'AGRUPADOR' ? null : (slugLimpio ? `/${slugLimpio}` : null),
       icono,
       orden,
+      idModuloPadre: tipoModulo === 'SUBMODULO' ? idModuloPadre : null,
     }
 
     guardandoRef.current = true
@@ -433,118 +497,283 @@ export function ModulosPage() {
       <AnimatePresence>
         {mostrarForm && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-5 overflow-hidden"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="mb-6 min-w-0 max-w-full"
           >
-            <Card className="p-5">
-              <form onSubmit={guardar} className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-line pb-3">
-                  <h3 className="text-base font-bold text-ink">
-                    {editando ? 'Editar módulo' : 'Registrar nuevo módulo'}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setMostrarForm(false)}
-                    className="text-muted hover:text-ink text-sm font-semibold"
-                  >
-                    ✕ Cerrar
-                  </button>
+            <Card className="border border-brand/30 shadow-md overflow-hidden p-0">
+              {/* Encabezado con contraste de color y banner de marca */}
+              <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Icon name={editando ? 'edit' : 'layers'} size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-ink">
+                      {editando ? `Editar módulo: ${editando.nombre}` : 'Registrar nuevo módulo de acceso'}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Configura el nombre visible, ruta de navegación, orden e ícono visual para el sistema.
+                    </p>
+                  </div>
                 </div>
 
+                <button
+                  type="button"
+                  aria-label="Cerrar formulario"
+                  onClick={() => setMostrarForm(false)}
+                  disabled={guardando}
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
+                >
+                  <Icon name="x" size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={guardar} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
                 {error && (
                   <div className="rounded-xl border border-red-200 bg-red-50/70 p-3 text-xs font-semibold text-red-600">
                     {error}
                   </div>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-                      Nombre visible *
-                    </label>
-                    <Input
-                      icon="file"
-                      value={nombre}
-                      onChange={e => handleNombreChange(e.target.value)}
-                      placeholder="Ej: Contabilidad General"
-                      required
-                    />
+                {/* PANEL 1: IDENTIFICACIÓN Y PRESENTACIÓN VISUAL */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3.5 flex items-center gap-2">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <span>Identificación y Presentación Visual</span>
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-                      Ruta en frontend (URL) *
-                    </label>
-                    <div className="flex h-[42px] items-center rounded-control border border-line bg-surface overflow-hidden focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/10 transition">
-                      <span className="flex h-full items-center justify-center bg-surface-muted px-3.5 text-sm font-bold text-muted border-r border-line select-none">
-                        /
-                      </span>
-                      <input
-                        type="text"
-                        value={rutaSlug}
-                        onChange={e => setRutaSlug(e.target.value.replace(/^\/+/, '').toLowerCase().replace(/\s+/g, '-'))}
-                        placeholder="contabilidad"
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                        Nombre visible <span className="text-danger">*</span>
+                      </label>
+                      <Input
+                        icon="file"
+                        value={nombre}
+                        onChange={e => handleNombreChange(e.target.value)}
+                        placeholder="Ej: Contabilidad General"
                         required
-                        className="h-full w-full bg-transparent px-3 text-sm text-ink placeholder:text-muted focus:outline-none"
+                        disabled={guardando}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                        Código interno {editando ? '' : '(automático)'}
+                      </label>
+                      <Input
+                        icon="lock"
+                        value={editando ? editando.codigo : (codigoCalculado || 'AUTO_GENERADO')}
+                        disabled
+                        className="font-mono text-xs bg-surface-muted cursor-not-allowed opacity-80"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                        Ícono visual <span className="text-danger">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={guardando}
+                        onClick={() => {
+                          setBusquedaIcono('')
+                          setMostrarIconPicker(true)
+                        }}
+                        className="flex h-[42px] w-full items-center justify-between rounded-control border border-line bg-surface px-3.5 text-sm text-ink hover:border-brand/50 hover:bg-alt transition select-none disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon name={icono} className="size-4.5 text-brand shrink-0" />
+                          <span className="truncate text-sm font-medium text-ink">
+                            {ICON_CATALOG.find(i => i.value === icono)?.label ?? icono}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold text-brand bg-brand-soft px-2 py-0.5 rounded shrink-0">
+                          Cambiar
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                        Descripción breve
+                      </label>
+                      <Input
+                        icon="fileText"
+                        value={descripcion}
+                        onChange={e => setDescripcion(e.target.value)}
+                        placeholder="Descripción o propósito del módulo para el directorio"
+                        maxLength={150}
+                        disabled={guardando}
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div>
+                {/* PANEL 2: JERARQUÍA Y UBICACIÓN EN EL MENÚ */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3.5 flex items-center gap-2">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <span>Jerarquía y Ubicación en el Menú</span>
+                  </div>
+
+                  {/* Selector visual de Tipo de Módulo */}
+                  <div className="mb-4">
                     <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-                      Ícono visual *
+                      Tipo de Módulo <span className="text-danger">*</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBusquedaIcono('')
-                        setMostrarIconPicker(true)
-                      }}
-                      className="flex h-[42px] w-full items-center justify-between rounded-control border border-line bg-surface px-3.5 text-sm text-ink hover:border-brand/50 hover:bg-alt transition select-none"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Icon name={icono} className="size-4.5 text-brand shrink-0" />
-                        <span className="truncate text-sm font-medium text-ink">
-                          {ICON_CATALOG.find(i => i.value === icono)?.label ?? icono}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoModulo('PRINCIPAL')
+                          setIdModuloPadre(null)
+                        }}
+                        className={cn(
+                          'flex flex-col text-left p-3.5 rounded-xl border transition cursor-pointer select-none',
+                          tipoModulo === 'PRINCIPAL'
+                            ? 'border-brand bg-brand-soft/50 shadow-xs ring-1 ring-brand'
+                            : 'border-line bg-surface hover:bg-alt hover:border-brand/40'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={cn('size-2 rounded-full', tipoModulo === 'PRINCIPAL' ? 'bg-brand' : 'bg-muted')} />
+                          <span className="font-bold text-sm text-ink">Módulo Principal</span>
+                        </div>
+                        <p className="text-xs text-muted leading-relaxed">
+                          Menú independiente con su propia pantalla y enlace directo (ej. Citas, Pacientes).
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoModulo('AGRUPADOR')
+                          setIdModuloPadre(null)
+                          setRutaSlug('')
+                        }}
+                        className={cn(
+                          'flex flex-col text-left p-3.5 rounded-xl border transition cursor-pointer select-none',
+                          tipoModulo === 'AGRUPADOR'
+                            ? 'border-amber-500 bg-amber-500/10 shadow-xs ring-1 ring-amber-500'
+                            : 'border-line bg-surface hover:bg-alt hover:border-amber-500/40'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={cn('size-2 rounded-full', tipoModulo === 'AGRUPADOR' ? 'bg-amber-500' : 'bg-muted')} />
+                          <span className="font-bold text-sm text-ink">Módulo Contenedor</span>
+                        </div>
+                        <p className="text-xs text-muted leading-relaxed">
+                          Carpeta para agrupar submódulos. No requiere enlace directo (ej. Configuración).
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoModulo('SUBMODULO')
+                          if (!idModuloPadre && opcionesModulosPadre.length > 1) {
+                            setIdModuloPadre(Number(opcionesModulosPadre[1].value))
+                          }
+                        }}
+                        className={cn(
+                          'flex flex-col text-left p-3.5 rounded-xl border transition cursor-pointer select-none',
+                          tipoModulo === 'SUBMODULO'
+                            ? 'border-purple-500 bg-purple-500/10 shadow-xs ring-1 ring-purple-500'
+                            : 'border-line bg-surface hover:bg-alt hover:border-purple-500/40'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={cn('size-2 rounded-full', tipoModulo === 'SUBMODULO' ? 'bg-purple-500' : 'bg-muted')} />
+                          <span className="font-bold text-sm text-ink">Submódulo</span>
+                        </div>
+                        <p className="text-xs text-muted leading-relaxed">
+                          Opción secundaria anidada dentro de un módulo agrupador existente (ej. Roles, Sedes).
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Campos dinámicos según el Tipo de Módulo */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {/* Regla 3: Si es SUBMODULO, mostrar selector de padre agrupador obligatorio */}
+                    {tipoModulo === 'SUBMODULO' && (
+                      <div className="relative z-30">
+                        <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                          Módulo Contenedor Padre <span className="text-danger">*</span>
+                        </label>
+                        <AnimatedSelect
+                          value={idModuloPadre ? String(idModuloPadre) : ''}
+                          onChange={val => setIdModuloPadre(val ? Number(val) : null)}
+                          options={opcionesModulosPadre}
+                          disabled={guardando}
+                        />
+                        <p className="mt-1 text-xs text-muted">
+                          Solo se listan módulos contenedores sin enlace directo.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Regla 1 y 3: Si es PRINCIPAL o SUBMODULO, pedir obligatoriamente el link */}
+                    {tipoModulo !== 'AGRUPADOR' && (
+                      <div>
+                        <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                          Ruta en frontend (URL) <span className="text-danger">*</span>
+                        </label>
+                        <div className="flex h-[42px] items-center rounded-control border border-line bg-surface overflow-hidden focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/10 transition">
+                          <span className="flex h-full items-center justify-center bg-surface-muted px-3.5 text-sm font-bold text-muted border-r border-line select-none">
+                            /
+                          </span>
+                          <input
+                            type="text"
+                            value={rutaSlug}
+                            onChange={e => setRutaSlug(e.target.value.replace(/^\/+/, '').toLowerCase().replace(/\s+/g, '-'))}
+                            placeholder="ej: mis-citas"
+                            required
+                            disabled={guardando}
+                            className="h-full w-full bg-transparent px-3 text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-50"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-muted">
+                          Identificador de ruta web único para navegar a la pantalla.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Regla 2: Si es AGRUPADOR, mensaje informativo en vez de link */}
+                    {tipoModulo === 'AGRUPADOR' && (
+                      <div className="sm:col-span-2 flex items-center gap-3 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-800 text-xs">
+                        <Icon name="folder" size={20} className="text-amber-500 shrink-0" />
+                        <span>
+                          <strong>Módulo Contenedor:</strong> No requiere ruta de enlace. Al hacer clic o pasar el cursor en la barra lateral, desplegará sus submódulos asignados.
                         </span>
                       </div>
-                      <span className="text-xs font-semibold text-brand bg-brand-soft px-2 py-0.5 rounded shrink-0">
-                        Cambiar
-                      </span>
-                    </button>
-                  </div>
+                    )}
 
-                  <div>
-                    <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-                      Orden en barra lateral *
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={999}
-                      value={orden}
-                      onChange={e => setOrden(Number(e.target.value))}
-                      required
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-                      Descripción breve
-                    </label>
-                    <Input
-                      icon="fileText"
-                      value={descripcion}
-                      onChange={e => setDescripcion(e.target.value)}
-                      placeholder="Descripción o propósito del módulo"
-                      maxLength={150}
-                    />
+                    <div>
+                      <label className="mb-2 block text-[0.92rem] font-bold text-ink">
+                        Orden en barra lateral <span className="text-danger">*</span>
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={orden}
+                        onChange={e => setOrden(Number(e.target.value))}
+                        required
+                        disabled={guardando}
+                      />
+                      <p className="mt-1 text-xs text-muted">
+                        Posición numérica en la barra lateral.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 border-t border-line pt-4">
+                <div className="flex items-center justify-end gap-3 border-t border-line/60 pt-4">
                   <Button
                     type="button"
                     variant="ghost"
@@ -636,10 +865,32 @@ export function ModulosPage() {
                     <span className="font-bold text-ink">{m.nombre}</span>
                   </td>
 
+                  <td className="text-center">
+                    {m.idModuloPadre ? (
+                      <Badge tone="purple">
+                        {m.nombreModuloPadre || mapaModulos[m.idModuloPadre]?.nombre || 'Configuración'}
+                      </Badge>
+                    ) : !m.ruta || m.ruta.trim() === '' ? (
+                      <Badge tone="amber">
+                        Agrupador
+                      </Badge>
+                    ) : (
+                      <Badge tone="blue">
+                        Principal
+                      </Badge>
+                    )}
+                  </td>
+
                   <td>
-                    <code className="rounded bg-surface-muted px-2 py-1 text-xs text-ink-soft border border-line">
-                      {m.ruta}
-                    </code>
+                    {m.ruta ? (
+                      <code className="rounded bg-surface-muted px-2 py-1 text-xs text-ink-soft border border-line">
+                        {m.ruta}
+                      </code>
+                    ) : (
+                      <span className="text-xs text-muted italic">
+                        Sin ruta (Agrupador)
+                      </span>
+                    )}
                   </td>
 
                   <td className="max-w-xs truncate text-xs text-muted" title={m.descripcion ?? ''}>

@@ -30,6 +30,7 @@ export interface UserModulo {
   ruta?: string | null
   icono?: string | null
   orden: number
+  idModuloPadre?: number | null
 }
 
 export interface User {

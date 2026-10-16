@@ -1152,14 +1152,14 @@ export function DashboardPage() {
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {(user?.modulos || [])
-                    .filter(m => m.codigo !== 'DASHBOARD')
+                    .filter(m => m.codigo !== 'DASHBOARD' && m.ruta)
                     .map(m => (
                       <QuickLink
-                        key={m.idModulo}
-                        href={m.codigo === 'PERSONAL' ? '/usuarios' : m.codigo === 'ROLES' ? '/roles' : m.codigo === 'SEDES' ? '/sedes' : m.codigo === 'SERVICIOS' ? '/servicios' : m.codigo === 'ESPECIALIDADES' ? '/especialidades' : m.codigo === 'LEGALES' ? '/documentos-legales' : m.codigo === 'PACIENTES' ? '/pacientes' : m.codigo === 'CITAS' ? '/citas' : m.codigo === 'HORARIOS' ? '/horarios' : '/dashboard'}
+                        key={m.idModulo || m.codigo}
+                        href={m.ruta || '/dashboard'}
                         label={m.nombre}
                         description={`Acceso al módulo de ${m.nombre}`}
-                        icon="file"
+                        icon={(m.icono as IconName) || 'file'}
                       />
                     ))}
                 </div>
