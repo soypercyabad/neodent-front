@@ -201,10 +201,11 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
   const items = user ? navItemsFor(user.rol, user.modulos) : []
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
-  const toggleGroup = (groupId: string, currentOpen: boolean) => {
+  const toggleGroup = (groupId: string | number, currentOpen: boolean) => {
+    const key = String(groupId)
     setOpenGroups(prev => ({
       ...prev,
-      [groupId]: !currentOpen,
+      [key]: !currentOpen,
     }))
   }
 
@@ -308,7 +309,7 @@ export function Sidebar({ onNavigate, collapsed = false }: SidebarProps) {
           const isGroupActive = group.items.some(
             child => location.pathname === child.href || location.pathname.startsWith(child.href + '/')
           )
-          const isOpen = openGroups[group.id] ?? isGroupActive
+          const isOpen = openGroups[String(group.id)] ?? isGroupActive
 
           if (collapsed) {
             return (
