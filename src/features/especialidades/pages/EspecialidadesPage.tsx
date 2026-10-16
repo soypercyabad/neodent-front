@@ -212,63 +212,108 @@ export function EspecialidadesPage() {
             transition={{ duration: 0.2 }}
             className="mb-5"
           >
-            <Card className="border-brand/30 p-5 sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
-                    {editando === null ? 'Registrar especialidad' : 'Editar especialidad'}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted">Completa la información de la especialidad odontológica.</p>
+            <Card className="border border-brand/30 shadow-md overflow-hidden">
+              {/* Encabezado con contraste visual */}
+              <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Icon name="tooth" size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-ink">
+                      {editando === null ? 'Registrar especialidad' : 'Editar especialidad'}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Define la rama clínica odontológica y su alcance para los tratamientos y profesionales.
+                    </p>
+                  </div>
                 </div>
 
-                <button type="button" aria-label="Cerrar formulario" onClick={cerrarForm}
-                  disabled={guardando} className="rounded-lg p-2 text-muted transition hover:bg-alt">
-                  <Icon name="x" size={20} />
+                <button
+                  type="button"
+                  aria-label="Cerrar formulario"
+                  onClick={cerrarForm}
+                  disabled={guardando}
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
+                >
+                  <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={e => void guardar(e)} className="grid gap-4">
-                <label>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Nombre de la especialidad <span className="text-danger">*</span>
-                  </span>
-
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                      <Icon name="tooth" size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      maxLength={100}
-                      value={form.nombre}
-                      onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
-                      placeholder="Ej. Ortodoncia"
-                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                    />
+              <form onSubmit={e => void guardar(e)} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                {/* PANEL 1: IDENTIFICACIÓN */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Identificación de la Especialidad <span className="text-danger">*</span>
+                    </h3>
                   </div>
-                </label>
 
-                <label>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Descripción</span>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-ink">
+                      Nombre de la especialidad <span className="text-danger">*</span>
+                    </span>
 
-                  <textarea
-                    rows={3}
-                    maxLength={255}
-                    value={form.descripcion}
-                    onChange={e => setForm(actual => ({ ...actual, descripcion: e.target.value }))}
-                    placeholder="Describe brevemente la especialidad..."
-                    className="w-full resize-y rounded-control border border-line bg-surface px-4 py-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                  />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                        <Icon name="tooth" size={15} />
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        maxLength={100}
+                        value={form.nombre}
+                        onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                        placeholder="Ej. Ortodoncia y Ortopedia Maxilar"
+                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
+                  </label>
+                </div>
 
-                  <span className="mt-1 block text-right text-xs text-muted">{form.descripcion.length}/255</span>
-                </label>
+                {/* PANEL 2: DESCRIPCIÓN */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Descripción y Alcance Clínico
+                    </h3>
+                  </div>
 
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-ink">Descripción</span>
 
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>Cancelar</Button>
+                    <textarea
+                      rows={3}
+                      maxLength={255}
+                      value={form.descripcion}
+                      onChange={e => setForm(actual => ({ ...actual, descripcion: e.target.value }))}
+                      placeholder="Describe brevemente la especialidad y el perfil de atención..."
+                      className="w-full resize-y rounded-control border border-line bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                    />
 
-                  <Button type="submit" disabled={guardando}>
+                    <span className="mt-1 block text-right text-[11px] text-muted">{form.descripcion.length}/255</span>
+                  </label>
+                </div>
+
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-3 border-t border-line">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={cerrarForm}
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancelar
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
                     {guardando ? 'Guardando…' : editando === null ? 'Registrar especialidad' : 'Guardar cambios'}
                   </Button>
                 </div>

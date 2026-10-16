@@ -16,10 +16,12 @@ export interface ModuloResponse {
   codigo: string
   nombre: string
   descripcion?: string | null
-  ruta?: string
+  ruta?: string | null
   icono: string | null
   orden: number
   activo?: boolean
+  idModuloPadre?: number | null
+  nombreModuloPadre?: string | null
 }
 
 export interface RolModuloResponse {

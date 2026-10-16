@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedSelect, Button, Card, DateField, Field, FieldCheck, FieldError, Input } from '@/shared/components/ui'
+import { AnimatedSelect, Button, Card, DateField, Field, FieldCheck, FieldError, Icon, Input } from '@/shared/components/ui'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { ApiError } from '@/shared/api/apiClient'
 import { EMAIL_RE } from '@/shared/lib/validation'
@@ -363,235 +363,289 @@ export function PatientForm({
   }
 
   return (
-    <Card className="mx-auto w-full max-w-5xl p-4 sm:p-7">
-      <form onSubmit={guardar} className="grid min-w-0 gap-4" noValidate>
-        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Tipo de documento *">
-            <AnimatedSelect
-              value={values.tipoDocumento}
-              options={tipos.map(t => ({
-                value: t.codigo,
-                label: `${t.codigo} · ${t.nombre}`,
-              }))}
-              onChange={cambiarTipoDocumento}
-              disabled={editing || saving}
-            />
-          </Field>
-
+    <Card className="mx-auto w-full max-w-5xl overflow-hidden border border-line shadow-card">
+      <div className="flex items-center justify-between border-b border-brand/20 bg-brand-soft/30 px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+            <Icon name="user" size={20} />
+          </div>
           <div>
-            <Field label="Número de documento *" error={errors.numeroDocumento}>
-              <Input
-                icon="idCard"
-                placeholder={
-                  esDni
-                    ? 'Ej. 12345678'
-                    : tipo?.codigo === 'CE'
-                    ? 'Ej. 001234567'
-                    : 'Ej. AB123456'
-                }
-                value={values.numeroDocumento}
+            <h3 className="text-base font-bold text-ink">
+              {editing ? 'Editar paciente' : 'Registrar paciente'}
+            </h3>
+            <p className="text-xs text-muted">
+              {editing
+                ? 'Actualiza los datos personales, de contacto y sede del paciente.'
+                : 'Ingresa el documento para verificar la identidad y completa los datos administrativos.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={guardar} className="p-5 sm:p-7 space-y-5" noValidate>
+        {/* PANEL 1: DOCUMENTO DE IDENTIDAD */}
+        <div className="rounded-xl border border-line bg-alt/30 p-4">
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+              Documento de Identidad y Verificación <span className="text-danger">*</span>
+            </h3>
+          </div>
+
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Tipo de documento *">
+              <AnimatedSelect
+                value={values.tipoDocumento}
+                options={tipos.map(t => ({
+                  value: t.codigo,
+                  label: `${t.codigo} · ${t.nombre}`,
+                }))}
+                onChange={cambiarTipoDocumento}
                 disabled={editing || saving}
-                inputMode={esDni ? 'numeric' : 'text'}
-                maxLength={maxDoc}
-                onChange={e => changeDocumento(e.target.value)}
-                trailing={
-                  checking ? (
-                    <span role="status" aria-label="Validando DNI" className="grid size-6 place-items-center">
-                      <span className="size-4 animate-spin rounded-full border-2 border-brand/20 border-t-brand" />
-                    </span>
-                  ) : !editing && documentoListo ? (
-                    <motion.span
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="grid size-6 place-items-center rounded-full bg-success text-xs font-bold text-white"
-                    >
-                      ✓
-                    </motion.span>
-                  ) : null
-                }
               />
             </Field>
 
-            <AnimatePresence mode="wait" initial={false}>
-              {checking && (
-                <motion.p
-                  key="checking"
-                  initial={{ opacity: 0, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-1.5 flex min-w-0 items-center gap-2 break-words text-xs font-semibold text-brand"
-                >
-                  <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-brand" />
-                  Validando DNI…
-                </motion.p>
-              )}
+            <div>
+              <Field label="Número de documento *" error={errors.numeroDocumento}>
+                <Input
+                  icon="idCard"
+                  placeholder={
+                    esDni
+                      ? 'Ej. 12345678'
+                      : tipo?.codigo === 'CE'
+                      ? 'Ej. 001234567'
+                      : 'Ej. AB123456'
+                  }
+                  value={values.numeroDocumento}
+                  disabled={editing || saving}
+                  inputMode={esDni ? 'numeric' : 'text'}
+                  maxLength={maxDoc}
+                  onChange={e => changeDocumento(e.target.value)}
+                  trailing={
+                    checking ? (
+                      <span role="status" aria-label="Validando DNI" className="grid size-6 place-items-center">
+                        <span className="size-4 animate-spin rounded-full border-2 border-brand/20 border-t-brand" />
+                      </span>
+                    ) : !editing && documentoListo ? (
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="grid size-6 place-items-center rounded-full bg-success text-xs font-bold text-white"
+                      >
+                        ✓
+                      </motion.span>
+                    ) : null
+                  }
+                />
+              </Field>
 
-              {!checking && !editing && esDni && dniValidado && datosAutomaticos && (
-                <motion.p
-                  key="automatico"
-                  initial={{ opacity: 0, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-1.5 break-words text-xs font-semibold text-success"
-                >
-                  DNI validado. Datos encontrados correctamente.
-                </motion.p>
-              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {checking && (
+                  <motion.p
+                    key="checking"
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-1.5 flex min-w-0 items-center gap-2 break-words text-xs font-semibold text-brand"
+                  >
+                    <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-brand" />
+                    Validando DNI…
+                  </motion.p>
+                )}
 
-              {!checking && !editing && esDni && dniValidado && !datosAutomaticos && (
-                <motion.p
-                  key="manual-dni"
-                  initial={{ opacity: 0, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-1.5 break-words text-xs font-semibold text-ink-soft"
-                >
-                  DNI disponible. Completa los datos manualmente.
-                </motion.p>
-              )}
+                {!checking && !editing && esDni && dniValidado && datosAutomaticos && (
+                  <motion.p
+                    key="automatico"
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-1.5 break-words text-xs font-semibold text-success"
+                  >
+                    DNI validado. Datos encontrados correctamente.
+                  </motion.p>
+                )}
 
-              {!checking && !editing && !esDni && tipo && values.numeroDocumento && !manualReady && (
-                <motion.p
-                  key="manual-espera"
-                  initial={{ opacity: 0, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-1.5 break-words text-xs text-muted"
-                >
-                  Validaremos el formato cuando dejes de escribir.
-                </motion.p>
-              )}
+                {!checking && !editing && esDni && dniValidado && !datosAutomaticos && (
+                  <motion.p
+                    key="manual-dni"
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-1.5 break-words text-xs font-semibold text-ink-soft"
+                  >
+                    DNI disponible. Completa los datos manualmente.
+                  </motion.p>
+                )}
 
-              {!checking && !editing && !esDni && tipo && manualReady && (
-                <motion.p
-                  key="manual-listo"
-                  initial={{ opacity: 0, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-1.5 break-words text-xs font-semibold text-success"
-                >
-                  Formato válido. Completa los datos personales manualmente.
-                </motion.p>
-              )}
-            </AnimatePresence>
+                {!checking && !editing && !esDni && tipo && values.numeroDocumento && !manualReady && (
+                  <motion.p
+                    key="manual-espera"
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-1.5 break-words text-xs text-muted"
+                  >
+                    Validaremos el formato cuando dejes de escribir.
+                  </motion.p>
+                )}
+
+                {!checking && !editing && !esDni && tipo && manualReady && (
+                  <motion.p
+                    key="manual-listo"
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-1.5 break-words text-xs font-semibold text-success"
+                  >
+                    Formato válido. Completa los datos personales manualmente.
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
-        <Field label="Nombres *" error={errors.nombres}>
-          <Input
-            icon="user"
-            placeholder="Ej. María"
-            value={values.nombres}
-            onChange={e => set('nombres', e.target.value)}
-            disabled={saving || camposBloqueados}
-            trailing={indicator('nombres', nombreOk)}
-          />
-        </Field>
+        {/* PANEL 2: DATOS PERSONALES */}
+        <div className="rounded-xl border border-line bg-alt/30 p-4">
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+              Datos Personales del Paciente <span className="text-danger">*</span>
+            </h3>
+          </div>
 
-        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
-            <Input
-              icon="user"
-              placeholder="Ej. Rojas"
-              value={values.apellidoPaterno}
-              onChange={e => set('apellidoPaterno', e.target.value)}
-              disabled={saving || camposBloqueados}
-              trailing={indicator('apellidoPaterno', paternoOk)}
-            />
-          </Field>
+          <div className="space-y-4">
+            <Field label="Nombres *" error={errors.nombres}>
+              <Input
+                icon="user"
+                placeholder="Ej. María"
+                value={values.nombres}
+                onChange={e => set('nombres', e.target.value)}
+                disabled={saving || camposBloqueados}
+                trailing={indicator('nombres', nombreOk)}
+              />
+            </Field>
 
-          <Field label="Apellido materno" error={errors.apellidoMaterno}>
-            <Input
-              icon="user"
-              placeholder="Opcional"
-              value={values.apellidoMaterno}
-              onChange={e => set('apellidoMaterno', e.target.value)}
-              disabled={saving || camposBloqueados}
-              trailing={indicator('apellidoMaterno', maternoOk)}
-            />
-          </Field>
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
+                <Input
+                  icon="user"
+                  placeholder="Ej. Rojas"
+                  value={values.apellidoPaterno}
+                  onChange={e => set('apellidoPaterno', e.target.value)}
+                  disabled={saving || camposBloqueados}
+                  trailing={indicator('apellidoPaterno', paternoOk)}
+                />
+              </Field>
 
-          <Field label="Fecha de nacimiento" error={errors.fechaNacimiento}>
-            <DateField
-              value={values.fechaNacimiento}
-              onChange={val => set('fechaNacimiento', val)}
-              placeholder="dd/mm/aaaa"
-              max={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })}
-              min="1900-01-01"
-              align="left"
-              defaultViewDate="2000-01-01"
-              disabled={saving}
-            />
-          </Field>
+              <Field label="Apellido materno" error={errors.apellidoMaterno}>
+                <Input
+                  icon="user"
+                  placeholder="Opcional"
+                  value={values.apellidoMaterno}
+                  onChange={e => set('apellidoMaterno', e.target.value)}
+                  disabled={saving || camposBloqueados}
+                  trailing={indicator('apellidoMaterno', maternoOk)}
+                />
+              </Field>
+            </div>
 
-          <Field label="Teléfono" error={errors.telefono}>
-            <Input
-              icon="phone"
-              placeholder="Ej. 987 654 321"
-              value={values.telefono}
-              inputMode="tel"
-              maxLength={17}
-              onChange={e =>
-                set(
-                  'telefono',
-                  formatPhone(e.target.value),
-                )
-              }
-              disabled={saving}
-              trailing={indicator('telefono', telefonoOk)}
-            />
-          </Field>
+            <Field label="Fecha de nacimiento" error={errors.fechaNacimiento}>
+              <DateField
+                value={values.fechaNacimiento}
+                onChange={val => set('fechaNacimiento', val)}
+                placeholder="dd/mm/aaaa"
+                max={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })}
+                min="1900-01-01"
+                align="left"
+                defaultViewDate="2000-01-01"
+                disabled={saving}
+              />
+            </Field>
+          </div>
         </div>
 
-        <div>
-          <Field label="Correo electrónico" error={errors.email}>
-            <Input
-              type="email"
-              icon="mail"
-              placeholder="paciente@correo.com"
-              value={values.email}
-              onChange={e => set('email', e.target.value)}
-              disabled={saving}
-              trailing={indicator('email', emailOk)}
-            />
-          </Field>
-          {editing && paciente?.tieneCuenta && (
-            <p className="mt-1.5 text-xs text-ink-soft">
-              Nota: Al modificar el correo de un paciente con cuenta, se actualizará su credencial de acceso y su cuenta pasará a <span className="font-semibold text-warning">Pendiente</span> hasta verificar el nuevo correo.
-            </p>
-          )}
+        {/* PANEL 3: CONTACTO Y SEDE */}
+        <div className="rounded-xl border border-line bg-alt/30 p-4">
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+              Información de Contacto y Sede de Registro
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Teléfono" error={errors.telefono}>
+                <Input
+                  icon="phone"
+                  placeholder="Ej. 987 654 321"
+                  value={values.telefono}
+                  inputMode="tel"
+                  maxLength={17}
+                  onChange={e =>
+                    set(
+                      'telefono',
+                      formatPhone(e.target.value),
+                    )
+                  }
+                  disabled={saving}
+                  trailing={indicator('telefono', telefonoOk)}
+                />
+              </Field>
+
+              <div>
+                <Field label="Correo electrónico" error={errors.email}>
+                  <Input
+                    type="email"
+                    icon="mail"
+                    placeholder="paciente@correo.com"
+                    value={values.email}
+                    onChange={e => set('email', e.target.value)}
+                    disabled={saving}
+                    trailing={indicator('email', emailOk)}
+                  />
+                </Field>
+                {editing && paciente?.tieneCuenta && (
+                  <p className="mt-1.5 text-xs text-ink-soft">
+                    Nota: Al modificar el correo de un paciente con cuenta, se actualizará su credencial de acceso y su cuenta pasará a <span className="font-semibold text-warning">Pendiente</span> hasta verificar el nuevo correo.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Dirección">
+                <Input
+                  icon="location"
+                  placeholder="Ej. Av. Larco 123, Miraflores"
+                  value={values.direccion}
+                  onChange={e => set('direccion', e.target.value)}
+                  disabled={saving}
+                />
+              </Field>
+
+              <Field label="Sede de atención / registro">
+                <AnimatedSelect
+                  label="Seleccionar sede"
+                  value={values.sedeId ? String(values.sedeId) : ''}
+                  options={[
+                    { value: '', label: 'Sin sede asignada' },
+                    ...sedes.map(s => ({
+                      value: String(s.id),
+                      label: s.distrito ? `${s.nombre} (${s.distrito})` : s.nombre,
+                    })),
+                  ]}
+                  onChange={val => setValues(v => ({ ...v, sedeId: val ? Number(val) : null }))}
+                  disabled={saving}
+                  className="w-full"
+                />
+              </Field>
+            </div>
+          </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Dirección">
-            <Input
-              icon="location"
-              placeholder="Ej. Av. Larco 123, Miraflores"
-              value={values.direccion}
-              onChange={e => set('direccion', e.target.value)}
-              disabled={saving}
-            />
-          </Field>
-
-          <Field label="Sede de atención / registro">
-            <AnimatedSelect
-              label="Seleccionar sede"
-              value={values.sedeId ? String(values.sedeId) : ''}
-              options={[
-                { value: '', label: 'Sin sede asignada' },
-                ...sedes.map(s => ({
-                  value: String(s.id),
-                  label: s.distrito ? `${s.nombre} (${s.distrito})` : s.nombre,
-                })),
-              ]}
-              onChange={val => setValues(v => ({ ...v, sedeId: val ? Number(val) : null }))}
-              disabled={saving}
-              className="w-full"
-            />
-          </Field>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex justify-end gap-3 pt-3 border-t border-line/60">
           <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
             Cancelar
           </Button>

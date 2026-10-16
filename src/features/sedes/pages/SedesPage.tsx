@@ -395,163 +395,194 @@ export function SedesPage() {
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="mb-5">
 
-            <Card className="border-brand/30 p-5 sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
-                    {editando === null ? 'Registrar nueva sede' : 'Editar sede'}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted">Completa la información general de la sede.</p>
+            <Card className="border border-brand/30 shadow-md overflow-hidden">
+              {/* Encabezado con contraste visual */}
+              <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Icon name="building" size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-ink">
+                      {editando === null ? 'Registrar nueva sede' : 'Editar sede'}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Establece la ubicación geográfica, dirección física y canales de atención de la sede clínica.
+                    </p>
+                  </div>
                 </div>
 
-                <button type="button" aria-label="Cerrar formulario" onClick={cerrarForm}
-                  disabled={guardando} className="rounded-lg p-2 text-muted transition hover:bg-alt">
-                  <Icon name="x" size={20} />
+                <button
+                  type="button"
+                  aria-label="Cerrar formulario"
+                  onClick={cerrarForm}
+                  disabled={guardando}
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
+                >
+                  <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={e => void guardar(e)} className="space-y-4">
-                {/* 1. NOMBRE DE LA SEDE (EXPANDIDO EN TODO EL ANCHO) */}
-                <div>
-                  <label className="block">
-                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
-                      Nombre de la sede <span className="text-danger">*</span>
-                    </span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                        <Icon name="mapPin" size={15} />
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        maxLength={80}
-                        value={form.nombre}
-                        onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
-                        placeholder="Ej. Sede San Isidro - Principal"
-                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                      />
-                    </div>
-                  </label>
-                </div>
-
-                {/* 2. UBICACIÓN: DEPARTAMENTO, PROVINCIA Y DISTRITO EN 3 COMBOS RELACIONADOS */}
-                <div className="rounded-xl border border-line/70 bg-alt/30 p-3.5 sm:p-4">
-                  <div className="mb-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-                      Ubicación geográfica
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted">
-                      Selecciona el departamento para filtrar las provincias y distritos correspondientes.
-                    </p>
+              <form onSubmit={e => void guardar(e)} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                {/* PANEL 1: IDENTIFICACIÓN Y UBICACIÓN */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Identificación y Ubicación Geográfica <span className="text-danger">*</span>
+                    </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div>
-                      <span className="mb-1.5 block text-xs font-semibold text-ink">Departamento</span>
-                      <AnimatedSelect
-                        label="Departamento"
-                        value={form.departamento}
-                        options={opcionesDepartamentos}
-                        onChange={cambiarDepartamento}
-                        disabled={guardando}
-                        placeholder="Seleccionar departamento"
-                      />
+                  <div className="grid gap-4">
+                    {/* NOMBRE */}
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                        Nombre de la sede <span className="text-danger">*</span>
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="mapPin" size={15} />
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          maxLength={80}
+                          value={form.nombre}
+                          onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                          placeholder="Ej. Sede San Isidro - Principal"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                        />
+                      </div>
+                    </label>
+
+                    {/* COMBOS DEPARTAMENTO / PROVINCIA / DISTRITO */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <span className="mb-1.5 block text-xs font-semibold text-ink">Departamento</span>
+                        <AnimatedSelect
+                          label="Departamento"
+                          value={form.departamento}
+                          options={opcionesDepartamentos}
+                          onChange={cambiarDepartamento}
+                          disabled={guardando}
+                          placeholder="Seleccionar departamento"
+                        />
+                      </div>
+
+                      <div>
+                        <span className="mb-1.5 block text-xs font-semibold text-ink">Provincia</span>
+                        <AnimatedSelect
+                          label="Provincia"
+                          value={form.provincia}
+                          options={opcionesProvincias}
+                          onChange={cambiarProvincia}
+                          disabled={guardando || !deptoKey || opcionesProvincias.length <= 1}
+                          placeholder={!deptoKey ? 'Elige departamento' : 'Seleccionar provincia'}
+                        />
+                      </div>
+
+                      <div>
+                        <span className="mb-1.5 block text-xs font-semibold text-ink">Distrito</span>
+                        <AnimatedSelect
+                          label="Distrito"
+                          value={form.distrito}
+                          options={opcionesDistritos}
+                          onChange={cambiarDistrito}
+                          disabled={guardando || !provKey || opcionesDistritos.length <= 1}
+                          placeholder={!provKey ? 'Elige provincia' : 'Seleccionar distrito'}
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-xs font-semibold text-ink">Provincia</span>
-                      <AnimatedSelect
-                        label="Provincia"
-                        value={form.provincia}
-                        options={opcionesProvincias}
-                        onChange={cambiarProvincia}
-                        disabled={guardando || !deptoKey || opcionesProvincias.length <= 1}
-                        placeholder={!deptoKey ? 'Elige departamento' : 'Seleccionar provincia'}
-                      />
-                    </div>
-
-                    <div>
-                      <span className="mb-1.5 block text-xs font-semibold text-ink">Distrito</span>
-                      <AnimatedSelect
-                        label="Distrito"
-                        value={form.distrito}
-                        options={opcionesDistritos}
-                        onChange={cambiarDistrito}
-                        disabled={guardando || !provKey || opcionesDistritos.length <= 1}
-                        placeholder={!provKey ? 'Elige provincia' : 'Seleccionar distrito'}
-                      />
-                    </div>
+                    {/* DIRECCIÓN */}
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                        Dirección exacta <span className="text-danger">*</span>
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="location" size={15} />
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          maxLength={200}
+                          value={form.direccion}
+                          onChange={e => setForm(actual => ({ ...actual, direccion: e.target.value }))}
+                          placeholder="Ej. Av. Javier Prado Este 1234, Urb. Corpac, Oficina 502"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                        />
+                      </div>
+                    </label>
                   </div>
                 </div>
 
-                {/* 3. DIRECCIÓN EXACTA */}
-                <div>
-                  <label className="block">
-                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
-                      Dirección exacta <span className="text-danger">*</span>
-                    </span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                        <Icon name="location" size={15} />
+                {/* PANEL 2: CANALES DE CONTACTO */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Canales de Contacto Directo
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                        Teléfono de contacto
                       </span>
-                      <input
-                        type="text"
-                        required
-                        maxLength={200}
-                        value={form.direccion}
-                        onChange={e => setForm(actual => ({ ...actual, direccion: e.target.value }))}
-                        placeholder="Ej. Av. Javier Prado Este 1234, Urb. Corpac, Oficina 502"
-                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                      />
-                    </div>
-                  </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="phone" size={15} />
+                        </span>
+                        <input
+                          type="tel"
+                          maxLength={20}
+                          value={form.telefono}
+                          onChange={e => setForm(actual => ({ ...actual, telefono: e.target.value }))}
+                          placeholder="Ej. (01) 440-2020 / 999 888 777"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                        Correo electrónico
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="mail" size={15} />
+                        </span>
+                        <input
+                          type="email"
+                          maxLength={120}
+                          value={form.email}
+                          onChange={e => setForm(actual => ({ ...actual, email: e.target.value }))}
+                          placeholder="Ej. contacto.sede@neodents.pe"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                        />
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
-                {/* 4. TELÉFONO Y CORREO ELECTRÓNICO */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
-                      Teléfono de contacto
-                    </span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                        <Icon name="phone" size={15} />
-                      </span>
-                      <input
-                        type="tel"
-                        maxLength={20}
-                        value={form.telefono}
-                        onChange={e => setForm(actual => ({ ...actual, telefono: e.target.value }))}
-                        placeholder="Ej. (01) 440-2020 / 999 888 777"
-                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
-                      Correo electrónico
-                    </span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                        <Icon name="mail" size={15} />
-                      </span>
-                      <input
-                        type="email"
-                        maxLength={120}
-                        value={form.email}
-                        onChange={e => setForm(actual => ({ ...actual, email: e.target.value }))}
-                        placeholder="Ej. contacto.sede@neodents.pe"
-                        className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
-                      />
-                    </div>
-                  </label>
-                </div>
-
-
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>Cancelar</Button>
-                  <Button type="submit" disabled={guardando}>
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-3 border-t border-line">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={cerrarForm}
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
                     {guardando ? 'Guardando…' : editando === null ? 'Registrar sede' : 'Guardar cambios'}
                   </Button>
                 </div>

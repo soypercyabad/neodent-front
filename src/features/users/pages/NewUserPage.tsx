@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedSelect, Button, Card, Field, FieldCheck, FieldError, Input, MultiSelectChips, PageHead } from '@/shared/components/ui'
+import { AnimatedSelect, Button, Card, Field, FieldCheck, FieldError, Icon, Input, MultiSelectChips, PageHead } from '@/shared/components/ui'
 import { ApiError } from '@/shared/api/apiClient'
 import { documentTypesApi, type TipoDocumentoOption } from '@/shared/api/documentTypesApi'
 import { useAuth } from '@/features/auth'
@@ -653,33 +653,63 @@ export function NewUserPage() {
         }
       />
 
-      <Card className="mx-auto w-full min-w-0 max-w-5xl overflow-visible p-4 sm:p-7 lg:p-8">
-        <form onSubmit={guardar} noValidate className="min-w-0 max-w-full space-y-5">
-          <div>
-            <label className="mb-2 block text-[0.92rem] font-bold text-ink">
-              Roles del trabajador <span className="text-danger">*</span>
-            </label>
+      <Card className="mx-auto w-full min-w-0 max-w-5xl overflow-hidden border border-brand/30 shadow-md">
+        {/* Encabezado con contraste visual */}
+        <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Icon name="usuarios" size={18} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-ink">Registrar nuevo trabajador</h2>
+              <p className="text-xs text-muted">
+                Asigna sus roles de acceso, valida su documento y configura su información profesional.
+              </p>
+            </div>
+          </div>
+        </div>
 
-            <MultiSelectChips
-              options={rolOptions}
-              value={roles}
-              onChange={val => {
-                setRoles(val)
-                setErrors(c => ({ ...c, roles: '' }))
-              }}
-              placeholder={cargandoRoles ? 'Cargando roles…' : 'Selecciona uno o varios roles'}
-              disabled={saving || cargandoRoles}
-            />
+        <form onSubmit={guardar} noValidate className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+          {/* PANEL 1: ROLES */}
+          <div className="rounded-xl border border-line bg-alt/30 p-4">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                Roles y Permisos del Trabajador <span className="text-danger">*</span>
+              </h3>
+            </div>
 
-            {errors.roles
-              ? <p className="mt-1.5 text-xs text-danger">{errors.roles}</p>
-              : <p className="mt-1.5 text-xs text-muted">
-                  Puedes asignar más de un rol al mismo trabajador.
-                </p>
-            }
+            <div>
+              <MultiSelectChips
+                options={rolOptions}
+                value={roles}
+                onChange={val => {
+                  setRoles(val)
+                  setErrors(c => ({ ...c, roles: '' }))
+                }}
+                placeholder={cargandoRoles ? 'Cargando roles…' : 'Selecciona uno o varios roles'}
+                disabled={saving || cargandoRoles}
+              />
+
+              {errors.roles
+                ? <p className="mt-1.5 text-xs text-danger">{errors.roles}</p>
+                : <p className="mt-1.5 text-xs text-muted">
+                    Puedes asignar más de un rol al mismo trabajador (ej. Odontólogo y Administrador).
+                  </p>
+              }
+            </div>
           </div>
 
-          <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* PANEL 2: IDENTIFICACIÓN */}
+          <div className="rounded-xl border border-line bg-alt/30 p-4">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                Identificación y Datos Personales <span className="text-danger">*</span>
+              </h3>
+            </div>
+
+            <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
             <div className="w-full min-w-0 max-w-full">
                 <Field label="Tipo de documento *">
                 <AnimatedSelect
@@ -801,74 +831,87 @@ export function NewUserPage() {
             </div>
             </div>
 
-          <Field label="Nombres *" error={errors.nombres}>
-            <Input
-              icon="user"
-              placeholder="Ej. María"
-              value={form.nombres}
-              onChange={e => update('nombres', e.target.value)}
-              onBlur={() => marcar('nombres')}
-              trailing={check('nombres')}
-              disabled={camposBloqueados || saving}
-            />
-          </Field>
+            <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Nombres *" error={errors.nombres}>
+                <Input
+                  icon="user"
+                  placeholder="Ej. María"
+                  value={form.nombres}
+                  onChange={e => update('nombres', e.target.value)}
+                  onBlur={() => marcar('nombres')}
+                  trailing={check('nombres')}
+                  disabled={camposBloqueados || saving}
+                />
+              </Field>
 
-          <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
-              <Input
-                icon="user"
-                placeholder="Ej. Rojas"
-                value={form.apellidoPaterno}
-                onChange={e => update('apellidoPaterno', e.target.value)}
-                onBlur={() => marcar('apellidoPaterno')}
-                trailing={check('apellidoPaterno')}
-                disabled={camposBloqueados || saving}
-              />
-            </Field>
+              <Field label="Apellido paterno *" error={errors.apellidoPaterno}>
+                <Input
+                  icon="user"
+                  placeholder="Ej. Rojas"
+                  value={form.apellidoPaterno}
+                  onChange={e => update('apellidoPaterno', e.target.value)}
+                  onBlur={() => marcar('apellidoPaterno')}
+                  trailing={check('apellidoPaterno')}
+                  disabled={camposBloqueados || saving}
+                />
+              </Field>
 
-            <Field label="Apellido materno" error={errors.apellidoMaterno}>
-              <Input
-                icon="user"
-                placeholder="Opcional"
-                value={form.apellidoMaterno}
-                onChange={e => update('apellidoMaterno', e.target.value)}
-                onBlur={() => marcar('apellidoMaterno')}
-                trailing={check('apellidoMaterno')}
-                disabled={camposBloqueados || saving}
-              />
-            </Field>
+              <Field label="Apellido materno" error={errors.apellidoMaterno}>
+                <Input
+                  icon="user"
+                  placeholder="Opcional"
+                  value={form.apellidoMaterno}
+                  onChange={e => update('apellidoMaterno', e.target.value)}
+                  onBlur={() => marcar('apellidoMaterno')}
+                  trailing={check('apellidoMaterno')}
+                  disabled={camposBloqueados || saving}
+                />
+              </Field>
+            </div>
+          </div>
 
-            <Field label="Teléfono" error={errors.telefono}>
-              <Input
-                icon="phone"
-                placeholder="Ej. 987 654 321"
-                value={form.telefono}
-                onChange={e =>
-                  update(
-                    'telefono',
-                    formatPhone(e.target.value),
-                  )
-                }
-                onBlur={() => marcar('telefono')}
-                trailing={check('telefono')}
-                inputMode="tel"
-                maxLength={17}
-                disabled={saving}
-              />
-            </Field>
+          {/* PANEL 3: INFORMACIÓN DE CONTACTO */}
+          <div className="rounded-xl border border-line bg-alt/30 p-4">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                Información de Contacto y Cuenta de Acceso <span className="text-danger">*</span>
+              </h3>
+            </div>
 
-            <Field label="Correo electrónico *" error={errors.correo}>
-              <Input
-                type="email"
-                icon="mail"
-                placeholder="usuario@correo.com"
-                value={form.correo}
-                onChange={e => update('correo', e.target.value)}
-                onBlur={() => marcar('correo')}
-                trailing={check('correo')}
-                disabled={saving}
-              />
-            </Field>
+            <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Teléfono" error={errors.telefono}>
+                <Input
+                  icon="phone"
+                  placeholder="Ej. 987 654 321"
+                  value={form.telefono}
+                  onChange={e =>
+                    update(
+                      'telefono',
+                      formatPhone(e.target.value),
+                    )
+                  }
+                  onBlur={() => marcar('telefono')}
+                  trailing={check('telefono')}
+                  inputMode="tel"
+                  maxLength={17}
+                  disabled={saving}
+                />
+              </Field>
+
+              <Field label="Correo electrónico *" error={errors.correo}>
+                <Input
+                  type="email"
+                  icon="mail"
+                  placeholder="usuario@correo.com"
+                  value={form.correo}
+                  onChange={e => update('correo', e.target.value)}
+                  onBlur={() => marcar('correo')}
+                  trailing={check('correo')}
+                  disabled={saving}
+                />
+              </Field>
+            </div>
           </div>
 
           <AnimatePresence initial={false}>
@@ -881,13 +924,15 @@ export function NewUserPage() {
                 transition={{ duration: 0.22 }}
                 className="relative z-20"
               >
-                <div className="space-y-4 rounded-card border border-line p-4">
+                <div className="space-y-4 rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">4</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Perfil Profesional Odontológico <span className="text-danger">*</span>
+                    </h3>
+                  </div>
 
-                  <h2 className="font-bold text-ink">
-                    Datos profesionales
-                  </h2>
-
-                  <div className="rounded-2xl border border-line bg-alt/40 p-4">
+                  <div className="rounded-xl border border-line bg-surface p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
 
                       <div className="flex justify-center sm:block">
@@ -1044,7 +1089,7 @@ export function NewUserPage() {
             </p>
           )}
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line/60">
 
             <Button
               type="button"
@@ -1059,7 +1104,7 @@ export function NewUserPage() {
               type="submit"
               disabled={saving || checking || cargandoRoles || !documentoListo || (esOdontologo && cargandoEspecialidades)}
             >
-              {saving ? 'Registrando…' : 'Registrar usuario'}
+              {saving ? 'Registrando…' : 'Registrar trabajador'}
             </Button>
 
           </div>

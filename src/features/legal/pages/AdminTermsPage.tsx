@@ -698,9 +698,11 @@ export function AdminTermsPage() {
                   <form onSubmit={handleGuardarTipo} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
                     {/* Panel 1: Parámetros del Catálogo */}
                     <div className="rounded-xl border border-line bg-alt/30 p-4">
-                      <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3 flex items-center gap-1.5">
-                        <Icon name="lock" size={14} />
-                        1. Identificación y Agrupación
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                          Identificación y Agrupación
+                        </h3>
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2 min-w-0 max-w-full">
@@ -737,9 +739,11 @@ export function AdminTermsPage() {
 
                     {/* Panel 2: Nombre descriptivo */}
                     <div className="rounded-xl border border-line bg-alt/30 p-4">
-                      <div className="text-xs font-bold uppercase tracking-wider text-brand mb-3 flex items-center gap-1.5">
-                        <Icon name="edit" size={14} />
-                        2. Nombre Oficial
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                          Nombre Oficial y Descripción
+                        </h3>
                       </div>
 
                       <Field
@@ -797,7 +801,7 @@ export function AdminTermsPage() {
           </AnimatePresence>
 
           <Card className="min-w-0 max-w-full overflow-hidden">
-            <div className="mb-4">
+            <div className="p-5 sm:p-6 pb-4 border-b border-line">
               <h2 className="text-base font-bold text-ink">Catálogo de Tipos de Documentos y Contratos</h2>
               <p className="mt-0.5 text-xs text-muted">
                 Define los tipos de contratos legales disponibles. Cada tipo mantiene su historial de versiones, teniendo estrictamente una versión activa a la vez.
@@ -1240,7 +1244,7 @@ export function AdminTermsPage() {
           </AnimatePresence>
 
           <Card className="min-w-0 max-w-full overflow-hidden">
-            <div className="mb-4">
+            <div className="p-5 sm:p-6 pb-4 border-b border-line">
               <h2 className="text-base font-bold text-ink">Versiones de Documentos Legales</h2>
               <p className="mt-0.5 text-xs text-muted">
                 Publica y administra las versiones de cada documento legal. Solo una versión puede estar Activa por tipo.
@@ -1409,7 +1413,7 @@ export function AdminTermsPage() {
        * ========================================================= */}
       {tabActual === 'aceptaciones' && (
         <Card className="min-w-0 max-w-full overflow-hidden">
-          <div className="mb-4">
+          <div className="p-5 sm:p-6 pb-4 border-b border-line">
             <h2 className="text-base font-bold text-ink">Auditoría de Aceptaciones</h2>
             <p className="mt-0.5 text-xs text-muted">
               Historial de aceptación de documentos legales por parte de los usuarios, incluyendo trazabilidad de dispositivo e IP.

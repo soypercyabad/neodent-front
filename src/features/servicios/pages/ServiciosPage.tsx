@@ -403,13 +403,21 @@ export function ServiciosPage() {
             transition={{ duration: 0.2 }}
             className="mb-5"
           >
-            <Card className="border-brand/30 p-5 sm:p-6">
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
-                    {editando === null ? 'Registrar nuevo servicio' : 'Editar servicio'}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted">Completa los datos generales del tratamiento.</p>
+            <Card className="border border-brand/30 shadow-md overflow-hidden">
+              {/* Encabezado con contraste visual */}
+              <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Icon name="tooth" size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-ink">
+                      {editando === null ? 'Registrar nuevo servicio' : 'Editar servicio'}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      Completa los parámetros clínicos, aranceles y sedes donde se brindará el tratamiento.
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -417,317 +425,340 @@ export function ServiciosPage() {
                   aria-label="Cerrar formulario"
                   onClick={cerrarForm}
                   disabled={guardando}
-                  className="rounded-lg p-2 text-muted hover:bg-alt"
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
                 >
-                  <Icon name="x" size={20} />
+                  <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={e => void guardar(e)} className="grid gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Nombre del servicio <span className="text-danger">*</span>
-                  </span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                      <Icon name="tooth" size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      maxLength={120}
-                      value={form.nombre}
-                      onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
-                      placeholder="Ej. Limpieza dental"
-                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
-                    />
+              <form onSubmit={e => void guardar(e)} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                {/* PANEL 1: INFORMACIÓN GENERAL */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Información General del Tratamiento <span className="text-danger">*</span>
+                    </h3>
                   </div>
-                </label>
 
-                <div>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Especialidad <span className="text-danger">*</span>
-                  </span>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">
+                        Nombre del servicio <span className="text-danger">*</span>
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="tooth" size={15} />
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          maxLength={120}
+                          value={form.nombre}
+                          onChange={e => setForm(actual => ({ ...actual, nombre: e.target.value }))}
+                          placeholder="Ej. Limpieza dental profunda"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                        />
+                      </div>
+                    </label>
 
-                  <AnimatedSelect
-                    label="Selecciona una especialidad"
-                    placeholder="Selecciona una especialidad"
-                    value={form.especialidadId}
-                    options={especialidades.map(especialidad => ({
-                      value: String(especialidad.id),
-                      label: `${especialidad.nombre}${especialidad.activo ? '' : ' (Inactiva)'}`,
-                      disabled: !especialidad.activo,
-                    }))}
-                    onChange={valor =>
-                      setForm(actual => ({ ...actual, especialidadId: valor }))
-                    }
-                    className="w-full"
-                  />
+                    <div>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">
+                        Especialidad <span className="text-danger">*</span>
+                      </span>
+
+                      <AnimatedSelect
+                        label="Selecciona una especialidad"
+                        placeholder="Selecciona una especialidad"
+                        value={form.especialidadId}
+                        options={especialidades.map(especialidad => ({
+                          value: String(especialidad.id),
+                          label: `${especialidad.nombre}${especialidad.activo ? '' : ' (Inactiva)'}`,
+                          disabled: !especialidad.activo,
+                        }))}
+                        onChange={valor =>
+                          setForm(actual => ({ ...actual, especialidadId: valor }))
+                        }
+                        className="w-full"
+                      />
+                    </div>
+
+                    <label className="sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">Descripción clínica</span>
+                      <textarea
+                        rows={2}
+                        maxLength={255}
+                        value={form.descripcion}
+                        onChange={e => setForm(actual => ({ ...actual, descripcion: e.target.value }))}
+                        placeholder="Describe brevemente el procedimiento para orientar al paciente..."
+                        className="w-full resize-y rounded-control border border-line bg-surface px-4 py-2.5 text-sm outline-none focus:border-brand"
+                      />
+                      <span className="mt-1 block text-right text-[11px] text-muted">
+                        {form.descripcion.length}/255
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
-                <label className="sm:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Descripción</span>
-                  <textarea
-                    rows={2}
-                    maxLength={255}
-                    value={form.descripcion}
-                    onChange={e => setForm(actual => ({ ...actual, descripcion: e.target.value }))}
-                    placeholder="Describe brevemente el tratamiento..."
-                    className="w-full resize-y rounded-control border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
-                  />
-                  <span className="mt-1 block text-right text-xs text-muted">
-                    {form.descripcion.length}/255
-                  </span>
-                </label>
-
-                <label>
-                  <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-ink">
-                    Duración (minutos) <span className="text-danger">*</span>
-                  </span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
-                      <Icon name="clock" size={16} />
-                    </span>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={1440}
-                      step={1}
-                      value={form.duracionMinutos}
-                      onChange={e => setForm(actual => ({ ...actual, duracionMinutos: e.target.value }))}
-                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
-                    />
+                {/* PANEL 2: DURACIÓN, TARIFA Y SEDES */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Duración, Tarifa y Sedes Disponibles <span className="text-danger">*</span>
+                    </h3>
                   </div>
-                </label>
 
-                <label>
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Precio referencial (S/)</span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-muted">
-                      S/
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={form.precioReferencial}
-                      onChange={handlePrecioChange}
-                      onKeyDown={handlePrecioKeyDown}
-                      placeholder="0.00"
-                      className="w-full rounded-control border border-line bg-surface py-3 pr-4 pl-9 text-sm outline-none focus:border-brand"
-                    />
+                  <div className="grid gap-4 sm:grid-cols-2 mb-4">
+                    <label>
+                      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                        Duración estimada (minutos) <span className="text-danger">*</span>
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted">
+                          <Icon name="clock" size={15} />
+                        </span>
+                        <input
+                          type="number"
+                          required
+                          min={1}
+                          max={1440}
+                          step={1}
+                          value={form.duracionMinutos}
+                          onChange={e => setForm(actual => ({ ...actual, duracionMinutos: e.target.value }))}
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                        />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink">Precio referencial (S/)</span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-xs font-semibold text-muted">
+                          S/
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={form.precioReferencial}
+                          onChange={handlePrecioChange}
+                          onKeyDown={handlePrecioKeyDown}
+                          placeholder="0.00"
+                          className="w-full rounded-control border border-line bg-surface py-2.5 pr-4 pl-9 text-sm outline-none focus:border-brand"
+                        />
+                      </div>
+                      <span className="mt-1 block text-[11px] text-muted">
+                        Opcional. Valor referencial mostrado al paciente.
+                      </span>
+                    </label>
                   </div>
-                  <span className="mt-1 block text-xs text-muted">
-                    Opcional. Valor decimal numérico (máx. 2 decimales).
-                  </span>
-                </label>
 
-                {/* MARCAR COMO DESTACADO */}
-                <div className="rounded-xl border border-line bg-surface/60 p-4 sm:col-span-2">
+                  {/* SEDES */}
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-ink">
+                      Sedes habilitadas para este servicio
+                    </span>
+
+                    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                      <button
+                        type="button"
+                        aria-expanded={mostrarSelectorSedes}
+                        onClick={() => setMostrarSelectorSedes(actual => !actual)}
+                        disabled={guardando}
+                        className={cn(
+                          'flex w-full items-center justify-between gap-4 p-3.5 text-left transition-colors',
+                          'hover:bg-alt disabled:cursor-not-allowed disabled:opacity-60',
+                          mostrarSelectorSedes && 'bg-brand-soft/40',
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-ink">
+                            {form.sedeIds.length === 0
+                              ? 'Seleccionar sedes...'
+                              : `${form.sedeIds.length} ${form.sedeIds.length === 1
+                                ? 'sede seleccionada'
+                                : 'sedes seleccionadas'
+                              }`}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-muted">
+                            {form.sedeIds.length === 0
+                              ? 'Haz clic para desplegar los establecimientos clínicos'
+                              : sedes
+                                .filter(sede => form.sedeIds.includes(sede.id))
+                                .slice(0, 2)
+                                .map(sede => sede.nombre)
+                                .join(' · ') +
+                              (form.sedeIds.length > 2 ? ` · +${form.sedeIds.length - 2} más` : '')}
+                          </p>
+                        </div>
+
+                        <motion.span
+                          aria-hidden="true"
+                          animate={{ rotate: mostrarSelectorSedes ? 180 : 0 }}
+                          transition={{ duration: 0.2, ease: 'easeInOut' }}
+                          className="flex shrink-0 items-center justify-center text-muted"
+                        >
+                          <Icon name="chevronDown" size={18} />
+                        </motion.span>
+                      </button>
+
+                      <AnimatePresence>
+                        {mostrarSelectorSedes && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeInOut' }}
+                            className="overflow-hidden border-t border-line"
+                          >
+                            <div className="border-b border-line p-3">
+                              <SearchInput
+                                value={busquedaSede}
+                                onChange={e => setBusquedaSede(e.target.value)}
+                                onClear={() => setBusquedaSede('')}
+                                placeholder="Buscar por nombre, distrito o provincia..."
+                                aria-label="Buscar sede"
+                                className="w-full"
+                              />
+                            </div>
+
+                            <div className="flex max-h-60 flex-col gap-1.5 overflow-y-auto overscroll-contain p-2.5">
+                              {sedes
+                                .filter(sede => {
+                                  const texto = normalizar(
+                                    `${sede.nombre} ${sede.distrito ?? ''}`,
+                                  )
+                                  return texto.includes(normalizar(busquedaSede.trim()))
+                                })
+                                .map(sede => {
+                                  const seleccionada = form.sedeIds.includes(sede.id)
+
+                                  return (
+                                    <label
+                                      key={sede.id}
+                                      className={cn(
+                                        'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors duration-150',
+                                        seleccionada
+                                          ? 'border-brand/40 bg-brand-soft/70 shadow-xs'
+                                          : 'border-line/70 bg-surface hover:border-brand/30 hover:bg-alt/80',
+                                      )}
+                                    >
+                                      <Checkbox
+                                        checked={seleccionada}
+                                        disabled={guardando}
+                                        onChange={e => {
+                                          setForm(actual => ({
+                                            ...actual,
+                                            sedeIds: e.target.checked
+                                              ? [...actual.sedeIds, sede.id]
+                                              : actual.sedeIds.filter(id => id !== sede.id),
+                                          }))
+                                        }}
+                                      />
+
+                                      <span className="min-w-0 flex-1">
+                                        <span
+                                          className={cn(
+                                            'block text-sm font-semibold',
+                                            seleccionada ? 'text-brand' : 'text-ink',
+                                          )}
+                                        >
+                                          {sede.nombre}
+                                        </span>
+
+                                        <span className="block truncate text-xs text-muted">
+                                          {sede.distrito ? `Distrito: ${sede.distrito}` : 'Sede clínica'}
+                                        </span>
+                                      </span>
+
+                                      {!sede.activo && (
+                                        <span className="shrink-0 rounded-full bg-alt px-2 py-0.5 text-[0.7rem] font-medium text-muted">
+                                          Inactiva
+                                        </span>
+                                      )}
+                                    </label>
+                                  )
+                                })}
+
+                              {sedes.length === 0 && (
+                                <p className="px-3 py-5 text-center text-sm text-muted">
+                                  No hay sedes registradas.
+                                </p>
+                              )}
+
+                              {sedes.length > 0 &&
+                                !sedes.some(sede =>
+                                  normalizar(
+                                    `${sede.nombre} ${sede.distrito ?? ''}`,
+                                  ).includes(normalizar(busquedaSede.trim())),
+                                ) && (
+                                  <p className="px-3 py-5 text-center text-sm text-muted">
+                                    No se encontraron sedes con esa búsqueda.
+                                  </p>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5">
+                              <span className="text-xs text-muted">
+                                {form.sedeIds.length} de {sedes.length} seleccionadas
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => setMostrarSelectorSedes(false)}
+                                className="text-xs font-semibold text-brand hover:underline"
+                              >
+                                Listo
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {form.sedeIds.length === 0 && (
+                      <p className="mt-1.5 text-[11px] text-muted">
+                        Sin sedes asignadas, el servicio no estará disponible para nuevas reservas.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* PANEL 3: DESTACADO */}
+                <div className="rounded-xl border border-brand/20 bg-brand-soft/20 p-4 flex items-center justify-between">
+                  <div>
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-ink">
+                      <Icon name="starFilled" size={14} className="text-amber-500" />
+                      <span>Destacar en reservas web</span>
+                    </span>
+                    <span className="text-[11px] text-muted block mt-0.5">
+                      Aparecerá en la sección de tratamientos recomendados al reservar citas.
+                    </span>
+                  </div>
                   <Checkbox
                     id="chk-destacado"
                     checked={form.destacado}
                     onChange={e => setForm(actual => ({ ...actual, destacado: e.target.checked }))}
-                    label={
-                      <div>
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                          <Icon name="starFilled" size={15} className="text-amber-500" />
-                          <span>Marcar como servicio destacado</span>
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted">
-                          Aparecerá priorizado en la pestaña principal &ldquo;Destacados&rdquo; durante la reserva de citas.
-                        </span>
-                      </div>
-                    }
+                    label={form.destacado ? 'Destacado' : 'Estándar'}
                   />
                 </div>
 
-                {/* SEDES DONDE SE OFRECE EL SERVICIO */}
-                <div className="sm:col-span-2">
-                  <div className="mb-3">
-                    <h3 className="text-sm font-bold text-ink">
-                      Sedes donde se ofrece el servicio
-                    </h3>
-                    <p className="mt-1 text-xs text-muted">
-                      Selecciona los establecimientos donde estará disponible este tratamiento.
-                    </p>
-                  </div>
-
-                  <div className="overflow-hidden rounded-xl border border-line bg-surface">
-                    {/* RESUMEN: SIEMPRE VISIBLE */}
-                    <button
-                      type="button"
-                      aria-expanded={mostrarSelectorSedes}
-                      onClick={() => setMostrarSelectorSedes(actual => !actual)}
-                      disabled={guardando}
-                      className={cn(
-                        'flex w-full items-center justify-between gap-4 p-4 text-left transition-colors',
-                        'hover:bg-alt disabled:cursor-not-allowed disabled:opacity-60',
-                        mostrarSelectorSedes && 'bg-brand-soft/40',
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-ink">
-                          {form.sedeIds.length === 0
-                            ? 'Seleccionar sedes'
-                            : `${form.sedeIds.length} ${form.sedeIds.length === 1
-                              ? 'sede seleccionada'
-                              : 'sedes seleccionadas'
-                            }`}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-muted">
-                          {form.sedeIds.length === 0
-                            ? 'Haz clic para buscar y seleccionar establecimientos'
-                            : sedes
-                              .filter(sede => form.sedeIds.includes(sede.id))
-                              .slice(0, 2)
-                              .map(sede => sede.nombre)
-                              .join(' · ') +
-                            (form.sedeIds.length > 2 ? ` · +${form.sedeIds.length - 2} más` : '')}
-                        </p>
-                      </div>
-
-                      <motion.span
-                        aria-hidden="true"
-                        animate={{ rotate: mostrarSelectorSedes ? 180 : 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="flex shrink-0 items-center justify-center text-muted"
-                      >
-                        <Icon name="chevronDown" size={18} />
-                      </motion.span>
-                    </button>
-
-                    {/* PANEL DESPLEGABLE CON ANIMACIÓN FLUIDA */}
-                    <AnimatePresence>
-                      {mostrarSelectorSedes && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.22, ease: 'easeInOut' }}
-                          className="overflow-hidden border-t border-line"
-                        >
-                          {/* BUSCADOR */}
-                          <div className="border-b border-line p-3">
-                            <SearchInput
-                              value={busquedaSede}
-                              onChange={e => setBusquedaSede(e.target.value)}
-                              onClear={() => setBusquedaSede('')}
-                              placeholder="Buscar por nombre, distrito o provincia..."
-                              aria-label="Buscar sede"
-                              className="w-full"
-                            />
-                          </div>
-
-                          {/* LISTA CON SEPARACIÓN Y ALTURA MÁXIMA */}
-                          <div className="flex max-h-60 flex-col gap-1.5 overflow-y-auto overscroll-contain p-2.5">
-                            {sedes
-                              .filter(sede => {
-                                const texto = normalizar(
-                                  `${sede.nombre} ${sede.distrito ?? ''}`,
-                                )
-                                return texto.includes(normalizar(busquedaSede.trim()))
-                              })
-                              .map(sede => {
-                                const seleccionada = form.sedeIds.includes(sede.id)
-
-                                return (
-                                  <label
-                                    key={sede.id}
-                                    className={cn(
-                                      'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors duration-150',
-                                      seleccionada
-                                        ? 'border-brand/40 bg-brand-soft/70 shadow-xs'
-                                        : 'border-line/70 bg-surface hover:border-brand/30 hover:bg-alt/80',
-                                    )}
-                                  >
-                                    <Checkbox
-                                      checked={seleccionada}
-                                      disabled={guardando}
-                                      onChange={e => {
-                                        setForm(actual => ({
-                                          ...actual,
-                                          sedeIds: e.target.checked
-                                            ? [...actual.sedeIds, sede.id]
-                                            : actual.sedeIds.filter(id => id !== sede.id),
-                                        }))
-                                      }}
-                                    />
-
-                                    <span className="min-w-0 flex-1">
-                                      <span
-                                        className={cn(
-                                          'block text-sm font-semibold',
-                                          seleccionada ? 'text-brand' : 'text-ink',
-                                        )}
-                                      >
-                                        {sede.nombre}
-                                      </span>
-
-                                      <span className="block truncate text-xs text-muted">
-                                        {sede.distrito ? `Distrito: ${sede.distrito}` : 'Sede clínica'}
-                                      </span>
-                                    </span>
-
-                                    {!sede.activo && (
-                                      <span className="shrink-0 rounded-full bg-alt px-2 py-0.5 text-[0.7rem] font-medium text-muted">
-                                        Inactiva
-                                      </span>
-                                    )}
-                                  </label>
-                                )
-                              })}
-
-                            {sedes.length === 0 && (
-                              <p className="px-3 py-5 text-center text-sm text-muted">
-                                No hay sedes registradas.
-                              </p>
-                            )}
-
-                            {sedes.length > 0 &&
-                              !sedes.some(sede =>
-                                normalizar(
-                                  `${sede.nombre} ${sede.distrito ?? ''}`,
-                                ).includes(normalizar(busquedaSede.trim())),
-                              ) && (
-                                <p className="px-3 py-5 text-center text-sm text-muted">
-                                  No se encontraron sedes con esa búsqueda.
-                                </p>
-                              )}
-                          </div>
-
-                          {/* PIE DEL SELECTOR */}
-                          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
-                            <span className="text-xs text-muted">
-                              {form.sedeIds.length} de {sedes.length} seleccionadas
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => setMostrarSelectorSedes(false)}
-                              className="text-xs font-semibold text-brand hover:underline"
-                            >
-                              Listo
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {form.sedeIds.length === 0 && (
-                    <p className="mt-2 text-xs text-muted">
-                      Sin sedes asignadas, el servicio no estará disponible para nuevas reservas.
-                    </p>
-                  )}
-                </div>
-
-
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-5 sm:col-span-2">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-3 border-t border-line">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={cerrarForm}
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={guardando}>
+                  <Button
+                    type="submit"
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
                     {guardando ? 'Guardando…' : editando === null ? 'Registrar servicio' : 'Guardar cambios'}
                   </Button>
                 </div>

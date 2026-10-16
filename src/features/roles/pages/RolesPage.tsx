@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   ActionsCell, AnimatedSelect, Badge, Button, Card, Checkbox, ConfirmDialog,
   Field, Icon, Input, PageHead, Pagination, RolesTableSkeleton, RowActions, SearchInput,
   Table, TableFoot, TableState, Toast, Toolbar, Tooltip,
-  type Column, type IconName, type ToastAviso,
+  type Column, type IconName, type ToastAviso, resolveIcon,
 } from '@/shared/components/ui'
+import { MODULE_NAV_MAP } from '@/app/navigation'
 import { useAuth } from '@/features/auth'
 import { scrollToTopOrElement } from '@/shared/lib/scroll'
 import { ApiError } from '@/shared/api/apiClient'
@@ -35,19 +36,14 @@ const MODULOS_CLINICOS_CODIGOS = new Set([
   'SERVICIOS',
 ])
 
-function iconSafe(name: string | null | undefined): IconName {
-  const ICON_KEYS: Set<string> = new Set([
-    'usuarios', 'citas', 'pacientes', 'logout', 'calendar', 'calendarEdit',
-    'bell', 'plus', 'printer', 'chevronDown', 'chevronUp', 'chevronLeft',
-    'chevronRight', 'arrowLeft', 'edit', 'trash', 'search', 'kebab', 'eye',
-    'file', 'xCircle', 'x', 'checkCircle', 'alertCircle', 'info', 'warning',
-    'spinner', 'refreshCw', 'check', 'user', 'lock', 'eyeOff', 'mail',
-    'phone', 'messageSquare', 'whatsapp', 'clock', 'question', 'tooth',
-    'toothCracked', 'braces', 'forceps', 'menu', 'layers', 'shield',
-    'location', 'building', 'sliders',
-  ])
-  if (name && ICON_KEYS.has(name)) {
-    return name as IconName
+function getModuloIcon(m: { icono?: string | null; codigo?: string | null }): IconName {
+  if (m.icono) {
+    const resolved = resolveIcon(m.icono, '')
+    if (resolved) return resolved as IconName
+  }
+  const cod = m.codigo?.toUpperCase() || ''
+  if (cod in MODULE_NAV_MAP) {
+    return MODULE_NAV_MAP[cod].icon
   }
   return 'layers'
 }
@@ -228,9 +224,43 @@ export function RolesPage() {
   }
 
   const toggleModulo = (id: number) => {
-    setSelectedModulos(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
-    )
+    setSelectedModulos(prev => {
+      const exists = prev.includes(id)
+      const targetMod = modulos.find(m => (m.id ?? m.idModulo!) === id)
+      if (exists) {
+        const next = prev.filter(x => x !== id)
+        if (targetMod?.idModuloPadre) {
+          const quedanHermanos = modulos.some(
+            m => m.idModuloPadre === targetMod.idModuloPadre && (m.id ?? m.idModulo!) !== id && next.includes(m.id ?? m.idModulo!)
+          )
+          if (!quedanHermanos) {
+            return next.filter(x => x !== targetMod.idModuloPadre)
+          }
+        }
+        return next
+      } else {
+        const next = [...prev, id]
+        if (targetMod?.idModuloPadre && !next.includes(targetMod.idModuloPadre)) {
+          next.push(targetMod.idModuloPadre)
+        }
+        return next
+      }
+    })
+  }
+
+  const toggleContenedor = (contenedorId: number) => {
+    const hijos = modulos.filter(m => m.idModuloPadre === contenedorId)
+    const hijosIds = hijos.map(m => m.id ?? m.idModulo!)
+    const todosSeleccionados = hijosIds.length > 0 && hijosIds.every(id => selectedModulos.includes(id))
+
+    setSelectedModulos(prev => {
+      if (todosSeleccionados) {
+        return prev.filter(id => id !== contenedorId && !hijosIds.includes(id))
+      } else {
+        const set = new Set([...prev, contenedorId, ...hijosIds])
+        return Array.from(set)
+      }
+    })
   }
 
   const seleccionarTodos = () => {
@@ -247,6 +277,22 @@ export function RolesPage() {
   const limpiarModulos = () => {
     setSelectedModulos([])
   }
+
+  const modulosContenedores = useMemo(() => {
+    return modulos.filter(m => {
+      const id = m.id ?? m.idModulo!
+      const esPadre = modulos.some(hijo => hijo.idModuloPadre === id)
+      return !m.ruta || esPadre
+    })
+  }, [modulos])
+
+  const modulosPrincipales = useMemo(() => {
+    return modulos.filter(m => {
+      const id = m.id ?? m.idModulo!
+      const esContenedor = modulosContenedores.some(c => (c.id ?? c.idModulo!) === id)
+      return !m.idModuloPadre && !esContenedor
+    })
+  }, [modulos, modulosContenedores])
 
   // GUARDAR ROL
   const guardar = async (e: FormEvent) => {
@@ -355,18 +401,19 @@ export function RolesPage() {
             exit={{ opacity: 0, height: 0 }}
             className="mb-5 overflow-hidden"
           >
-            <Card className="p-6">
-              <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                    <Icon name={editando ? 'edit' : 'lock'} size={18} />
-                  </span>
+            <Card className="border border-brand/30 shadow-md overflow-hidden">
+              {/* Encabezado con contraste visual */}
+              <div className="bg-brand-soft/30 border-b border-brand/20 px-5 py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Icon name={editando ? 'edit' : 'shield'} size={18} />
+                  </div>
                   <div>
-                    <h3 className="text-base font-bold text-ink">
+                    <h2 className="text-base font-bold text-ink">
                       {editando ? `Editar rol: ${editando.nombre}` : 'Nuevo rol de usuario'}
-                    </h3>
+                    </h2>
                     <p className="text-xs text-muted">
-                      Define los datos y selecciona los módulos que tendrá permitidos este perfil.
+                      Define los datos y selecciona los módulos y submenús que tendrá permitidos este perfil.
                     </p>
                   </div>
                 </div>
@@ -374,55 +421,63 @@ export function RolesPage() {
                 <button
                   type="button"
                   onClick={() => setMostrarForm(false)}
-                  className="rounded-lg p-1.5 text-muted hover:bg-alt hover:text-ink"
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface/80 hover:text-ink transition shrink-0"
                   aria-label="Cerrar formulario"
                 >
                   <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={guardar} className="flex flex-col gap-4">
-                <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
-                  <Field
-                    label="Nombre del rol *"
-                    hint={editando?.sistema ? 'El nombre de un rol reservado del sistema no puede modificarse.' : undefined}
-                  >
-                    <Input
-                      icon="lock"
-                      value={nombre}
-                      onChange={e =>
-                        setNombre(
-                          e.target.value
-                            .toUpperCase()
-                            .replace(/\s+/g, '_'),
-                        )
-                      }
-                      disabled={guardando || Boolean(editando?.sistema)}
-                      placeholder="Ej. AUDITOR_CLINICO"
-                    />
-                  </Field>
+              <form onSubmit={guardar} className="p-5 sm:p-6 grid gap-5 min-w-0 max-w-full bg-surface">
+                {/* PANEL 1: IDENTIFICACIÓN */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Identificación y Alcance del Rol <span className="text-danger">*</span>
+                    </h3>
+                  </div>
 
-                  <Field label="Descripción del rol">
-                    <Input
-                      icon="file"
-                      value={descripcion}
-                      onChange={e => setDescripcion(e.target.value)}
-                      disabled={guardando}
-                      placeholder="Describe la responsabilidad y alcance de este rol…"
-                    />
-                  </Field>
+                  <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
+                    <Field
+                      label="Nombre del rol *"
+                      hint={editando?.sistema ? 'El nombre de un rol reservado del sistema no puede modificarse.' : undefined}
+                    >
+                      <Input
+                        icon="lock"
+                        value={nombre}
+                        onChange={e =>
+                          setNombre(
+                            e.target.value
+                              .toUpperCase()
+                              .replace(/\s+/g, '_'),
+                          )
+                        }
+                        disabled={guardando || Boolean(editando?.sistema)}
+                        placeholder="Ej. AUDITOR_CLINICO"
+                      />
+                    </Field>
+
+                    <Field label="Descripción del rol">
+                      <Input
+                        icon="file"
+                        value={descripcion}
+                        onChange={e => setDescripcion(e.target.value)}
+                        disabled={guardando}
+                        placeholder="Describe la responsabilidad y alcance de este rol…"
+                      />
+                    </Field>
+                  </div>
                 </div>
 
-                {/* SELECCIÓN DE MÓDULOS */}
-                <div className="rounded-2xl border border-line bg-surface-muted/30 p-4">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line/70 pb-3">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
+                {/* PANEL 2: ASIGNACIÓN DE MÓDULOS */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-line/60">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
                         Módulos con acceso ({selectedModulos.length} de {modulos.length} asignados)
-                      </h4>
-                      <p className="text-xs text-muted">
-                        Los usuarios con este rol solo podrán ver e interactuar con los módulos seleccionados.
-                      </p>
+                      </h3>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs">
@@ -455,64 +510,159 @@ export function RolesPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    {modulos.map(m => {
-                      const moduloId = m.id ?? m.idModulo!
-                      const checked = selectedModulos.includes(moduloId)
-                      const iconName = iconSafe(m.icono)
+                  {/* A. MÓDULOS PRINCIPALES (OPERATIVOS) */}
+                  {modulosPrincipales.length > 0 && (
+                    <div className="mb-4">
+                      <span className="text-xs font-bold text-ink-soft uppercase tracking-wider block mb-2">
+                        Módulos Principales / Operativos
+                      </span>
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        {modulosPrincipales.map(m => {
+                          const moduloId = m.id ?? m.idModulo!
+                          const checked = selectedModulos.includes(moduloId)
+                          const iconName = getModuloIcon(m)
 
-                      return (
-                        <div
-                          key={moduloId}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            if (!guardando) toggleModulo(moduloId)
-                          }}
-                          onKeyDown={e => {
-                            if ((e.key === ' ' || e.key === 'Enter') && !guardando) {
-                              e.preventDefault()
-                              toggleModulo(moduloId)
-                            }
-                          }}
-                          className={cn(
-                            'group flex items-start gap-2.5 rounded-xl border p-2.5 text-xs transition cursor-pointer select-none',
-                            checked
-                              ? 'border-brand/40 bg-brand-soft/70 text-ink shadow-2xs ring-1 ring-brand/30'
-                              : 'border-line/70 bg-surface text-ink-soft hover:bg-hover hover:text-ink',
-                            guardando && 'cursor-not-allowed opacity-60',
-                          )}
-                        >
-                          <span className="pt-0.5 pointer-events-none">
+                          return (
+                            <div
+                              key={moduloId}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                if (!guardando) toggleModulo(moduloId)
+                              }}
+                              onKeyDown={e => {
+                                if ((e.key === ' ' || e.key === 'Enter') && !guardando) {
+                                  e.preventDefault()
+                                  toggleModulo(moduloId)
+                                }
+                              }}
+                              className={cn(
+                                'group flex items-start gap-2.5 rounded-xl border p-2.5 text-xs transition cursor-pointer select-none',
+                                checked
+                                  ? 'border-brand/40 bg-brand-soft/70 text-ink shadow-2xs ring-1 ring-brand/30'
+                                  : 'border-line/70 bg-surface text-ink-soft hover:bg-hover hover:text-ink',
+                                guardando && 'cursor-not-allowed opacity-60',
+                              )}
+                            >
+                              <span className="pt-0.5 pointer-events-none">
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={guardando}
+                                  readOnly
+                                  tabIndex={-1}
+                                />
+                              </span>
+
+                              <span className={cn(
+                                'flex size-7 shrink-0 items-center justify-center rounded-lg transition',
+                                checked
+                                  ? 'bg-brand text-white shadow-xs'
+                                  : 'bg-alt text-muted group-hover:text-ink',
+                              )}>
+                                <Icon name={iconName} size={15} />
+                              </span>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-ink truncate leading-tight">
+                                  {m.nombre}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-muted truncate">
+                                  {m.codigo}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* B. MÓDULOS CONTENEDORES CON SUBMENÚS */}
+                  {modulosContenedores.map(c => {
+                    const cId = c.id ?? c.idModulo!
+                    const submodulos = modulos.filter(x => x.idModuloPadre === cId)
+                    const submodulosIds = submodulos.map(x => x.id ?? x.idModulo!)
+                    const submodulosSeleccionados = submodulosIds.filter(id => selectedModulos.includes(id)).length
+                    const todosSeleccionados = submodulosIds.length > 0 && submodulosSeleccionados === submodulosIds.length
+                    const contenedorChecked = selectedModulos.includes(cId)
+
+                    return (
+                      <div key={cId} className="rounded-xl border border-line bg-surface p-3.5 mb-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-line/60">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => !guardando && toggleContenedor(cId)}
+                            className="flex items-center gap-2.5 cursor-pointer select-none"
+                          >
                             <Checkbox
-                              checked={checked}
+                              checked={todosSeleccionados || contenedorChecked}
                               disabled={guardando}
                               readOnly
                               tabIndex={-1}
                             />
-                          </span>
-
-                          <span className={cn(
-                            'flex size-7 shrink-0 items-center justify-center rounded-lg transition',
-                            checked
-                              ? 'bg-brand text-white shadow-xs'
-                              : 'bg-alt text-muted group-hover:text-ink',
-                          )}>
-                            <Icon name={iconName} size={15} />
-                          </span>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-ink truncate leading-tight">
-                              {m.nombre}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-muted truncate">
-                              {m.codigo}
-                            </p>
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                              <Icon name={getModuloIcon(c)} size={15} />
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-ink text-xs">{c.nombre}</span>
+                                <Badge tone="amber" className="text-[10px] py-0 px-1.5">Módulo Agrupador</Badge>
+                              </div>
+                              <span className="text-[11px] text-muted block">
+                                {submodulosSeleccionados} de {submodulos.length} submenús asignados
+                              </span>
+                            </div>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => !guardando && toggleContenedor(cId)}
+                            className="text-xs font-semibold text-brand hover:underline"
+                          >
+                            {todosSeleccionados ? 'Deseleccionar grupo' : 'Seleccionar todo el grupo'}
+                          </button>
                         </div>
-                      )
-                    })}
-                  </div>
+
+                        {/* SUBMÓDULOS DENTRO DEL CONTENEDOR */}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 pl-1">
+                          {submodulos.map(sub => {
+                            const subId = sub.id ?? sub.idModulo!
+                            const checked = selectedModulos.includes(subId)
+                            return (
+                              <div
+                                key={subId}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => !guardando && toggleModulo(subId)}
+                                className={cn(
+                                  'group flex items-start gap-2.5 rounded-xl border p-2 text-xs transition cursor-pointer select-none',
+                                  checked
+                                    ? 'border-brand/40 bg-brand-soft/70 text-ink shadow-2xs ring-1 ring-brand/30'
+                                    : 'border-line/70 bg-surface text-ink-soft hover:bg-hover hover:text-ink',
+                                  guardando && 'cursor-not-allowed opacity-60',
+                                )}
+                              >
+                                <span className="pt-0.5 pointer-events-none">
+                                  <Checkbox checked={checked} disabled={guardando} readOnly tabIndex={-1} />
+                                </span>
+                                <span className={cn(
+                                  'flex size-6 shrink-0 items-center justify-center rounded-md transition text-xs',
+                                  checked ? 'bg-brand text-white shadow-xs' : 'bg-alt text-muted group-hover:text-ink'
+                                )}>
+                                  <Icon name={getModuloIcon(sub)} size={13} />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-ink truncate leading-tight text-xs">{sub.nombre}</p>
+                                  <p className="mt-0.5 text-[10px] text-muted truncate">{sub.codigo}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {error && (
@@ -521,16 +671,23 @@ export function RolesPage() {
                   </p>
                 )}
 
-                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-3 border-t border-line">
                   <Button
-                    variant="ghost"
+                    type="button"
+                    variant="outline"
                     onClick={() => setMostrarForm(false)}
                     disabled={guardando}
+                    className="w-full sm:w-auto"
                   >
                     Cancelar
                   </Button>
 
-                  <Button type="submit" disabled={guardando}>
+                  <Button
+                    type="submit"
+                    disabled={guardando}
+                    className="w-full sm:w-auto"
+                  >
                     {guardando
                       ? 'Guardando…'
                       : editando

@@ -127,6 +127,21 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS
 
+export function isIconName(name: string): name is IconName {
+  return name in ICONS
+}
+
+export function resolveIcon(name: string | null | undefined, fallback: IconName | '' = 'layers'): IconName | '' {
+  if (!name) return fallback
+  const trimmed = name.trim()
+  if (trimmed in ICONS) return trimmed as IconName
+  const camel = trimmed
+    .replace(/[-_]([a-z0-9])/gi, (_, c) => c.toUpperCase())
+    .replace(/^[A-Z]/, c => c.toLowerCase())
+  if (camel in ICONS) return camel as IconName
+  return fallback
+}
+
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name: IconName
   size?: number

@@ -625,196 +625,227 @@ export function ScheduleHistoryPage() {
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="relative z-10 w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-2xl"
+              className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
             >
-              <div className="flex items-center justify-between border-b border-line pb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-ink">
-                    {editando === null ? 'Nuevo horario de atención' : 'Editar horario de atención'}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-muted">
-                    Define el turno semanal y el periodo exacto durante el cual estará vigente.
-                  </p>
+              <div className="flex items-center justify-between border-b border-brand/20 bg-brand-soft/30 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+                    <Icon name="clock" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-ink">
+                      {editando === null ? 'Registrar horario de atención' : 'Editar horario de atención'}
+                    </h3>
+                    <p className="text-xs text-muted">
+                      Define el especialista, sede, jornada semanal y vigencia temporal del turno.
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={cerrarForm}
-                  className="rounded-lg p-1.5 text-muted hover:bg-alt hover:text-ink"
+                  className="rounded-lg p-1.5 text-muted hover:bg-alt hover:text-ink transition-colors"
                   aria-label="Cerrar modal"
                 >
                   <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={guardar} className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="sm:col-span-2 lg:col-span-2">
-                  <AnimatedSelect
-                    value={form.odontologoId}
-                    options={listaOdontologos.map(item => ({
-                      value: String(item.odontologoId),
-                      label: `Dr(a). ${nombreCompleto(item)}`,
-                    }))}
-                    onChange={value => {
-                      const espDoctor = catalogo.filter(item => String(item.odontologoId) === value)
-                      setForm(actual => ({
-                        ...actual,
-                        odontologoId: value,
-                        odontologoEspecialidadId: espDoctor[0]
-                          ? String(espDoctor[0].odontologoEspecialidadId)
-                          : '',
-                      }))
-                    }}
-                    label="Odontólogo"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-2">
-                  <AnimatedSelect
-                    value={form.odontologoEspecialidadId}
-                    options={opcionesEspecialidadesForm}
-                    onChange={value =>
-                      setForm(actual => ({ ...actual, odontologoEspecialidadId: value }))
-                    }
-                    label="Especialidad"
-                    disabled={guardando || !form.odontologoId}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-2">
-                  <AnimatedSelect
-                    value={form.sedeId}
-                    options={sedes.map(s => ({ value: String(s.id), label: s.nombre }))}
-                    onChange={value => setForm(actual => ({ ...actual, sedeId: value }))}
-                    label="Sede"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-2">
-                  <AnimatedSelect
-                    value={form.diaSemana}
-                    options={DIAS.map(d => ({ value: d.value, label: d.label }))}
-                    onChange={value => setForm(actual => ({ ...actual, diaSemana: value }))}
-                    label="Día de atención"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="min-w-0 sm:col-span-1 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Hora de inicio</span>
-                  <ClockTimePicker
-                    value={form.horaInicio}
-                    onChange={value => setForm(actual => ({ ...actual, horaInicio: value }))}
-                    label="Hora de inicio"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="min-w-0 sm:col-span-1 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Hora de fin</span>
-                  <ClockTimePicker
-                    value={form.horaFin}
-                    onChange={value => setForm(actual => ({ ...actual, horaFin: value }))}
-                    label="Hora de fin"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="min-w-0 sm:col-span-1 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Vigente desde</span>
-                  <AnimatedDatePicker
-                    value={form.fechaInicioVigencia}
-                    onChange={value =>
-                      setForm(actual => ({
-                        ...actual,
-                        fechaInicioVigencia: value,
-                        fechaFinVigencia:
-                          !actual.sinFechaFin && actual.fechaFinVigencia < value
-                            ? value
-                            : actual.fechaFinVigencia,
-                      }))
-                    }
-                    label="Inicio de vigencia"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="min-w-0 sm:col-span-1 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">Vigente hasta</span>
-                  <AnimatedDatePicker
-                    value={form.fechaFinVigencia}
-                    onChange={value => setForm(actual => ({ ...actual, fechaFinVigencia: value }))}
-                    min={form.fechaInicioVigencia || undefined}
-                    label="Fin de vigencia"
-                    disabled={guardando || form.sinFechaFin}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-4">
-                  <Checkbox
-                    checked={form.sinFechaFin}
-                    onChange={event =>
-                      setForm(actual => ({
-                        ...actual,
-                        sinFechaFin: event.target.checked,
-                        fechaFinVigencia: event.target.checked ? '' : actual.fechaFinVigencia,
-                      }))
-                    }
-                    label="Mantener este horario sin fecha final (indefinido)"
-                    disabled={guardando}
-                  />
-                </div>
-
-                {/* ALERTA INTELIGENTE DE VIGENCIA Y AJUSTE RÁPIDO */}
-                {resumenVigencia && !form.sinFechaFin && (
-                  <div className="sm:col-span-2 lg:col-span-4 rounded-xl border border-line bg-alt/50 p-3.5 text-xs">
-                    {resumenVigencia.aviso && (
-                      <div className="mb-2 flex items-start gap-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 text-amber-900">
-                        <Icon name="warning" size={17} className="mt-0.5 shrink-0 text-amber-600" />
-                        <div className="min-w-0">
-                          <p className="font-bold text-amber-950">Aviso sobre fecha de vigencia</p>
-                          <p className="mt-0.5 leading-relaxed text-amber-900">{resumenVigencia.aviso}</p>
-                          {resumenVigencia.fechaAjustadaSugerida && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setForm(actual => ({
-                                  ...actual,
-                                  fechaFinVigencia: resumenVigencia.fechaAjustadaSugerida!,
-                                }))
-                              }
-                              className="mt-1.5 inline-flex items-center gap-1 font-bold text-brand hover:underline"
-                            >
-                              <span>Ajustar fin de vigencia al {fechaCorta(resumenVigencia.fechaAjustadaSugerida)} →</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-muted font-medium">
-                      <Icon name="calendar" size={15} className="shrink-0 text-brand" />
-                      <span>
-                        {resumenVigencia.count === 0 ? (
-                          <strong className="text-danger">0 turnos efectivos en este periodo</strong>
-                        ) : (
-                          <>
-                            <strong className="text-ink">
-                              {resumenVigencia.count} turno{resumenVigencia.count === 1 ? '' : 's'} de atención efectivo{resumenVigencia.count === 1 ? '' : 's'}
-                            </strong>
-                            {resumenVigencia.primerDia &&
-                              ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
-                              })`}
-                          </>
-                        )}
-                      </span>
+              <form onSubmit={guardar} className="p-6 space-y-4">
+                {/* PANEL 1: ESPECIALISTA Y SEDE */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Profesional, Especialidad y Sede <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <AnimatedSelect
+                        value={form.odontologoId}
+                        options={listaOdontologos.map(item => ({
+                          value: String(item.odontologoId),
+                          label: `Dr(a). ${nombreCompleto(item)}`,
+                        }))}
+                        onChange={value => {
+                          const espDoctor = catalogo.filter(item => String(item.odontologoId) === value)
+                          setForm(actual => ({
+                            ...actual,
+                            odontologoId: value,
+                            odontologoEspecialidadId: espDoctor[0]
+                              ? String(espDoctor[0].odontologoEspecialidadId)
+                              : '',
+                          }))
+                        }}
+                        label="Odontólogo"
+                        disabled={guardando}
+                      />
+                    </div>
+                    <div>
+                      <AnimatedSelect
+                        value={form.odontologoEspecialidadId}
+                        options={opcionesEspecialidadesForm}
+                        onChange={value =>
+                          setForm(actual => ({ ...actual, odontologoEspecialidadId: value }))
+                        }
+                        label="Especialidad"
+                        disabled={guardando || !form.odontologoId}
+                      />
+                    </div>
+                    <div>
+                      <AnimatedSelect
+                        value={form.sedeId}
+                        options={sedes.map(s => ({ value: String(s.id), label: s.nombre }))}
+                        onChange={value => setForm(actual => ({ ...actual, sedeId: value }))}
+                        label="Sede"
+                        disabled={guardando}
+                      />
                     </div>
                   </div>
-                )}
+                </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-5 sm:col-span-2 lg:col-span-4">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
+                {/* PANEL 2: JORNADA Y HORAS */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Jornada Semanal y Horario del Turno <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <AnimatedSelect
+                        value={form.diaSemana}
+                        options={DIAS.map(d => ({ value: d.value, label: d.label }))}
+                        onChange={value => setForm(actual => ({ ...actual, diaSemana: value }))}
+                        label="Día de atención"
+                        disabled={guardando}
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Hora de inicio</span>
+                      <ClockTimePicker
+                        value={form.horaInicio}
+                        onChange={value => setForm(actual => ({ ...actual, horaInicio: value }))}
+                        label="Hora de inicio"
+                        disabled={guardando}
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Hora de fin</span>
+                      <ClockTimePicker
+                        value={form.horaFin}
+                        onChange={value => setForm(actual => ({ ...actual, horaFin: value }))}
+                        label="Hora de fin"
+                        disabled={guardando}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* PANEL 3: VIGENCIA */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Período de Vigencia del Horario <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Vigente desde</span>
+                      <AnimatedDatePicker
+                        value={form.fechaInicioVigencia}
+                        onChange={value =>
+                          setForm(actual => ({
+                            ...actual,
+                            fechaInicioVigencia: value,
+                            fechaFinVigencia:
+                              !actual.sinFechaFin && actual.fechaFinVigencia < value
+                                ? value
+                                : actual.fechaFinVigencia,
+                          }))
+                        }
+                        label="Inicio de vigencia"
+                        disabled={guardando}
+                      />
+                    </div>
+                    <div>
+                      <span className="mb-1.5 block text-xs font-bold text-ink">Vigente hasta</span>
+                      <AnimatedDatePicker
+                        value={form.fechaFinVigencia}
+                        onChange={value => setForm(actual => ({ ...actual, fechaFinVigencia: value }))}
+                        min={form.fechaInicioVigencia || undefined}
+                        label="Fin de vigencia"
+                        disabled={guardando || form.sinFechaFin}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Checkbox
+                        checked={form.sinFechaFin}
+                        onChange={event =>
+                          setForm(actual => ({
+                            ...actual,
+                            sinFechaFin: event.target.checked,
+                            fechaFinVigencia: event.target.checked ? '' : actual.fechaFinVigencia,
+                          }))
+                        }
+                        label="Mantener este horario sin fecha final (indefinido)"
+                        disabled={guardando}
+                      />
+                    </div>
+                  </div>
+
+                  {resumenVigencia && !form.sinFechaFin && (
+                    <div className="mt-3 rounded-lg border border-line bg-surface p-3 text-xs">
+                      {resumenVigencia.aviso && (
+                        <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-amber-900">
+                          <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                          <div className="min-w-0">
+                            <p className="font-bold text-amber-950">Aviso sobre fecha de vigencia</p>
+                            <p className="mt-0.5 leading-relaxed text-amber-900">{resumenVigencia.aviso}</p>
+                            {resumenVigencia.fechaAjustadaSugerida && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setForm(actual => ({
+                                    ...actual,
+                                    fechaFinVigencia: resumenVigencia.fechaAjustadaSugerida!,
+                                  }))
+                                }
+                                className="mt-1 inline-flex items-center gap-1 font-bold text-brand hover:underline"
+                              >
+                                <span>Ajustar fin de vigencia al {fechaCorta(resumenVigencia.fechaAjustadaSugerida)} →</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 text-muted font-medium">
+                        <Icon name="calendar" size={15} className="shrink-0 text-brand" />
+                        <span>
+                          {resumenVigencia.count === 0 ? (
+                            <strong className="text-danger">0 turnos efectivos en este periodo</strong>
+                          ) : (
+                            <>
+                              <strong className="text-ink">
+                                {resumenVigencia.count} turno{resumenVigencia.count === 1 ? '' : 's'} de atención efectivo{resumenVigencia.count === 1 ? '' : 's'}
+                              </strong>
+                              {resumenVigencia.primerDia &&
+                                ` (primer turno: ${fechaCorta(resumenVigencia.primerDia)}${resumenVigencia.count > 1 ? ` · último: ${fechaCorta(resumenVigencia.ultimoDia!)}` : ''
+                                })`}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-line/60">
+                  <Button variant="outline" onClick={cerrarForm} disabled={guardando}>
                     Cancelar
                   </Button>
                   <Button type="submit" disabled={guardando}>

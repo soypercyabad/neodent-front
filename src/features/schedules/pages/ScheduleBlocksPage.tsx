@@ -392,15 +392,20 @@ export function ScheduleBlocksPage() {
             transition={{ duration: 0.2 }}
             className="mb-6"
           >
-            <Card className="border-brand/30 p-5 shadow-md sm:p-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-ink">
-                    {editando !== null ? 'Editar bloqueo de agenda' : 'Registrar bloqueo o feriado'}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted">
-                    El alcance del formulario cambia según el tipo de bloqueo configurado.
-                  </p>
+            <Card className="overflow-hidden border border-line shadow-card">
+              <div className="flex items-center justify-between border-b border-brand/20 bg-brand-soft/30 px-5 py-4 sm:px-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+                    <Icon name="calendar" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-ink">
+                      {editando !== null ? 'Editar bloqueo de agenda' : 'Registrar bloqueo o feriado'}
+                    </h3>
+                    <p className="text-xs text-muted">
+                      Configura excepciones de disponibilidad, feriados no laborables o permisos del personal.
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -408,178 +413,200 @@ export function ScheduleBlocksPage() {
                   aria-label="Cerrar formulario"
                   onClick={cerrarForm}
                   disabled={guardando}
-                  className="rounded-lg p-2 text-muted transition hover:bg-alt hover:text-ink"
+                  className="rounded-lg p-1.5 text-muted hover:bg-alt hover:text-ink transition-colors"
                 >
-                  <Icon name="x" size={20} />
+                  <Icon name="x" size={18} />
                 </button>
               </div>
 
-              <form onSubmit={event => void guardar(event)} className="grid gap-4 lg:grid-cols-2">
-                <label className="min-w-0 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Tipo de bloqueo
-                  </span>
-                  <AnimatedSelect
-                    value={form.tipoBloqueoId}
-                    options={tipos.map(tipo => ({
-                      value: String(tipo.id),
-                      label: tipo.nombre,
-                    }))}
-                    onChange={value => {
-                      const siguiente = tipos.find(tipo => String(tipo.id) === value)
-                      setForm(actual => ({
-                        ...actual,
-                        tipoBloqueoId: value,
-                        odontologoId: siguiente?.permiteOdontologo ? actual.odontologoId : '',
-                        sedeId: siguiente?.permiteSede ? actual.sedeId : '',
-                      }))
-                    }}
-                    label="Tipo de bloqueo"
-                    placeholder="Selecciona un tipo"
-                    disabled={guardando}
-                  />
-                  {tipoSeleccionado?.descripcion && (
-                    <p className="mt-1.5 text-xs text-muted">{tipoSeleccionado.descripcion}</p>
-                  )}
-                </label>
-
-                {tipoSeleccionado?.permiteOdontologo && (
-                  <label className="min-w-0">
-                    <span className="mb-1.5 block text-sm font-semibold text-ink">
-                      Odontólogo {tipoSeleccionado.requiereOdontologo ? '*' : '(opcional)'}
-                    </span>
-                    <AnimatedSelect
-                      value={form.odontologoId}
-                      options={[
-                        ...(!tipoSeleccionado.requiereOdontologo
-                          ? [{ value: '', label: 'Todos los odontólogos' }]
-                          : []),
-                        ...opcionesOdontologos,
-                      ]}
-                      onChange={value => setForm(actual => ({ ...actual, odontologoId: value }))}
-                      label="Odontólogo"
-                      placeholder="Selecciona un odontólogo"
-                      disabled={guardando}
-                    />
-                  </label>
-                )}
-
-                {tipoSeleccionado?.permiteSede && (
-                  <label className="min-w-0">
-                    <span className="mb-1.5 block text-sm font-semibold text-ink">
-                      Sede {tipoSeleccionado.requiereSede ? '*' : '(opcional)'}
-                    </span>
-                    <AnimatedSelect
-                      value={form.sedeId}
-                      options={[
-                        ...(!tipoSeleccionado.requiereSede
-                          ? [{ value: '', label: 'Todas las sedes' }]
-                          : []),
-                        ...opcionesSedes,
-                      ]}
-                      onChange={value => setForm(actual => ({ ...actual, sedeId: value }))}
-                      label="Sede"
-                      placeholder="Selecciona una sede"
-                      disabled={guardando}
-                    />
-                  </label>
-                )}
-
-                <div className="lg:col-span-2">
-                  <Checkbox
-                    checked={form.diaCompleto}
-                    onChange={event =>
-                      setForm(actual => ({
-                        ...actual,
-                        diaCompleto: event.target.checked,
-                      }))
-                    }
-                    label="Bloquear día completo"
-                    disabled={guardando}
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-                  <div className="min-w-0">
-                    <span className="mb-1.5 block text-sm font-semibold text-ink">
-                      Fecha de inicio
-                    </span>
-                    <AnimatedDatePicker
-                      value={form.fechaInicio}
-                      onChange={value =>
-                        setForm(actual => ({
-                          ...actual,
-                          fechaInicio: value,
-                          fechaFin:
-                            actual.fechaFin && actual.fechaFin >= value ? actual.fechaFin : value,
-                        }))
-                      }
-                      min={hoyIso()}
-                      label="Fecha de inicio"
-                      disabled={guardando}
-                    />
+              <form onSubmit={event => void guardar(event)} className="p-5 sm:p-6 space-y-4">
+                {/* PANEL 1: TIPO Y ALCANCE */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Tipo y Alcance del Bloqueo <span className="text-danger">*</span>
+                    </h3>
                   </div>
 
-                  <div className="min-w-0">
-                    <span className="mb-1.5 block text-sm font-semibold text-ink">
-                      Fecha de fin
-                    </span>
-                    <AnimatedDatePicker
-                      value={form.fechaFin}
-                      onChange={value => setForm(actual => ({ ...actual, fechaFin: value }))}
-                      min={form.fechaInicio || hoyIso()}
-                      label="Fecha de fin"
-                      disabled={guardando}
-                    />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <AnimatedSelect
+                        value={form.tipoBloqueoId}
+                        options={tipos.map(tipo => ({
+                          value: String(tipo.id),
+                          label: tipo.nombre,
+                        }))}
+                        onChange={value => {
+                          const siguiente = tipos.find(tipo => String(tipo.id) === value)
+                          setForm(actual => ({
+                            ...actual,
+                            tipoBloqueoId: value,
+                            odontologoId: siguiente?.permiteOdontologo ? actual.odontologoId : '',
+                            sedeId: siguiente?.permiteSede ? actual.sedeId : '',
+                          }))
+                        }}
+                        label="Tipo de bloqueo"
+                        placeholder="Selecciona un tipo"
+                        disabled={guardando}
+                      />
+                      {tipoSeleccionado?.descripcion && (
+                        <p className="mt-1.5 text-xs text-muted">{tipoSeleccionado.descripcion}</p>
+                      )}
+                    </div>
+
+                    {tipoSeleccionado?.permiteOdontologo && (
+                      <div className="min-w-0">
+                        <AnimatedSelect
+                          value={form.odontologoId}
+                          options={[
+                            ...(!tipoSeleccionado.requiereOdontologo
+                              ? [{ value: '', label: 'Todos los odontólogos' }]
+                              : []),
+                            ...opcionesOdontologos,
+                          ]}
+                          onChange={value => setForm(actual => ({ ...actual, odontologoId: value }))}
+                          label={`Odontólogo ${tipoSeleccionado.requiereOdontologo ? '*' : '(opcional)'}`}
+                          placeholder="Selecciona un odontólogo"
+                          disabled={guardando}
+                        />
+                      </div>
+                    )}
+
+                    {tipoSeleccionado?.permiteSede && (
+                      <div className="min-w-0">
+                        <AnimatedSelect
+                          value={form.sedeId}
+                          options={[
+                            ...(!tipoSeleccionado.requiereSede
+                              ? [{ value: '', label: 'Todas las sedes' }]
+                              : []),
+                            ...opcionesSedes,
+                          ]}
+                          onChange={value => setForm(actual => ({ ...actual, sedeId: value }))}
+                          label={`Sede ${tipoSeleccionado.requiereSede ? '*' : '(opcional)'}`}
+                          placeholder="Selecciona una sede"
+                          disabled={guardando}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {!form.diaCompleto && (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-                    <div className="min-w-0">
-                      <span className="mb-1.5 block text-sm font-semibold text-ink">
-                        Hora de inicio
-                      </span>
-                      <ClockTimePicker
-                        value={form.horaInicio}
-                        onChange={value => setForm(actual => ({ ...actual, horaInicio: value }))}
-                        label="Hora de inicio"
+                {/* PANEL 2: PERÍODO Y HORARIOS */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Período y Horario de la Excepción <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Checkbox
+                        checked={form.diaCompleto}
+                        onChange={event =>
+                          setForm(actual => ({
+                            ...actual,
+                            diaCompleto: event.target.checked,
+                          }))
+                        }
+                        label="Bloquear día completo"
                         disabled={guardando}
                       />
                     </div>
 
-                    <div className="min-w-0">
-                      <span className="mb-1.5 block text-sm font-semibold text-ink">
-                        Hora de fin
-                      </span>
-                      <ClockTimePicker
-                        value={form.horaFin}
-                        onChange={value => setForm(actual => ({ ...actual, horaFin: value }))}
-                        label="Hora de fin"
-                        disabled={guardando}
-                      />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <span className="mb-1.5 block text-xs font-bold text-ink">
+                          Fecha de inicio
+                        </span>
+                        <AnimatedDatePicker
+                          value={form.fechaInicio}
+                          onChange={value =>
+                            setForm(actual => ({
+                              ...actual,
+                              fechaInicio: value,
+                              fechaFin:
+                                actual.fechaFin && actual.fechaFin >= value ? actual.fechaFin : value,
+                            }))
+                          }
+                          min={hoyIso()}
+                          label="Fecha de inicio"
+                          disabled={guardando}
+                        />
+                      </div>
+
+                      <div>
+                        <span className="mb-1.5 block text-xs font-bold text-ink">
+                          Fecha de fin
+                        </span>
+                        <AnimatedDatePicker
+                          value={form.fechaFin}
+                          onChange={value => setForm(actual => ({ ...actual, fechaFin: value }))}
+                          min={form.fechaInicio || hoyIso()}
+                          label="Fecha de fin"
+                          disabled={guardando}
+                        />
+                      </div>
                     </div>
+
+                    {!form.diaCompleto && (
+                      <div className="grid gap-3 sm:grid-cols-2 pt-1">
+                        <div>
+                          <span className="mb-1.5 block text-xs font-bold text-ink">
+                            Hora de inicio
+                          </span>
+                          <ClockTimePicker
+                            value={form.horaInicio}
+                            onChange={value => setForm(actual => ({ ...actual, horaInicio: value }))}
+                            label="Hora de inicio"
+                            disabled={guardando}
+                          />
+                        </div>
+
+                        <div>
+                          <span className="mb-1.5 block text-xs font-bold text-ink">
+                            Hora de fin
+                          </span>
+                          <ClockTimePicker
+                            value={form.horaFin}
+                            onChange={value => setForm(actual => ({ ...actual, horaFin: value }))}
+                            label="Hora de fin"
+                            disabled={guardando}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
-                <label className="min-w-0 lg:col-span-2">
-                  <span className="mb-1.5 block text-sm font-semibold text-ink">
-                    Motivo o detalle
-                  </span>
-                  <textarea
-                    value={form.motivo}
-                    onChange={event => setForm(actual => ({ ...actual, motivo: event.target.value }))}
-                    maxLength={255}
-                    rows={3}
-                    disabled={guardando}
-                    placeholder="Ej. Combate de Angamos, capacitación interna, vacaciones programadas…"
-                    className="w-full resize-none rounded-control border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <div className="mt-1 text-right text-xs text-muted">{form.motivo.length}/255</div>
-                </label>
+                {/* PANEL 3: MOTIVO */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Motivo o Justificación <span className="text-danger">*</span>
+                    </h3>
+                  </div>
 
-                <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-5 lg:col-span-2">
-                  <Button variant="ghost" onClick={cerrarForm} disabled={guardando}>
+                  <div>
+                    <textarea
+                      value={form.motivo}
+                      onChange={event => setForm(actual => ({ ...actual, motivo: event.target.value }))}
+                      maxLength={255}
+                      rows={3}
+                      disabled={guardando}
+                      placeholder="Ej. Combate de Angamos, capacitación interna del personal, vacaciones programadas…"
+                      className="w-full resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <div className="mt-1 text-right text-xs text-muted">{form.motivo.length}/255</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-line/60">
+                  <Button variant="outline" onClick={cerrarForm} disabled={guardando}>
                     Cancelar
                   </Button>
                   <Button type="submit" disabled={guardando || !tipoSeleccionado}>
