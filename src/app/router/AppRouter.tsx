@@ -13,7 +13,7 @@ import {
   NewAppointmentSchedulePage, NewAppointmentConfirmPage,
 } from '@/features/appointments'
 import { UsersPage, UserDetailPage, NewUserPage, EditUserPage } from '@/features/users'
-import { PatientsPage, PatientDetailPage, NewPatientPage, EditPatientPage } from '@/features/patients'
+import { PatientsPage, PatientDetailPage, NewPatientPage, EditPatientPage, ClinicalHistoryPage } from '@/features/patients'
 import { DashboardPage } from '@/features/dashboard'
 import { RolesPage } from '@/features/roles'
 import { ModulosPage } from '@/features/modulos'
@@ -89,6 +89,7 @@ export function AppRouter() {
             <Route path="/pacientes" element={<PatientsPage />} />
             {rutaPacientes !== '/pacientes' && <Route path={rutaPacientes} element={<PatientsPage />} />}
             <Route path="/pacientes/:id" element={<PatientDetailPage />} />
+            <Route path="/pacientes/:id/historia-clinica" element={<ClinicalHistoryPage defaultTab="ODONTOGRAMA" />} />
             <Route path="/pacientes/nuevo" element={<NewPatientPage />} />
             <Route path="/pacientes/:id/editar" element={<EditPatientPage />} />
           </Route>

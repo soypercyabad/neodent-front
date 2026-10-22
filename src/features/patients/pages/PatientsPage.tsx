@@ -461,6 +461,11 @@ export function PatientsPage() {
                           onClick: () => navigate(`/pacientes/${p.id}`),
                         },
                         {
+                          label: 'Historia Clínica y Odontograma',
+                          icon: 'tooth',
+                          onClick: () => navigate(`/pacientes/${p.id}/historia-clinica`),
+                        },
+                        {
                           label: 'Editar',
                           icon: 'edit',
                           onClick: () => navigate(`/pacientes/${p.id}/editar`),
