@@ -1291,14 +1291,15 @@ export function OdontogramView({
 
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        id="picker-color-condicion"
-                        value={nuevoColor}
-                        onChange={e => setNuevoColor(e.target.value)}
-                        className="w-10 h-10 rounded-xl cursor-pointer border border-line bg-surface p-1 shadow-2xs hover:border-brand transition-all shrink-0"
-                        title="Haz clic para abrir el selector de color"
-                      />
+                      <Tooltip content="Haz clic para abrir el selector de color">
+                        <input
+                          type="color"
+                          id="picker-color-condicion"
+                          value={nuevoColor}
+                          onChange={e => setNuevoColor(e.target.value)}
+                          className="w-10 h-10 rounded-xl cursor-pointer border border-line bg-surface p-1 shadow-2xs hover:border-brand transition-all shrink-0"
+                        />
+                      </Tooltip>
                       <Input
                         id="codigo-hex-color"
                         value={nuevoColor}
@@ -2049,7 +2050,8 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
 
   return (
     <div className="w-14 h-14 relative flex items-center justify-center">
-      <svg viewBox="-5 -5 110 110" className="w-full h-full cursor-pointer drop-shadow-xs overflow-visible">
+      {/* SVG VISUAL DE LAS CARAS (SIN TAGS <title> NATIVOS) */}
+      <svg viewBox="-5 -5 110 110" className="w-full h-full drop-shadow-xs overflow-visible pointer-events-none">
         {/* Halo / Indicador cuando está seleccionada toda la pieza */}
         {esGeneral && (
           <circle
@@ -2071,11 +2073,7 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'VESTIBULAR' ? '#38BDF8' : '#F1F5F9'}
           stroke={caraSeleccionada === 'VESTIBULAR' || esGeneral ? '#0284C7' : COLOR_LINEA}
           strokeWidth={caraSeleccionada === 'VESTIBULAR' ? '2.5' : esGeneral ? '1.5' : '1.8'}
-          className="hover:opacity-80 transition-all"
-          onClick={() => onSelectCara('VESTIBULAR')}
-        >
-          <title>Cara Vestibular (Arriba)</title>
-        </path>
+        />
 
         {/* LINGUAL / PALATINA (Abajo) */}
         <path
@@ -2083,11 +2081,7 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'LINGUAL' ? '#38BDF8' : '#F1F5F9'}
           stroke={caraSeleccionada === 'LINGUAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
           strokeWidth={caraSeleccionada === 'LINGUAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
-          className="hover:opacity-80 transition-all"
-          onClick={() => onSelectCara('LINGUAL')}
-        >
-          <title>Cara Lingual / Palatina (Abajo)</title>
-        </path>
+        />
 
         {/* MESIAL (Izquierda) */}
         <path
@@ -2095,11 +2089,7 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'MESIAL' ? '#38BDF8' : '#F1F5F9'}
           stroke={caraSeleccionada === 'MESIAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
           strokeWidth={caraSeleccionada === 'MESIAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
-          className="hover:opacity-80 transition-all"
-          onClick={() => onSelectCara('MESIAL')}
-        >
-          <title>Cara Mesial (Izquierda)</title>
-        </path>
+        />
 
         {/* DISTAL (Derecha) */}
         <path
@@ -2107,11 +2097,7 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'DISTAL' ? '#38BDF8' : '#F1F5F9'}
           stroke={caraSeleccionada === 'DISTAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
           strokeWidth={caraSeleccionada === 'DISTAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
-          className="hover:opacity-80 transition-all"
-          onClick={() => onSelectCara('DISTAL')}
-        >
-          <title>Cara Distal (Derecha)</title>
-        </path>
+        />
 
         {/* OCLUSAL (Centro) */}
         <circle
@@ -2121,12 +2107,63 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           fill={esGeneral ? '#0284C7' : caraSeleccionada === 'OCLUSAL' ? '#0284C7' : '#FFFFFF'}
           stroke={caraSeleccionada === 'OCLUSAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
           strokeWidth={caraSeleccionada === 'OCLUSAL' ? '2.5' : esGeneral ? '2' : '1.8'}
-          className="hover:opacity-80 transition-all"
-          onClick={() => onSelectCara('OCLUSAL')}
-        >
-          <title>Cara Oclusal (Centro)</title>
-        </circle>
+        />
       </svg>
+
+      {/* OVERLAY DE INTERACCIÓN CON TOOLTIPS MODERNOS DEL SISTEMA (SIN TITLES NATIVOS) */}
+      <div className="absolute inset-0 z-10">
+        {/* VESTIBULAR (Arriba) */}
+        <Tooltip content="Cara Vestibular (Arriba)" side="top" className="absolute top-0 inset-x-2 h-4.5">
+          <button
+            type="button"
+            aria-label="Cara Vestibular (Arriba)"
+            onClick={() => onSelectCara('VESTIBULAR')}
+            className="w-full h-full cursor-pointer rounded-t-full hover:bg-sky-400/20 transition-colors focus:outline-none"
+          />
+        </Tooltip>
+
+        {/* LINGUAL / PALATINA (Abajo) */}
+        <Tooltip content="Cara Lingual / Palatina (Abajo)" side="bottom" className="absolute bottom-0 inset-x-2 h-4.5">
+          <button
+            type="button"
+            aria-label="Cara Lingual o Palatina (Abajo)"
+            onClick={() => onSelectCara('LINGUAL')}
+            className="w-full h-full cursor-pointer rounded-b-full hover:bg-sky-400/20 transition-colors focus:outline-none"
+          />
+        </Tooltip>
+
+        {/* MESIAL (Izquierda) */}
+        <Tooltip content="Cara Mesial (Izquierda)" side="left" className="absolute left-0 inset-y-2 w-4.5">
+          <button
+            type="button"
+            aria-label="Cara Mesial (Izquierda)"
+            onClick={() => onSelectCara('MESIAL')}
+            className="w-full h-full cursor-pointer rounded-l-full hover:bg-sky-400/20 transition-colors focus:outline-none"
+          />
+        </Tooltip>
+
+        {/* DISTAL (Derecha) */}
+        <Tooltip content="Cara Distal (Derecha)" side="right" className="absolute right-0 inset-y-2 w-4.5">
+          <button
+            type="button"
+            aria-label="Cara Distal (Derecha)"
+            onClick={() => onSelectCara('DISTAL')}
+            className="w-full h-full cursor-pointer rounded-r-full hover:bg-sky-400/20 transition-colors focus:outline-none"
+          />
+        </Tooltip>
+
+        {/* OCLUSAL (Centro) */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <Tooltip content="Cara Oclusal (Centro)" side="top">
+            <button
+              type="button"
+              aria-label="Cara Oclusal (Centro)"
+              onClick={() => onSelectCara('OCLUSAL')}
+              className="w-5 h-5 rounded-full pointer-events-auto cursor-pointer hover:ring-2 hover:ring-sky-400/50 transition-all focus:outline-none"
+            />
+          </Tooltip>
+        </div>
+      </div>
     </div>
   )
 }

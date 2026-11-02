@@ -24,53 +24,62 @@ import type { RegisterInput } from '../model/auth.types'
 
 const INITIAL_COOLDOWN_SECONDS = 60
 
-interface RegistrationState {
+interface RegistrationFlowState {
   correo: string
   registrationData: RegisterInput
   turnstileToken: string
+  challengeId?: number
 }
+
+interface PendingActivationFlowState {
+  correo: string
+  challengeId: number
+  registrationData?: never
+  turnstileToken?: never
+}
+
+type VerificationLocationState = RegistrationFlowState | PendingActivationFlowState
 
 export function VerifyEmailPage() {
   const { user, isLoading } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
-  const registration =
-    location.state as RegistrationState | null
+  const state = location.state as VerificationLocationState | null
+  const isRestartFlow = Boolean(
+    state &&
+    'challengeId' in state &&
+    typeof state.challengeId === 'number' &&
+    !('registrationData' in state && state.registrationData),
+  )
 
-  const [challengeId, setChallengeId] =
-    useState<number | null>(null)
+  const [challengeId, setChallengeId] = useState<number | null>(() => {
+    if (isRestartFlow && state && 'challengeId' in state && typeof state.challengeId === 'number') {
+      return state.challengeId
+    }
+    return null
+  })
 
-  const [codigo, setCodigo] =
-    useState('')
+  const [codigo, setCodigo] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sendingInitialCode, setSendingInitialCode] = useState(() => !isRestartFlow)
+  const [resending, setResending] = useState(false)
+  const [verified, setVerified] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(() =>
+    isRestartFlow ? 'Te enviamos un nuevo código de verificación a tu correo.' : null,
+  )
+  const [countdown, setCountdown] = useState(INITIAL_COOLDOWN_SECONDS)
 
-  const [loading, setLoading] =
-    useState(false)
-
-  const [sendingInitialCode, setSendingInitialCode] =
-    useState(true)
-
-  const [resending, setResending] =
-    useState(false)
-
-  const [verified, setVerified] =
-    useState(false)
-
-  const [error, setError] =
-    useState<string | null>(null)
-
-  const [message, setMessage] =
-    useState<string | null>(null)
-
-  const [countdown, setCountdown] =
-    useState(INITIAL_COOLDOWN_SECONDS)
-
-  const initialCodeRequestedRef =
-    useRef(false)
+  const initialCodeRequestedRef = useRef(false)
 
   useEffect(() => {
     if (
-      !registration ||
+      isRestartFlow ||
+      !state ||
+      !('registrationData' in state) ||
+      !state.registrationData ||
+      !state.turnstileToken ||
       initialCodeRequestedRef.current
     ) {
       return
@@ -79,70 +88,32 @@ export function VerifyEmailPage() {
     initialCodeRequestedRef.current = true
 
     const solicitarCodigoInicial = async () => {
-      const d = registration.registrationData
+      const d = state.registrationData
 
       setSendingInitialCode(true)
       setError(null)
       setMessage(null)
 
       try {
-        const response =
-          await authApi.initPatientRegistration({
-            tipoDocumento:
-              d.tipoDocumento,
+        const response = await authApi.initPatientRegistration({
+          tipoDocumento: d.tipoDocumento,
+          numeroDocumento: d.numeroDocumento.trim(),
+          nombres: d.nombres.trim(),
+          apellidoPaterno: d.apellidoPaterno.trim(),
+          apellidoMaterno: d.apellidoMaterno.trim() || null,
+          fechaNacimiento: d.fechaNacimiento,
+          telefono: d.telefono.replace(/[\s-]/g, ''),
+          email: d.correo.trim().toLowerCase(),
+          password: d.password,
+          aceptaTerminos: d.aceptaTerminos,
+          turnstileToken: state.turnstileToken,
+        })
 
-            numeroDocumento:
-              d.numeroDocumento.trim(),
-
-            nombres:
-              d.nombres.trim(),
-
-            apellidoPaterno:
-              d.apellidoPaterno.trim(),
-
-            apellidoMaterno:
-              d.apellidoMaterno.trim() ||
-              null,
-
-            fechaNacimiento:
-              d.fechaNacimiento,
-
-            telefono:
-              d.telefono.replace(
-                /[\s-]/g,
-                '',
-              ),
-
-            email:
-              d.correo
-                .trim()
-                .toLowerCase(),
-
-            password:
-              d.password,
-
-            aceptaTerminos:
-              d.aceptaTerminos,
-
-            turnstileToken:
-              registration.turnstileToken,
-          })
-
-        setChallengeId(
-          response.challengeId,
-        )
-
-        setCountdown(
-          INITIAL_COOLDOWN_SECONDS,
-        )
-
-        setMessage(
-          response.message ||
-            'Código enviado correctamente.',
-        )
+        setChallengeId(response.challengeId)
+        setCountdown(INITIAL_COOLDOWN_SECONDS)
+        setMessage(response.message || 'Código enviado correctamente.')
       } catch (err) {
         setChallengeId(null)
-
         setError(
           err instanceof Error
             ? err.message
@@ -154,54 +125,29 @@ export function VerifyEmailPage() {
     }
 
     void solicitarCodigoInicial()
-  }, [registration])
+  }, [state, isRestartFlow])
 
   useEffect(() => {
-    if (
-      !challengeId ||
-      countdown <= 0
-    ) {
+    if (!challengeId || countdown <= 0) {
       return
     }
 
-    const timer =
-      window.setInterval(() => {
-        setCountdown(prev =>
-          prev > 0
-            ? prev - 1
-            : 0,
-        )
-      }, 1000)
+    const timer = window.setInterval(() => {
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
 
-    return () =>
-      window.clearInterval(timer)
-  }, [
-    challengeId,
-    countdown,
-  ])
+    return () => window.clearInterval(timer)
+  }, [challengeId, countdown])
 
-  const formatCountdown = (
-    seconds: number,
-  ) =>
+  const formatCountdown = (seconds: number) =>
     `${Math.floor(seconds / 60)
       .toString()
-      .padStart(2, '0')}:${(
-      seconds % 60
-    )
-      .toString()
-      .padStart(2, '0')}`
+      .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 
-  const handleVerify = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (
-      !registration ||
-      !challengeId ||
-      loading ||
-      !/^\d{6}$/.test(codigo)
-    ) {
+    if (!state || !challengeId || loading || !/^\d{6}$/.test(codigo)) {
       return
     }
 
@@ -210,54 +156,30 @@ export function VerifyEmailPage() {
     setMessage(null)
 
     try {
-      const d =
-        registration.registrationData
-
-      await authApi
-        .confirmPatientRegistration({
+      if (isRestartFlow) {
+        await authApi.verifyRegistrationEmail(challengeId, codigo)
+      } else {
+        const d = (state as RegistrationFlowState).registrationData
+        await authApi.confirmPatientRegistration({
           challengeId,
           codigo,
-
-          tipoDocumento:
-            d.tipoDocumento,
-
-          numeroDocumento:
-            d.numeroDocumento.trim(),
-
-          nombres:
-            d.nombres.trim(),
-
-          apellidoPaterno:
-            d.apellidoPaterno.trim(),
-
-          apellidoMaterno:
-            d.apellidoMaterno.trim() ||
-            null,
-
-          fechaNacimiento:
-            d.fechaNacimiento,
-
-          telefono:
-            d.telefono.replace(
-              /[\s-]/g,
-              '',
-            ),
-
-          email:
-            d.correo
-              .trim()
-              .toLowerCase(),
-
+          tipoDocumento: d.tipoDocumento,
+          numeroDocumento: d.numeroDocumento.trim(),
+          nombres: d.nombres.trim(),
+          apellidoPaterno: d.apellidoPaterno.trim(),
+          apellidoMaterno: d.apellidoMaterno.trim() || null,
+          fechaNacimiento: d.fechaNacimiento,
+          telefono: d.telefono.replace(/[\s-]/g, ''),
+          email: d.correo.trim().toLowerCase(),
           direccion: null,
           password: d.password,
-          aceptaTerminos:
-            d.aceptaTerminos,
+          aceptaTerminos: d.aceptaTerminos,
         })
+      }
 
       setVerified(true)
     } catch (err) {
       setCodigo('')
-
       setError(
         err instanceof Error
           ? err.message
@@ -269,12 +191,7 @@ export function VerifyEmailPage() {
   }
 
   const handleResend = async () => {
-    if (
-      !challengeId ||
-      countdown > 0 ||
-      resending ||
-      loading
-    ) {
+    if (!challengeId || countdown > 0 || resending || loading) {
       return
     }
 
@@ -283,25 +200,11 @@ export function VerifyEmailPage() {
     setMessage(null)
 
     try {
-      const response =
-        await authApi.resendCode(
-          challengeId,
-        )
-
-      setChallengeId(
-        response.challengeId,
-      )
-
+      const response = await authApi.resendCode(challengeId)
+      setChallengeId(response.challengeId)
       setCodigo('')
-
-      setCountdown(
-        INITIAL_COOLDOWN_SECONDS,
-      )
-
-      setMessage(
-        response.message ||
-          'Te enviamos un nuevo código a tu correo.',
-      )
+      setCountdown(INITIAL_COOLDOWN_SECONDS)
+      setMessage(response.message || 'Te enviamos un nuevo código a tu correo.')
     } catch (err) {
       setError(
         err instanceof Error
@@ -313,31 +216,30 @@ export function VerifyEmailPage() {
     }
   }
 
-  const volverAlRegistro = () => {
-    if (!registration) {
-      navigate(
-        '/registro',
-        { replace: true },
-      )
+  const volver = () => {
+    if (isRestartFlow) {
+      navigate('/activar-cuenta-pendiente', {
+        replace: true,
+        state: { correo: state?.correo },
+      })
+      return
+    }
 
+    if (!state || !('registrationData' in state) || !state.registrationData) {
+      navigate('/registro', { replace: true })
       return
     }
 
     navigate('/registro', {
       replace: true,
       state: {
-        initialValues:
-          registration.registrationData,
+        initialValues: state.registrationData,
       },
     })
   }
 
   if (isLoading) {
-    return (
-      <p className="text-center text-muted">
-        Cargando…
-      </p>
-    )
+    return <p className="text-center text-muted">Cargando…</p>
   }
 
   if (user) {
@@ -345,16 +247,13 @@ export function VerifyEmailPage() {
   }
 
   if (
-    !registration?.correo ||
-    !registration.registrationData ||
-    !registration.turnstileToken
+    !state?.correo ||
+    (!isRestartFlow &&
+      (!('registrationData' in state) ||
+        !state.registrationData ||
+        !state.turnstileToken))
   ) {
-    return (
-      <Navigate
-        to="/registro"
-        replace
-      />
-    )
+    return <Navigate to="/registro" replace />
   }
 
   return (
@@ -398,7 +297,7 @@ export function VerifyEmailPage() {
                   ? 'Estamos enviando tu código de verificación a '
                   : 'Ingresa el código de 6 dígitos enviado a '}
                 <strong>
-                  {registration.correo}
+                  {state.correo}
                 </strong>
                 .
               </p>
@@ -537,17 +436,17 @@ export function VerifyEmailPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={volverAlRegistro}
+                    onClick={volver}
                     className="w-full justify-center"
                   >
-                    Volver al registro
+                    {isRestartFlow ? 'Volver a activar cuenta' : 'Volver al registro'}
                   </Button>
                 )}
 
               <div className="border-t border-line/60 pt-2 text-center">
                 <button
                   type="button"
-                  onClick={volverAlRegistro}
+                  onClick={volver}
                   disabled={
                     sendingInitialCode ||
                     loading ||
@@ -555,7 +454,9 @@ export function VerifyEmailPage() {
                   }
                   className="cursor-pointer text-xs font-medium text-ink-soft hover:text-brand hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  ¿Datos incorrectos? Volver al registro
+                  {isRestartFlow
+                    ? '¿Problemas con el código? Volver a activar cuenta'
+                    : '¿Datos incorrectos? Volver al registro'}
                 </button>
               </div>
             </form>
