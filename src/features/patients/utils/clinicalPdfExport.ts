@@ -12,6 +12,7 @@ export interface CamposClinicos {
   antecedentesMedicos: string
   medicamentosActuales: string
   antecedentesOdontologicos: string
+  habitos: string
   alergiasTexto: string
   examenExtraoral: string
   examenIntraoral: string
@@ -44,48 +45,87 @@ function calcularEdad(fechaNac?: string | null): string {
 
 export function parsearCamposClinicos(historia?: HistoriaClinicaResponse | null): CamposClinicos {
   const defecto: CamposClinicos = {
-    motivoConsulta: 'Paciente acude para una evaluación odontológica general y revisión de su estado de salud bucal.',
-    enfermedadActual: 'Sin dolor agudo espontáneo en el momento de la evaluación. Refiere sintomatología ocasional a cambios térmicos.',
-    antecedentesMedicos: 'No registra antecedentes patológicos sistémicos relevantes.',
-    medicamentosActuales: 'No consume medicamentos de forma habitual.',
-    antecedentesOdontologicos: 'Última profilaxis hace aproximadamente 1 año.',
-    alergiasTexto: 'No se reportan alergias a fármacos ni a anestésicos locales.',
-    examenExtraoral: 'Simetría facial conservada. Sin adenopatías palpables. Articulación temporomandibular (ATM) asintomática sin ruidos articulares ni desviación.',
-    examenIntraoral: 'Mucosa yugal, labial y lingual normocoloreadas e hidratadas. Encías con signos leves de inflamación marginal por placa.',
-    observacionesClinicas: 'Paciente normorreactivo y colaborador durante la evaluación clínica.',
-    diagnostico: 'Gingivitis inducida por placa bacteriana (CIE-10: K05.1). Caries dental en fosas y fisuras (CIE-10: K02.1).',
-    planTratamiento: '1. Profilaxis dental integral y destartraje ultrasónico.\n2. Restauración con resina compuesta en piezas afectadas.\n3. Instrucción de higiene bucal y fisioterapia oral.\n4. Control odontológico en 6 meses.',
+    motivoConsulta: '',
+    enfermedadActual: '',
+    antecedentesMedicos: '',
+    medicamentosActuales: '',
+    antecedentesOdontologicos: '',
+    habitos: '',
+    alergiasTexto: '',
+    examenExtraoral: '',
+    examenIntraoral: '',
+    observacionesClinicas: '',
+    diagnostico: '',
+    planTratamiento: '',
   }
 
   if (!historia) return defecto
 
-  // Si observacionesGenerales tiene formato JSON estructurado
+  // Priorizar campos estructurados nativos devueltos por el backend
+  if (
+    historia.motivoConsulta ||
+    historia.enfermedadActual ||
+    historia.antecedentesMedicos ||
+    historia.medicamentosActuales ||
+    historia.habitos ||
+    historia.antecedentesOdontologicos ||
+    historia.diagnostico ||
+    historia.planTratamiento
+  ) {
+    return {
+      motivoConsulta: historia.motivoConsulta || '',
+      enfermedadActual: historia.enfermedadActual || '',
+      antecedentesMedicos: historia.antecedentesMedicos || historia.antecedentes || '',
+      medicamentosActuales: historia.medicamentosActuales || '',
+      antecedentesOdontologicos: historia.antecedentesOdontologicos || '',
+      habitos: historia.habitos || '',
+      alergiasTexto: historia.alergias || '',
+      examenExtraoral: historia.examenExtraoral || '',
+      examenIntraoral: historia.examenIntraoral || '',
+      observacionesClinicas: historia.observacionesGenerales || '',
+      diagnostico: historia.diagnostico || '',
+      planTratamiento: historia.planTratamiento || '',
+    }
+  }
+
+  // Fallback para registros antiguos con formato JSON serializado en observacionesGenerales
   if (historia.observacionesGenerales && historia.observacionesGenerales.trim().startsWith('{')) {
     try {
       const parsed = JSON.parse(historia.observacionesGenerales)
+      let antOdonto = parsed.antecedentesOdontologicos || ''
+      let habitosExtraidos = parsed.habitos || ''
+      if (antOdonto.includes('[Hábito:')) {
+        if (!habitosExtraidos) {
+          const matches = Array.from(antOdonto.matchAll(/\[Hábito:\s*([^\]]+)\]/g)).map(m => (m as any)[1].trim())
+          habitosExtraidos = matches.join(', ')
+        }
+        antOdonto = antOdonto.replace(/\[Hábito:\s*[^\]]+\]/g, '').replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '').trim()
+      }
+
       return {
-        motivoConsulta: parsed.motivoConsulta || defecto.motivoConsulta,
-        enfermedadActual: parsed.enfermedadActual || defecto.enfermedadActual,
-        antecedentesMedicos: parsed.antecedentesMedicos || historia.antecedentes || defecto.antecedentesMedicos,
-        medicamentosActuales: parsed.medicamentosActuales || defecto.medicamentosActuales,
-        antecedentesOdontologicos: parsed.antecedentesOdontologicos || defecto.antecedentesOdontologicos,
-        alergiasTexto: historia.alergias || parsed.alergiasTexto || defecto.alergiasTexto,
-        examenExtraoral: parsed.examenExtraoral || defecto.examenExtraoral,
-        examenIntraoral: parsed.examenIntraoral || defecto.examenIntraoral,
-        observacionesClinicas: parsed.observacionesClinicas || defecto.observacionesClinicas,
-        diagnostico: parsed.diagnostico || defecto.diagnostico,
-        planTratamiento: parsed.planTratamiento || defecto.planTratamiento,
+        motivoConsulta: parsed.motivoConsulta || '',
+        enfermedadActual: parsed.enfermedadActual || '',
+        antecedentesMedicos: parsed.antecedentesMedicos || historia.antecedentes || '',
+        medicamentosActuales: parsed.medicamentosActuales || '',
+        antecedentesOdontologicos: antOdonto,
+        habitos: habitosExtraidos,
+        alergiasTexto: historia.alergias || parsed.alergiasTexto || '',
+        examenExtraoral: parsed.examenExtraoral || '',
+        examenIntraoral: parsed.examenIntraoral || '',
+        observacionesClinicas: parsed.observacionesClinicas || '',
+        diagnostico: parsed.diagnostico || '',
+        planTratamiento: parsed.planTratamiento || '',
       }
     } catch {
-      // Ignorar error de parseo y continuar con fallback
+      // Ignorar error de parseo y continuar con campos nativos
     }
   }
 
   return {
     ...defecto,
-    alergiasTexto: historia.alergias || defecto.alergiasTexto,
-    antecedentesMedicos: historia.antecedentes || defecto.antecedentesMedicos,
-    observacionesClinicas: historia.observacionesGenerales || defecto.observacionesClinicas,
+    alergiasTexto: historia.alergias || '',
+    antecedentesMedicos: historia.antecedentes || '',
+    observacionesClinicas: historia.observacionesGenerales || '',
   }
 }
 
@@ -232,7 +272,7 @@ function generarEstilosImpresion(): string {
       padding-left: 5px;
     }
     .signature-area {
-      margin-top: 35px;
+      margin-top: 30px;
       display: table;
       width: 100%;
       table-layout: fixed;
@@ -243,11 +283,14 @@ function generarEstilosImpresion(): string {
       width: 50%;
       text-align: center;
       vertical-align: bottom;
-      padding: 0 25px;
+      padding: 0 28px;
+    }
+    .signature-space {
+      height: 75px;
     }
     .signature-line {
       border-top: 1.5px solid #334155;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }
     .signature-label {
       font-size: 8pt;
@@ -472,12 +515,14 @@ export function exportarHistoriaClinicaPdf(options: {
     <!-- VI. RESPONSABILIDAD MÉDICO-LEGAL Y FIRMAS -->
     <div class="signature-area">
       <div class="signature-col">
+        <div class="signature-space"></div>
         <div class="signature-line"></div>
         <div class="signature-label">${odontologoNombre || 'Dr(a). Odontólogo Tratante'}</div>
         <div class="signature-sub">C.O.P.: ${odontologoCop || '42589'} • Especialista Odontólogo</div>
         <div class="signature-sub">Firma y Sello Profesional</div>
       </div>
       <div class="signature-col">
+        <div class="signature-space"></div>
         <div class="signature-line"></div>
         <div class="signature-label">${nombrePaciente}</div>
         <div class="signature-sub">${paciente.tipoDocumento}: ${paciente.numeroDocumento}</div>
@@ -535,8 +580,8 @@ export function exportarExpedienteCronologicoPdf(options: {
     evoluciones.length === 0
       ? `<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 12px;">Sin evoluciones registradas aún en el expediente.</td></tr>`
       : evoluciones
-          .map(
-            ev => `
+        .map(
+          ev => `
         <tr>
           <td style="font-weight: bold; width: 12%;">${formatearFecha(ev.fecha)}</td>
           <td style="width: 25%; font-weight: 600;">${ev.diagnostico || 'Control clínico'}</td>
@@ -544,8 +589,8 @@ export function exportarExpedienteCronologicoPdf(options: {
           <td style="width: 20%; font-size: 8pt; color: #475569;">${ev.indicaciones || '-'}</td>
           <td style="width: 13%; font-size: 8pt;">${ev.odontologoNombre || 'Odontólogo tratante'}<br><span style="color: #64748b;">COP: ${ev.numeroColegiatura || 'Colegiado'}</span></td>
         </tr>`,
-          )
-          .join('')
+        )
+        .join('')
 
   // Piezas dentales con hallazgos en odontograma
   const piezasConHallazgos = odontograma?.piezas?.filter(p => p.codigoCondicion !== 'SANO') || []
@@ -553,16 +598,16 @@ export function exportarExpedienteCronologicoPdf(options: {
     piezasConHallazgos.length === 0
       ? `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 10px;">Odontograma inicial sin hallazgos patológicos activos.</td></tr>`
       : piezasConHallazgos
-          .map(
-            p => `
+        .map(
+          p => `
         <tr>
           <td style="font-weight: bold; width: 15%; text-align: center;">Pieza #${p.numeroPieza}</td>
           <td style="width: 25%; text-align: center;">${p.superficie || 'General'}</td>
           <td style="width: 35%; font-weight: 600; color: #b91c1c;">${p.nombreCondicion}</td>
           <td style="width: 25%; font-size: 8pt;">${p.estado || 'HALLAZGO'} ${p.observacion ? `(${p.observacion})` : ''}</td>
         </tr>`,
-          )
-          .join('')
+        )
+        .join('')
 
   // Recetas emitidas
   const recetasList = recetas || []
@@ -570,16 +615,16 @@ export function exportarExpedienteCronologicoPdf(options: {
     recetasList.length === 0
       ? `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 10px;">Sin recetas médicas registradas en el expediente.</td></tr>`
       : recetasList
-          .map(
-            rec => `
+        .map(
+          rec => `
         <tr>
           <td style="font-weight: bold; width: 15%;">${formatearFecha(rec.fecha)}</td>
           <td style="width: 50%;">${rec.detalles.map(d => `<strong>${d.medicamento}</strong> (${d.concentracion || ''}) - ${d.dosis || ''} cada ${d.frecuencia || ''} x ${d.duracion || ''}`).join('<br>')}</td>
           <td style="width: 20%; font-size: 8pt;">${rec.indicacionesGenerales || '-'}</td>
           <td style="width: 15%; font-size: 8pt;">${rec.odontologoNombre}</td>
         </tr>`,
-          )
-          .join('')
+        )
+        .join('')
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -691,12 +736,14 @@ export function exportarExpedienteCronologicoPdf(options: {
     <!-- FIRMAS DE RESPONSABILIDAD -->
     <div class="signature-area">
       <div class="signature-col">
+        <div class="signature-space"></div>
         <div class="signature-line"></div>
         <div class="signature-label">${odontologoNombre || 'Dr(a). Odontólogo Tratante'}</div>
         <div class="signature-sub">C.O.P.: ${odontologoCop || '42589'} • Director Clínico</div>
         <div class="signature-sub">Firma y Sello de Certificación</div>
       </div>
       <div class="signature-col">
+        <div class="signature-space"></div>
         <div class="signature-line"></div>
         <div class="signature-label">${nombrePaciente}</div>
         <div class="signature-sub">${paciente.tipoDocumento}: ${paciente.numeroDocumento}</div>
@@ -760,21 +807,21 @@ export function exportarRecetaPdf({
   // Validez por defecto: 5 días tras emisión si no se indicó
   const fechaValidez = receta.validaHasta
     ? new Date(receta.validaHasta).toLocaleDateString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
     : (() => {
-        const d = new Date(receta.fecha)
-        d.setDate(d.getDate() + 5)
-        return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      })()
+      const d = new Date(receta.fecha)
+      d.setDate(d.getDate() + 5)
+      return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    })()
 
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Receta Odontológica — ${codigoRx} — ${nombrePaciente}</title>
+  <title>Receta Odontológica - ${codigoRx} - ${nombrePaciente}</title>
   <style>
     @page {
       size: A5 portrait;
@@ -999,6 +1046,9 @@ export function exportarRecetaPdf({
     .signature-block {
       text-align: center;
     }
+    .sig-space {
+      height: 50px;
+    }
     .sig-line {
       border-bottom: 1px solid #94a3b8;
       width: 100%;
@@ -1092,17 +1142,17 @@ export function exportarRecetaPdf({
     <div class="section-title">Rp/ Prescripción</div>
     <div class="rx-drugs-list">
       ${receta.detalles
-        .map(
-          item => `
+      .map(
+        item => `
         <div class="drug-card">
           <div class="drug-name">
-            ${item.medicamento}${item.dci ? ` <span class="drug-dci">— ${item.dci}</span>` : ''}
+            ${item.medicamento}${item.dci ? ` <span class="drug-dci">- ${item.dci}</span>` : ''}
           </div>
           <div class="drug-meta-row">
             <div>
               <div class="posology-title">Concentración / forma</div>
               <div class="field-val" style="font-size: 11px;">
-                ${[item.concentracion, item.formaFarmaceutica].filter(Boolean).join(' — ') || 'Según presentación'}
+                ${[item.concentracion, item.formaFarmaceutica].filter(Boolean).join(' - ') || 'Según presentación'}
               </div>
             </div>
             <div>
@@ -1116,20 +1166,20 @@ export function exportarRecetaPdf({
             <div class="posology-title">Posología, vía y duración</div>
             <div class="posology-text">
               ${[
-                item.dosis ? `${item.dosis}` : null,
-                item.viaAdministracion ? `vía ${item.viaAdministracion.toLowerCase()}` : null,
-                item.frecuencia ? `${item.frecuencia.toLowerCase()}` : null,
-                item.duracion ? `por ${item.duracion.toLowerCase()}` : null,
-              ]
-                .filter(Boolean)
-                .join(', ')}
+            item.dosis ? `${item.dosis}` : null,
+            item.viaAdministracion ? `vía ${item.viaAdministracion.toLowerCase()}` : null,
+            item.frecuencia ? `${item.frecuencia.toLowerCase()}` : null,
+            item.duracion ? `por ${item.duracion.toLowerCase()}` : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}
               ${item.observaciones ? `. (${item.observaciones})` : ''}
             </div>
           </div>
         </div>
       `,
-        )
-        .join('')}
+      )
+      .join('')}
     </div>
 
     <!-- INDICACIONES ADICIONALES -->
@@ -1145,6 +1195,7 @@ export function exportarRecetaPdf({
         <div class="demo-tag">Conforme a Ley General de Salud N° 26842 y Directivas DIGEMID / MINSA.</div>
       </div>
       <div class="signature-block">
+        <div class="sig-space"></div>
         <div class="sig-line"></div>
         <div class="sig-title">Firma y sello</div>
         <div class="sig-sub">${receta.odontologoNombre}</div>
@@ -1169,4 +1220,474 @@ export function exportarRecetaPdf({
     alert('Por favor permita las ventanas emergentes (pop-ups) en su navegador para ver e imprimir la receta.')
   }
 }
+
+export interface ExportarOdontogramaParams {
+  paciente: PacienteResponse
+  odontograma: OdontogramaResponse | null
+  historia?: HistoriaClinicaResponse | null
+  odontologoNombre?: string
+  odontologoCop?: string
+}
+
+/**
+ * Genera la Ficha Técnica del Odontograma Clínico conforme a la NTS N° 139-MINSA
+ */
+export function exportarOdontogramaPdf({
+  paciente,
+  odontograma,
+  historia,
+  odontologoNombre,
+  odontologoCop,
+}: ExportarOdontogramaParams) {
+  const nombrePaciente = obtenerNombrePaciente(paciente)
+  const edadPaciente = calcularEdad(paciente.fechaNacimiento || historia?.fechaNacimiento)
+  const codigoHc = `HC-${String(paciente.id).padStart(5, '0')}`
+  const fechaHoy = new Date().toLocaleDateString('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+  const piezas = odontograma?.piezas || []
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Odontograma Clínico - ${codigoHc} - ${nombrePaciente}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    body { background: #f8fafc; color: #0f172a; padding: 20px; font-size: 11px; line-height: 1.4; display: flex; flex-direction: column; align-items: center; }
+    .no-print-bar { width: 100%; max-width: 800px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: white; padding: 10px 16px; border-radius: 12px; }
+    .no-print-bar button { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 11px; cursor: pointer; }
+    .doc-container { width: 100%; max-width: 800px; background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; }
+    .brand { font-size: 20px; font-weight: 800; color: #0f172a; }
+    .subbrand { font-size: 9px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; }
+    .title-box { text-align: right; }
+    .doc-title { font-size: 14px; font-weight: 800; color: #0284c7; text-transform: uppercase; }
+    .doc-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .grid-info { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+    .label { font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: 600; }
+    .val { font-size: 11.5px; font-weight: 700; color: #0f172a; margin-top: 1px; }
+    .section-title { font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin: 16px 0 8px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10.5px; }
+    th { background: #f1f5f9; padding: 6px 10px; text-align: left; font-weight: 700; color: #334155; border: 1px solid #cbd5e1; font-size: 10px; text-transform: uppercase; }
+    td { padding: 6px 10px; border: 1px solid #e2e8f0; color: #1e293b; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700; }
+    .sig-area { margin-top: 30px; display: flex; justify-content: flex-end; }
+    .sig-col { width: 220px; text-align: center; }
+    .sig-space { height: 70px; }
+    .sig-line { border-bottom: 1px solid #94a3b8; margin-bottom: 6px; }
+    @media print {
+      body { background: transparent; padding: 0; }
+      .no-print-bar { display: none !important; }
+      .doc-container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div style="font-weight: 700; font-size: 12px;">Odontograma Clínico Oficial · NTS N° 139-MINSA</div>
+    <div>
+      <button type="button" style="background: transparent; color: #cbd5e1; border: 1px solid #334155; margin-right: 8px;" onclick="window.close()">Cerrar</button>
+      <button type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+
+  <div class="doc-container">
+    <div class="header">
+      <div>
+        <div class="brand">NeoDents</div>
+        <div class="subbrand">Clínica Odontológica Especializada</div>
+      </div>
+      <div class="title-box">
+        <div class="doc-title">Odontograma Clínico</div>
+        <div class="doc-sub">Registro de Hallazgos y Patologías Dentales</div>
+      </div>
+    </div>
+
+    <div class="grid-info">
+      <div><span class="label">Paciente</span><div class="val">${nombrePaciente}</div></div>
+      <div><span class="label">Edad</span><div class="val">${edadPaciente}</div></div>
+      <div><span class="label">Historia Clínica</span><div class="val">${codigoHc}</div></div>
+      <div><span class="label">Fecha Emisión</span><div class="val">${fechaHoy}</div></div>
+    </div>
+
+    <div class="section-title">Registro Tabulado de Hallazgos y Tratamientos (${piezas.length})</div>
+    ${piezas.length === 0
+      ? '<div style="padding: 24px; text-align: center; color: #64748b; font-size: 11px;">No se registraron patologías dentales en este examen clínico. Piezas en estado sano.</div>'
+      : `<table>
+        <thead>
+          <tr>
+            <th style="width: 70px;">Pieza FDI</th>
+            <th style="width: 110px;">Superficie</th>
+            <th>Diagnóstico / Condición Clínica</th>
+            <th style="width: 110px;">Fase / Estado</th>
+            <th>Observación Clínica</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${piezas
+        .map(
+          p => `<tr>
+              <td><strong>#${p.numeroPieza}</strong></td>
+              <td>${p.superficie && p.superficie !== 'GENERAL' ? `Cara ${p.superficie}` : 'Toda la pieza'}</td>
+              <td><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${p.colorHexadecimal}; margin-right:5px;"></span><strong>${p.nombreCondicion}</strong></td>
+              <td><span class="badge" style="background:#e0f2fe; color:#0369a1;">${p.estado || 'HALLAZGO'}</span></td>
+              <td>${p.observacion || '-'}</td>
+            </tr>`,
+        )
+        .join('')}
+        </tbody>
+      </table>`
+    }
+
+    <div class="sig-area">
+      <div class="sig-col">
+        <div class="sig-space"></div>
+        <div class="sig-line"></div>
+        <div style="font-weight: 700; font-size: 11px;">${odontologoNombre || 'Dr(a). Odontólogo Tratante'}</div>
+        <div style="font-size: 9.5px; color: #64748b;">C.O.P. ${odontologoCop || '42589'}</div>
+        <div style="font-size: 9.5px; color: #64748b;">Firma y Sello Profesional</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const printWindow = window.open('', '_blank', 'width=850,height=900,scrollbars=yes')
+  if (printWindow) {
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+  } else {
+    alert('Por favor permita las ventanas emergentes (pop-ups) en su navegador para ver el odontograma.')
+  }
+}
+
+export interface PresupuestoItemExport {
+  id?: number | string
+  numeroPieza: number
+  nombrePieza?: string
+  superficie?: string
+  nombreCondicion: string
+  observacion?: string
+  estado?: string
+  costo: number
+}
+
+export interface ExportarPresupuestoParams {
+  paciente: PacienteResponse
+  items: PresupuestoItemExport[]
+  totalPresupuesto: number
+  totalRealizado: number
+  historia?: HistoriaClinicaResponse | null
+  odontologoNombre?: string
+  odontologoCop?: string
+}
+
+/**
+ * Genera el documento PDF formal de PRESUPUESTO Y PLAN DE TRATAMIENTO ODONTOLÓGICO
+ * Con formato oficial unificado idéntico a la Historia Clínica y el Odontograma de NeoDents.
+ */
+export function exportarPresupuestoPdf({
+  paciente,
+  items,
+  totalPresupuesto,
+  totalRealizado,
+  odontologoNombre,
+  odontologoCop,
+}: ExportarPresupuestoParams): void {
+  const numHC = `HC-${paciente.id.toString().padStart(6, '0')}`
+  const numPTO = `PTO-${paciente.id.toString().padStart(6, '0')}`
+  const nombrePaciente = obtenerNombrePaciente(paciente)
+  const edadTexto = calcularEdad(paciente.fechaNacimiento)
+  const fechaEmision = new Date().toLocaleDateString('es-PE', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+  const saldoPendiente = Math.max(0, totalPresupuesto - totalRealizado)
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Presupuesto Odontológico - ${numPTO} - ${nombrePaciente}</title>
+  <style>
+    ${generarEstilosImpresion()}
+    .kpi-row {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+      margin-bottom: 12px;
+    }
+    .kpi-col {
+      display: table-cell;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      vertical-align: top;
+    }
+    .kpi-title {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .kpi-val {
+      font-size: 13pt;
+      font-weight: 800;
+      margin-top: 2px;
+      color: #0f172a;
+    }
+    .kpi-sub {
+      font-size: 7.5pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .table-budget {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 14px;
+      font-size: 8.5pt;
+    }
+    .table-budget th {
+      background: #f1f5f9;
+      padding: 7px 9px;
+      text-align: left;
+      font-weight: 700;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      font-size: 8pt;
+      text-transform: uppercase;
+    }
+    .table-budget td {
+      padding: 7px 9px;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+      vertical-align: middle;
+    }
+    .table-budget tfoot td {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 9px;
+      font-weight: 800;
+    }
+    .badge-estado {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-realizado { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-programado { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .badge-presupuestado { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .badge-hallazgo { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div>
+      <strong>Presupuesto y Plan de Tratamientos Odontológicos</strong>
+      <span style="opacity: 0.7; font-size: 11px; margin-left: 8px;">(Cotización Clínica Oficial NeoDents)</span>
+    </div>
+    <div>
+      <button type="button" class="btn-print" onclick="window.print()">Imprimir o Guardar PDF</button>
+    </div>
+  </div>
+
+  <div class="document-container">
+    <table class="header-table">
+      <tr>
+        <td style="width: 55%; vertical-align: top;">
+          <div class="header-logo">NeoDents</div>
+          <div class="header-sublogo">Centro Odontológico Especializado</div>
+          <div style="font-size: 7.5pt; color: #475569; margin-top: 3px;">
+            RUC: 20608934512 • Sede Principal: San Isidro, Lima - Perú • Tel: (01) 421-9988
+          </div>
+        </td>
+        <td class="header-doc-title" style="width: 45%; vertical-align: top;">
+          <div class="doc-main-title">Presupuesto Odontológico</div>
+          <div class="badge-hc">COTIZACIÓN N° ${numPTO}</div>
+          <div class="doc-meta">Historia Clínica: <strong>${numHC}</strong></div>
+          <div class="doc-meta">Fecha de Emisión: ${fechaEmision}</div>
+          <div class="doc-meta">Validez: <strong>30 días calendario</strong></div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- I. FILIACIÓN DEL PACIENTE -->
+    <div class="section-title">I. Datos de Filiación del Paciente</div>
+    <table class="data-table">
+      <tr>
+        <th>Apellidos y Nombres:</th>
+        <td style="width: 40%; font-weight: bold;">${nombrePaciente}</td>
+        <th>Documento de Identidad:</th>
+        <td style="width: 25%; font-weight: bold;">${paciente.tipoDocumento} ${paciente.numeroDocumento}</td>
+      </tr>
+      <tr>
+        <th>Edad / Fecha Nac.:</th>
+        <td>${edadTexto} (${formatearFecha(paciente.fechaNacimiento)})</td>
+        <th>Teléfono de Contacto:</th>
+        <td>${paciente.telefono || 'No registrado'}</td>
+      </tr>
+      <tr>
+        <th>Correo Electrónico:</th>
+        <td>${paciente.email || 'No registrado'}</td>
+        <th>Sede de Atención:</th>
+        <td>${paciente.sedeRegistroNombre || 'Sede Principal San Isidro'}</td>
+      </tr>
+    </table>
+
+    <!-- II. RESUMEN FINANCIERO DEL PLAN -->
+    <div class="section-title">II. Resumen Económico del Plan de Tratamiento</div>
+    <div class="kpi-row">
+      <div class="kpi-col" style="border-right: none;">
+        <div class="kpi-title">Total Presupuestado</div>
+        <div class="kpi-val" style="color: #0284c7;">S/. ${totalPresupuesto.toFixed(2)}</div>
+        <div class="kpi-sub">${items.length} procedimientos cotizados</div>
+      </div>
+      <div class="kpi-col" style="border-right: none;">
+        <div class="kpi-title">Tratamientos Realizados</div>
+        <div class="kpi-val" style="color: #16a34a;">S/. ${totalRealizado.toFixed(2)}</div>
+        <div class="kpi-sub">${items.filter(i => i.estado === 'REALIZADO').length} procedimientos ejecutados</div>
+      </div>
+      <div class="kpi-col" style="border-right: none;">
+        <div class="kpi-title">Saldo Pendiente</div>
+        <div class="kpi-val" style="color: #d97706;">S/. ${saldoPendiente.toFixed(2)}</div>
+        <div class="kpi-sub">Por ejecutar o cancelar</div>
+      </div>
+      <div class="kpi-col">
+        <div class="kpi-title">Estado del Plan</div>
+        <div class="kpi-val" style="font-size: 10.5pt; color: #16a34a; margin-top: 4px;">Activo Aprobado</div>
+        <div class="kpi-sub">Conforme a evaluación clínica</div>
+      </div>
+    </div>
+
+    <!-- III. DETALLE DE TRATAMIENTOS -->
+    <div class="section-title">III. Detalle de Tratamientos y Presupuesto Odontológico</div>
+    ${items.length === 0
+      ? '<div style="padding: 16px; text-align: center; color: #64748b; font-size: 9pt; border: 1px dashed #cbd5e1; border-radius: 4px;">No se registran tratamientos en este presupuesto.</div>'
+      : `<table class="table-budget">
+        <thead>
+          <tr>
+            <th style="width: 80px;">Pieza FDI</th>
+            <th style="width: 110px;">Superficie</th>
+            <th>Diagnóstico / Procedimiento Odontológico</th>
+            <th style="width: 105px; text-align: center;">Estado Clínico</th>
+            <th style="width: 95px; text-align: right;">Tarifa Est.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item => {
+            const badgeClass =
+              item.estado === 'REALIZADO'
+                ? 'badge-realizado'
+                : item.estado === 'PROGRAMADO'
+                  ? 'badge-programado'
+                  : item.estado === 'PRESUPUESTADO'
+                    ? 'badge-presupuestado'
+                    : 'badge-hallazgo'
+            const badgeLabel =
+              item.estado === 'REALIZADO'
+                ? 'Realizado'
+                : item.estado === 'PROGRAMADO'
+                  ? 'Programado'
+                  : item.estado === 'PRESUPUESTADO'
+                    ? 'Presupuestado'
+                    : 'Hallazgo'
+
+            return `<tr>
+              <td>
+                <strong style="color: #0369a1;">N° ${item.numeroPieza}</strong>
+                ${item.nombrePieza ? `<div style="font-size: 7.5pt; color: #64748b;">${item.nombrePieza}</div>` : ''}
+              </td>
+              <td>${item.superficie || 'Toda la pieza'}</td>
+              <td>
+                <strong style="color: #0f172a;">${item.nombreCondicion}</strong>
+                ${item.observacion && item.observacion.trim().toLowerCase() !== item.nombreCondicion.trim().toLowerCase()
+                  ? `<div style="font-size: 7.5pt; color: #64748b; font-style: italic;">${item.observacion}</div>`
+                  : ''}
+              </td>
+              <td style="text-align: center;">
+                <span class="badge-estado ${badgeClass}">${badgeLabel}</span>
+              </td>
+              <td style="text-align: right; font-weight: 700; font-family: monospace; font-size: 9pt;">
+                S/. ${item.costo.toFixed(2)}
+              </td>
+            </tr>`
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align: right; text-transform: uppercase; font-size: 8.5pt; color: #334155;">
+              TOTAL GENERAL COTIZADO:
+            </td>
+            <td style="text-align: right; font-size: 11pt; color: #0284c7; font-family: monospace;">
+              S/. ${totalPresupuesto.toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>`
+    }
+
+    <!-- CONDICIONES GENERALES -->
+    <div class="text-box" style="margin-top: 10px;">
+      <div class="text-box-title">Términos y Condiciones del Presupuesto</div>
+      <ul style="padding-left: 14px; font-size: 7.5pt; color: #475569; line-height: 1.4;">
+        <li>El presente presupuesto tiene una vigencia de 30 días naturales a partir de su emisión.</li>
+        <li>Los pagos se efectúan por avance o de acuerdo con el plan de financiamiento coordinado con la clínica.</li>
+        <li>Cualquier procedimiento adicional derivado de hallazgos durante el tratamiento será informado y presupuestado previamente.</li>
+      </ul>
+    </div>
+
+    <!-- FIRMAS -->
+    <div class="signature-area">
+      <div class="signature-col">
+        <div class="signature-space"></div>
+        <div class="signature-line"></div>
+        <div class="signature-label">Firma del Paciente / Tutor Legal</div>
+        <div class="signature-sub">Aceptación de Plan de Tratamiento y Presupuesto</div>
+        <div class="signature-sub">DNI / CE: ______________________</div>
+      </div>
+      <div class="signature-col">
+        <div class="signature-space"></div>
+        <div class="signature-line"></div>
+        <div class="signature-label">${odontologoNombre || 'Dr(a). Odontólogo Tratante'}</div>
+        <div class="signature-sub">C.O.P. ${odontologoCop || '42589'}</div>
+        <div class="signature-sub">Firma y Sello Profesional</div>
+      </div>
+    </div>
+
+    <!-- PIE DE PÁGINA LEGAL -->
+    <div class="footer-legal">
+      <strong>Aviso de Confidencialidad y Validez:</strong> Este documento es emitido con fines informativos y de planificación clínica odontológica por NeoDents Centro Odontológico Especializado. Los precios incluyen IGV y corresponden a las tarifas clínicas vigentes a la fecha de emisión.
+    </div>
+  </div>
+</body>
+</html>`
+
+  const printWindow = window.open('', '_blank', 'width=950,height=900,scrollbars=yes')
+  if (printWindow) {
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+  } else {
+    alert('Por favor permita las ventanas emergentes (pop-ups) en su navegador para ver e imprimir el presupuesto.')
+  }
+}
+
+
 

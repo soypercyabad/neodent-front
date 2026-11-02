@@ -1,5 +1,20 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
+export interface CatalogoClinicoItem {
+  id: number
+  tipo: 'ALERGIA' | 'PATOLOGIA' | 'HABITO' | 'MEDICAMENTO'
+  nombre: string
+  descripcion?: string
+  activo: boolean
+}
+
+export interface CatalogosClinicosAgrupados {
+  alergias: CatalogoClinicoItem[]
+  patologias: CatalogoClinicoItem[]
+  habitos: CatalogoClinicoItem[]
+  medicamentos: CatalogoClinicoItem[]
+}
+
 export interface HistoriaClinicaResponse {
   id: number
   pacienteId: number
@@ -8,8 +23,18 @@ export interface HistoriaClinicaResponse {
   numeroDocumento: string
   fechaNacimiento?: string
   edad?: number
+  motivoConsulta?: string
+  enfermedadActual?: string
   antecedentes?: string
   alergias?: string
+  antecedentesMedicos?: string
+  medicamentosActuales?: string
+  habitos?: string
+  antecedentesOdontologicos?: string
+  examenExtraoral?: string
+  examenIntraoral?: string
+  diagnostico?: string
+  planTratamiento?: string
   observacionesGenerales?: string
   fechaCreacion: string
   fechaActualizacion?: string
@@ -18,8 +43,18 @@ export interface HistoriaClinicaResponse {
 }
 
 export interface GuardarHistoriaClinicaRequest {
+  motivoConsulta?: string
+  enfermedadActual?: string
   antecedentes?: string
   alergias?: string
+  antecedentesMedicos?: string
+  medicamentosActuales?: string
+  habitos?: string
+  antecedentesOdontologicos?: string
+  examenExtraoral?: string
+  examenIntraoral?: string
+  diagnostico?: string
+  planTratamiento?: string
   observacionesGenerales?: string
 }
 
@@ -52,6 +87,7 @@ export interface CondicionOdontograma {
   descripcion?: string
   colorHexadecimal: string
   activo: boolean
+  aplicaA?: 'AMBOS' | 'PIEZA_COMPLETA' | 'SUPERFICIE'
 }
 
 export interface PiezaDentalDetalle {
@@ -94,20 +130,29 @@ export interface CrearCondicionRequest {
   codigo?: string
   descripcion?: string
   colorHexadecimal?: string
+  aplicaA?: 'AMBOS' | 'PIEZA_COMPLETA' | 'SUPERFICIE'
+}
+
+export interface PiezaDentalCatalogoItem {
+  numeroPieza: number
+  nombre: string
+  tipoDenticion: string
+  cuadrante: number
+  activo: boolean
 }
 
 export const CONDICIONES_DEFAULT: CondicionOdontograma[] = [
-  { id: 1, codigo: 'CARIES', nombre: 'Caries Dental', descripcion: 'Lesión cariosa activa o recidivante', colorHexadecimal: '#EF4444', activo: true },
-  { id: 2, codigo: 'RESTAURACION', nombre: 'Restauración / Obturación', descripcion: 'Resina compuesta, amalgama o ionómero', colorHexadecimal: '#3B82F6', activo: true },
-  { id: 3, codigo: 'CORONA', nombre: 'Corona Protésica', descripcion: 'Corona fija en zirconio, metal-porcelana o disilicato', colorHexadecimal: '#A855F7', activo: true },
-  { id: 4, codigo: 'AUSENTE', nombre: 'Pieza Ausente', descripcion: 'Pieza dental extraída o ausente', colorHexadecimal: '#64748B', activo: true },
-  { id: 5, codigo: 'ENDODONCIA', nombre: 'Endodoncia / Conducto', descripcion: 'Tratamiento pulpar o necropulpectomía', colorHexadecimal: '#F97316', activo: true },
-  { id: 6, codigo: 'SELLANTE', nombre: 'Sellante de Fosas', descripcion: 'Sellado preventivo de fisuras', colorHexadecimal: '#06B6D4', activo: true },
-  { id: 7, codigo: 'FRACTURA', nombre: 'Fractura / Fisura', descripcion: 'Pérdida de tejido dentario por trauma', colorHexadecimal: '#E11D48', activo: true },
-  { id: 8, codigo: 'IMPLANTE', nombre: 'Implante Dental', descripcion: 'Perno o implante osteointegrado', colorHexadecimal: '#8B5CF6', activo: true },
-  { id: 9, codigo: 'PROTESIS_REMOVIBLE', nombre: 'Prótesis Removible', descripcion: 'Aparato protésico removible parcial o total', colorHexadecimal: '#F59E0B', activo: true },
-  { id: 10, codigo: 'DIENTE_IMPACTADO', nombre: 'Diente Impactado', descripcion: 'Pieza dental retenida en hueso', colorHexadecimal: '#EC4899', activo: true },
-  { id: 11, codigo: 'SANO', nombre: 'Sano / Normal', descripcion: 'Esmalte íntegro sin hallazgos patológicos', colorHexadecimal: '#10B981', activo: true },
+  { id: 1, codigo: 'CARIES', nombre: 'Caries Dental', descripcion: 'Lesión cariosa activa o recidivante', colorHexadecimal: '#EF4444', activo: true, aplicaA: 'SUPERFICIE' },
+  { id: 2, codigo: 'RESTAURACION', nombre: 'Restauración / Obturación', descripcion: 'Resina compuesta, amalgama o ionómero', colorHexadecimal: '#3B82F6', activo: true, aplicaA: 'SUPERFICIE' },
+  { id: 3, codigo: 'CORONA', nombre: 'Corona Protésica', descripcion: 'Corona fija en zirconio, metal-porcelana o disilicato', colorHexadecimal: '#A855F7', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 4, codigo: 'AUSENTE', nombre: 'Pieza Ausente', descripcion: 'Pieza dental extraída o ausente', colorHexadecimal: '#64748B', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 5, codigo: 'ENDODONCIA', nombre: 'Endodoncia / Conducto', descripcion: 'Tratamiento pulpar o necropulpectomía', colorHexadecimal: '#F97316', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 6, codigo: 'SELLANTE', nombre: 'Sellante de Fosas', descripcion: 'Sellado preventivo de fisuras', colorHexadecimal: '#06B6D4', activo: true, aplicaA: 'SUPERFICIE' },
+  { id: 7, codigo: 'FRACTURA', nombre: 'Fractura / Fisura', descripcion: 'Pérdida de tejido dentario por trauma', colorHexadecimal: '#E11D48', activo: true, aplicaA: 'AMBOS' },
+  { id: 8, codigo: 'IMPLANTE', nombre: 'Implante Dental', descripcion: 'Perno o implante osteointegrado', colorHexadecimal: '#8B5CF6', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 9, codigo: 'PROTESIS_REMOVIBLE', nombre: 'Prótesis Removible', descripcion: 'Aparato protésico removible parcial o total', colorHexadecimal: '#F59E0B', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 10, codigo: 'DIENTE_IMPACTADO', nombre: 'Diente Impactado', descripcion: 'Pieza dental retenida en hueso', colorHexadecimal: '#EC4899', activo: true, aplicaA: 'PIEZA_COMPLETA' },
+  { id: 11, codigo: 'SANO', nombre: 'Sano / Normal', descripcion: 'Esmalte íntegro sin hallazgos patológicos', colorHexadecimal: '#10B981', activo: true, aplicaA: 'AMBOS' },
 ]
 
 export interface DocumentoClinico {
@@ -153,6 +198,13 @@ export interface RecetaClinica {
 }
 
 export const clinicalApi = {
+  obtenerCatalogosClinicosActivos(token: string): Promise<CatalogosClinicosAgrupados> {
+    return apiRequest<CatalogosClinicosAgrupados>('/api/catalogos-clinicos/activos', {
+      accessToken: token,
+      method: 'GET',
+    })
+  },
+
   obtenerHistoria(token: string, pacienteId: number): Promise<HistoriaClinicaResponse | undefined> {
     return apiRequest<HistoriaClinicaResponse>(`/api/pacientes/${pacienteId}/historia-clinica`, {
       accessToken: token,
@@ -209,12 +261,9 @@ export const clinicalApi = {
         accessToken: token,
         method: 'GET',
       })
-      if (Array.isArray(data) && data.length > 0) {
-        return data
-      }
-      return CONDICIONES_DEFAULT
+      return Array.isArray(data) ? data : []
     } catch {
-      return CONDICIONES_DEFAULT
+      return []
     }
   },
 
@@ -223,6 +272,21 @@ export const clinicalApi = {
       accessToken: token,
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  },
+
+  actualizarCondicion(token: string, id: number, data: CrearCondicionRequest): Promise<CondicionOdontograma> {
+    return apiRequest<CondicionOdontograma>(`/api/odontograma/condiciones/${id}`, {
+      accessToken: token,
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  eliminarCondicion(token: string, id: number): Promise<void> {
+    return apiRequest<void>(`/api/odontograma/condiciones/${id}`, {
+      accessToken: token,
+      method: 'DELETE',
     })
   },
 
@@ -251,12 +315,35 @@ export const clinicalApi = {
     numeroPieza: number,
     superficie?: string,
   ): Promise<OdontogramaResponse> {
-    const url = `/api/pacientes/${pacienteId}/odontograma/pieza/${numeroPieza}${
-      superficie ? `?superficie=${encodeURIComponent(superficie)}` : ''
-    }`
+    const url = `/api/pacientes/${pacienteId}/odontograma/pieza/${numeroPieza}${superficie ? `?superficie=${encodeURIComponent(superficie)}` : ''
+      }`
     return apiRequest<OdontogramaResponse>(url, {
       accessToken: token,
       method: 'DELETE',
+    })
+  },
+
+  async listarPiezasDentales(token: string): Promise<PiezaDentalCatalogoItem[]> {
+    try {
+      const data = await apiRequest<PiezaDentalCatalogoItem[]>('/api/odontograma/piezas', {
+        accessToken: token,
+        method: 'GET',
+      })
+      return Array.isArray(data) ? data : []
+    } catch {
+      return []
+    }
+  },
+
+  actualizarNombrePieza(
+    token: string,
+    numeroPieza: number,
+    nombre: string,
+  ): Promise<PiezaDentalCatalogoItem> {
+    return apiRequest<PiezaDentalCatalogoItem>(`/api/odontograma/piezas/${numeroPieza}`, {
+      accessToken: token,
+      method: 'PUT',
+      body: JSON.stringify({ nombre }),
     })
   },
 }

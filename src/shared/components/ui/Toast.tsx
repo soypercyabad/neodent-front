@@ -31,9 +31,16 @@ let toastIdCounter = 0
 
 export const toast = {
   show(aviso: ToastAviso): string {
+    // Evitar toasts duplicados idénticos simultáneos
+    const yaExiste = activeToasts.find(t => t.texto === aviso.texto && t.tipo === aviso.tipo)
+    if (yaExiste) {
+      return yaExiste.id
+    }
+
     const id = aviso.id || `toast-${Date.now()}-${++toastIdCounter}`
-    // Agregar al final (la más antigua arriba, la más nueva abajo apilándose)
-    activeToasts = [...activeToasts, { ...aviso, id }]
+    // Limitar máximo a 2 toasts visibles para evitar saturación en pantalla
+    const sinExceso = activeToasts.length >= 2 ? activeToasts.slice(activeToasts.length - 1) : activeToasts
+    activeToasts = [...sinExceso, { ...aviso, id }]
     notifyListeners()
     return id
   },

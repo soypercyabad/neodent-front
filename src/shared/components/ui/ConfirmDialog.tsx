@@ -11,6 +11,10 @@ export interface ConfirmDialogProps {
   confirmLabel?: string
   /** Texto del botón que vuelve atrás sin hacer nada. */
   cancelLabel?: string
+  /** Variante del botón de confirmación */
+  confirmVariant?: 'primary' | 'outline' | 'ghost' | 'danger'
+  /** Clase de z-index para apilar por encima de modales previos */
+  zIndex?: string
   onConfirm: () => void
   onCancel: () => void
 }
@@ -25,6 +29,8 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Aceptar',
   cancelLabel = 'Regresar',
+  confirmVariant = 'primary',
+  zIndex = 'z-[120]',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -49,7 +55,7 @@ export function ConfirmDialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4 backdrop-blur-xs"
+          className={`fixed inset-0 ${zIndex} grid place-items-center bg-ink/50 p-4 backdrop-blur-xs`}
           onClick={e => {
             if (e.target === e.currentTarget) onCancel()
           }}
@@ -64,8 +70,10 @@ export function ConfirmDialog({
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className="w-full max-w-[28rem] rounded-2xl border border-line bg-surface px-6 py-8 text-center shadow-2xl sm:px-8"
           >
-            <span className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-brand-soft text-brand">
-              <Icon name="question" size={24} strokeWidth={2.4} />
+            <span className={`mx-auto mb-4 grid size-12 place-items-center rounded-full ${
+              confirmVariant === 'danger' ? 'bg-danger/10 text-danger' : 'bg-brand-soft text-brand'
+            }`}>
+              <Icon name={confirmVariant === 'danger' ? 'trash' : 'question'} size={24} strokeWidth={2.4} />
             </span>
 
             <h2 id={titleId} className="text-lg font-bold text-ink">
@@ -88,6 +96,7 @@ export function ConfirmDialog({
                 {cancelLabel}
               </Button>
               <Button
+                variant={confirmVariant}
                 onClick={onConfirm}
                 className="flex-1 justify-center"
               >

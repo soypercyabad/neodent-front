@@ -2,14 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
+  ActionsCell,
   Avatar,
   BackLink,
   Badge,
   Button,
   Card,
   Icon,
+  Input,
+  MultiSelectChips,
+  RowActions,
+  Table,
+  TableFoot,
+  TableState,
   Toast,
   Tooltip,
+  type Column,
   type ToastAviso,
 } from '@/shared/components/ui'
 import { useAuth } from '@/features/auth'
@@ -17,20 +25,25 @@ import { formatPhone } from '@/shared/lib/format'
 import { patientsApi, type PacienteResponse } from '../api/patientsApi'
 import {
   clinicalApi,
+  type CatalogosClinicosAgrupados,
   type CondicionOdontograma,
   type CrearCondicionRequest,
   type DocumentoClinico,
   type EvolucionClinicaResponse,
+  type GuardarHistoriaClinicaRequest,
   type HistoriaClinicaResponse,
   type OdontogramaResponse,
+  type PiezaDentalCatalogoItem,
   type RecetaClinica,
 } from '../api/clinicalApi'
-import { OdontogramView } from '../components/OdontogramView'
+import { OdontogramView, NOMBRES_ANATOMICOS_DEFAULT } from '../components/OdontogramView'
 import {
   parsearCamposClinicos,
   exportarHistoriaClinicaPdf,
   exportarExpedienteCronologicoPdf,
   exportarRecetaPdf,
+  exportarOdontogramaPdf,
+  exportarPresupuestoPdf,
   type CamposClinicos,
 } from '../utils/clinicalPdfExport'
 
@@ -116,6 +129,39 @@ const HABITOS_RIESGOS = [
   'Respirador bucal',
 ]
 
+const OPCIONES_ALERGIAS_LISTA = ALERGIAS_COMUNES.map(a => ({ value: a, label: a }))
+
+const OPCIONES_PATOLOGIAS_LISTA = PATOLOGIAS_SISTEMICAS.map(p => ({ value: p, label: p }))
+
+const OPCIONES_HABITOS_LISTA = HABITOS_RIESGOS.map(h => ({ value: h, label: h }))
+
+// Catálogo de medicamentos habituales frecuentes
+const MEDICAMENTOS_HABITUALES_COMUNES = [
+  'Losartán 50mg',
+  'Enalapril 10mg / 20mg',
+  'Metformina 850mg',
+  'Amlodipino 5mg / 10mg',
+  'Atorvastatina 20mg',
+  'Levotiroxina 100mcg',
+  'Omeprazol 20mg',
+  'Aspirina 100mg (Cardioaspirina)',
+  'Warfarina / Anticoagulante',
+  'Clonazepam / Alprazolam',
+  'Hidroclorotiazida 25mg',
+  'Insulina (NPH / Glargina)',
+]
+
+const OPCIONES_MEDICAMENTOS_LISTA = MEDICAMENTOS_HABITUALES_COMUNES.map(m => ({ value: m, label: m }))
+
+const COLUMNS_TRATAMIENTOS: Column[] = [
+  { key: 'pieza', label: 'Pieza' },
+  { key: 'superficie', label: 'Superficie' },
+  { key: 'condicion', label: 'Diagnóstico / Procedimiento' },
+  { key: 'estado', label: 'Estado Clínico', align: 'center' },
+  { key: 'tarifa', label: 'Tarifa Est.', align: 'right' },
+  { label: 'Acciones', align: 'center' },
+]
+
 export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: TabExpediente } = {}) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -134,6 +180,17 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
       raw.includes('ODONTOLOGO') ||
       raw.includes('ADMIN') ||
       raw.includes('ROLE_ODONTOLOGO') ||
+      raw.includes('ROLE_ADMIN')
+    )
+  }, [user])
+
+  const esAdmin = useMemo(() => {
+    if (!user) return false
+    const r = user.rol
+    const raw = user.rolesRaw || []
+    return (
+      r === 'Administrador' ||
+      raw.includes('ADMIN') ||
       raw.includes('ROLE_ADMIN')
     )
   }, [user])
@@ -189,11 +246,78 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
   const [paciente, setPaciente] = useState<PacienteResponse | null>(null)
   const [historia, setHistoria] = useState<HistoriaClinicaResponse | null>(null)
   const [condiciones, setCondiciones] = useState<CondicionOdontograma[]>([])
+  const [piezasCatalogo, setPiezasCatalogo] = useState<PiezaDentalCatalogoItem[]>([])
   const [odontograma, setOdontograma] = useState<OdontogramaResponse | null>(null)
   const [evoluciones, setEvoluciones] = useState<EvolucionClinicaResponse[]>([])
+  const [catalogosClinicos, setCatalogosClinicos] = useState<CatalogosClinicosAgrupados | null>(null)
 
   // Campos clínicos estructurados (conforme a MINSA y Mockup oficial)
   const camposClinicos = useMemo(() => parsearCamposClinicos(historia), [historia])
+
+  // Desglose de antecedentes y alergias reales para renderizado limpio de Badges/Chips
+  const { alergiasLista, patologiasLista, habitosLista, medicamentosLista, otrosAntecedentes } = useMemo(() => {
+    const rawAlergias = (historia?.alergias || camposClinicos.alergiasTexto || '').trim()
+    const alergiasArr = rawAlergias && !rawAlergias.toLowerCase().startsWith('no ') && !rawAlergias.toLowerCase().startsWith('ningun') && !rawAlergias.toLowerCase().startsWith('niega') && !rawAlergias.toLowerCase().startsWith('sin ')
+      ? rawAlergias.split(/[,;\n]+/).map(s => s.trim()).filter(s => {
+        const l = s.toLowerCase()
+        return Boolean(l) && !l.startsWith('niega') && !l.startsWith('no ') && !l.startsWith('ningun') && !l.startsWith('sin ')
+      })
+      : []
+
+    const rawAntecedentes = (historia?.antecedentes || camposClinicos.antecedentesMedicos || '').trim()
+    let patologiasArr: string[] = []
+    let habitosArr: string[] = []
+    let otrosTexto = ''
+
+    if (rawAntecedentes) {
+      if (rawAntecedentes.includes('Patologías:') || rawAntecedentes.includes('Hábitos:')) {
+        const partes = rawAntecedentes.split('|').map(p => p.trim())
+        partes.forEach(parte => {
+          if (parte.toLowerCase().startsWith('patologías:') || parte.toLowerCase().startsWith('patologias:')) {
+            const contenido = parte.substring(parte.indexOf(':') + 1).trim()
+            patologiasArr = contenido.split(',').map(s => s.trim()).filter(s => {
+              const l = s.toLowerCase()
+              return Boolean(l) && !l.startsWith('aparentemente') && !l.startsWith('sin ') && !l.startsWith('no ') && !l.startsWith('ningun') && !l.startsWith('niega')
+            })
+          } else if (parte.toLowerCase().startsWith('hábitos:') || parte.toLowerCase().startsWith('habitos:')) {
+            const contenido = parte.substring(parte.indexOf(':') + 1).trim()
+            habitosArr = contenido.split(',').map(s => s.trim()).filter(Boolean)
+          } else {
+            otrosTexto = otrosTexto ? `${otrosTexto} | ${parte}` : parte
+          }
+        })
+      } else if (!rawAntecedentes.toLowerCase().startsWith('no ') && !rawAntecedentes.toLowerCase().startsWith('niega') && !rawAntecedentes.toLowerCase().startsWith('sin ') && !rawAntecedentes.toLowerCase().startsWith('aparentemente')) {
+        patologiasArr = rawAntecedentes.split(/[,;\n]+/).map(s => s.trim()).filter(s => {
+          const l = s.toLowerCase()
+          return Boolean(l) && !l.startsWith('aparentemente') && !l.startsWith('sin ') && !l.startsWith('no ') && !l.startsWith('ningun') && !l.startsWith('niega')
+        })
+      } else {
+        otrosTexto = rawAntecedentes
+      }
+    }
+
+    if (camposClinicos.habitos) {
+      const deCampos = camposClinicos.habitos.split(',').map(s => s.trim()).filter(Boolean)
+      habitosArr = Array.from(new Set([...habitosArr, ...deCampos]))
+    }
+
+    let medicamentosArr: string[] = []
+    const rawMed = (camposClinicos.medicamentosActuales || '').trim()
+    if (rawMed && !rawMed.toLowerCase().startsWith('no ') && !rawMed.toLowerCase().startsWith('ningun') && !rawMed.toLowerCase().startsWith('sin ')) {
+      medicamentosArr = rawMed.split(/[,;\n]+/).map(s => s.trim()).filter(s => {
+        const l = s.toLowerCase()
+        return Boolean(l) && !l.startsWith('niega') && !l.startsWith('no ') && !l.startsWith('ningun') && !l.startsWith('sin ')
+      })
+    }
+
+    return {
+      alergiasLista: alergiasArr,
+      patologiasLista: patologiasArr,
+      habitosLista: habitosArr,
+      medicamentosLista: medicamentosArr,
+      otrosAntecedentes: otrosTexto,
+    }
+  }, [historia?.alergias, historia?.antecedentes, camposClinicos.alergiasTexto, camposClinicos.antecedentesMedicos, camposClinicos.habitos, camposClinicos.medicamentosActuales])
 
   // Modales de Exportación y Edición de Historia Clínica
   const [modalExportarAbierto, setModalExportarAbierto] = useState(false)
@@ -201,8 +325,37 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
   const [camposForm, setCamposForm] = useState<CamposClinicos>(() => parsearCamposClinicos(null))
   const [seccionModal, setSeccionModal] = useState<'ANAMNESIS' | 'ANTECEDENTES' | 'EXAMEN' | 'DIAGNOSTICO'>('ANAMNESIS')
 
+  const limpiarTextoNegaciones = (val: string | undefined | null): string => {
+    if (!val) return ''
+    return val
+      .split(/[,;\n]+/)
+      .map(s => s.trim())
+      .filter(s => {
+        const l = s.toLowerCase()
+        return (
+          Boolean(l) &&
+          !l.startsWith('niega') &&
+          !l.startsWith('aparentemente') &&
+          !l.startsWith('no ') &&
+          !l.startsWith('ningun') &&
+          !l.startsWith('sin ')
+        )
+      })
+      .join(', ')
+  }
+
   const abrirEditarHistoria = (seccion?: 'anamnesis' | 'antecedentes' | 'examen' | 'diagnostico') => {
-    setCamposForm(parsearCamposClinicos(historia))
+    const parsed = parsearCamposClinicos(historia)
+    setCamposForm({
+      ...parsed,
+      alergiasTexto: limpiarTextoNegaciones(parsed.alergiasTexto),
+      antecedentesMedicos: limpiarTextoNegaciones(parsed.antecedentesMedicos),
+      medicamentosActuales: limpiarTextoNegaciones(parsed.medicamentosActuales),
+    })
+    setOtraAlergiaInput('')
+    setOtraPatologiaInput('')
+    setOtroMedicamentoInput('')
+    setOtroHabitoInput('')
     if (seccion === 'antecedentes') setSeccionModal('ANTECEDENTES')
     else if (seccion === 'examen') setSeccionModal('EXAMEN')
     else if (seccion === 'diagnostico') setSeccionModal('DIAGNOSTICO')
@@ -210,14 +363,216 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
     setModalEditarHistoriaAbierto(true)
   }
 
+  // Estados y helpers para MultiSelectChips en el modal clínico (estilo Roles y Permisos)
+  const [otraAlergiaInput, setOtraAlergiaInput] = useState('')
+  const [otraPatologiaInput, setOtraPatologiaInput] = useState('')
+  const [otroMedicamentoInput, setOtroMedicamentoInput] = useState('')
+  const [otroHabitoInput, setOtroHabitoInput] = useState('')
+
+  const alergiasSeleccionadas = useMemo(() => {
+    if (!camposForm.alergiasTexto) return []
+    return camposForm.alergiasTexto
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => {
+        const l = s.toLowerCase()
+        return (
+          Boolean(l) &&
+          !l.startsWith('niega') &&
+          !l.startsWith('no ') &&
+          !l.startsWith('ningun') &&
+          !l.startsWith('sin ')
+        )
+      })
+  }, [camposForm.alergiasTexto])
+
+  const opcionesAlergiasChips = useMemo(() => {
+    const listaBase = catalogosClinicos?.alergias?.length
+      ? catalogosClinicos.alergias.map(c => ({ value: c.nombre, label: c.nombre }))
+      : OPCIONES_ALERGIAS_LISTA
+    const map = new Map<string, string>()
+    listaBase.forEach(o => map.set(o.value, o.label))
+    alergiasSeleccionadas.forEach(val => {
+      if (!map.has(val)) map.set(val, val)
+    })
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+  }, [catalogosClinicos, alergiasSeleccionadas])
+
+  const handleAlergiasChange = (nuevos: string[]) => {
+    setCamposForm(p => ({ ...p, alergiasTexto: nuevos.join(', ') }))
+  }
+
+  const agregarOtraAlergia = () => {
+    const v = otraAlergiaInput.trim()
+    if (!v) return
+    setCamposForm(p => {
+      const actual = p.alergiasTexto
+        ? p.alergiasTexto.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+      if (!actual.includes(v)) {
+        actual.push(v)
+      }
+      return { ...p, alergiasTexto: actual.join(', ') }
+    })
+    setOtraAlergiaInput('')
+  }
+
+  const antecedentesSeleccionados = useMemo(() => {
+    if (!camposForm.antecedentesMedicos) return []
+    return camposForm.antecedentesMedicos
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => {
+        const l = s.toLowerCase()
+        return (
+          Boolean(l) &&
+          !l.startsWith('aparentemente') &&
+          !l.startsWith('sin ') &&
+          !l.startsWith('no ') &&
+          !l.startsWith('ningun') &&
+          !l.startsWith('niega')
+        )
+      })
+  }, [camposForm.antecedentesMedicos])
+
+  const opcionesPatologiasChips = useMemo(() => {
+    const listaBase = catalogosClinicos?.patologias?.length
+      ? catalogosClinicos.patologias.map(c => ({ value: c.nombre, label: c.nombre }))
+      : OPCIONES_PATOLOGIAS_LISTA
+    const map = new Map<string, string>()
+    listaBase.forEach(o => map.set(o.value, o.label))
+    antecedentesSeleccionados.forEach(val => {
+      if (!map.has(val)) map.set(val, val)
+    })
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+  }, [catalogosClinicos, antecedentesSeleccionados])
+
+  const handlePatologiasChange = (nuevos: string[]) => {
+    setCamposForm(p => ({ ...p, antecedentesMedicos: nuevos.join(', ') }))
+  }
+
+  const agregarOtraPatologia = () => {
+    const v = otraPatologiaInput.trim()
+    if (!v) return
+    setCamposForm(p => {
+      const actual = p.antecedentesMedicos
+        ? p.antecedentesMedicos.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+      if (!actual.includes(v)) {
+        actual.push(v)
+      }
+      return { ...p, antecedentesMedicos: actual.join(', ') }
+    })
+    setOtraPatologiaInput('')
+  }
+
+  const habitosSeleccionados = useMemo(() => {
+    if (!camposForm.habitos) return []
+    return camposForm.habitos
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  }, [camposForm.habitos])
+
+  const opcionesHabitosChips = useMemo(() => {
+    const listaBase = catalogosClinicos?.habitos?.length
+      ? catalogosClinicos.habitos.map(c => ({ value: c.nombre, label: c.nombre }))
+      : OPCIONES_HABITOS_LISTA
+    const map = new Map<string, string>()
+    listaBase.forEach(o => map.set(o.value, o.label))
+    habitosSeleccionados.forEach(val => {
+      if (!map.has(val)) map.set(val, val)
+    })
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+  }, [catalogosClinicos, habitosSeleccionados])
+
+  const handleHabitosChange = (nuevos: string[]) => {
+    setCamposForm(p => ({ ...p, habitos: nuevos.join(', ') }))
+  }
+
+  const agregarOtroHabito = () => {
+    const v = otroHabitoInput.trim()
+    if (!v) return
+    setCamposForm(p => {
+      const actual = p.habitos
+        ? p.habitos.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+      if (!actual.includes(v)) {
+        actual.push(v)
+      }
+      return { ...p, habitos: actual.join(', ') }
+    })
+    setOtroHabitoInput('')
+  }
+
+  const medicamentosSeleccionados = useMemo(() => {
+    if (!camposForm.medicamentosActuales) return []
+    return camposForm.medicamentosActuales
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => {
+        const l = s.toLowerCase()
+        return (
+          Boolean(l) &&
+          !l.startsWith('niega') &&
+          !l.startsWith('ningun') &&
+          !l.startsWith('no toma') &&
+          !l.startsWith('no consume') &&
+          !l.startsWith('sin ') &&
+          !l.startsWith('no ')
+        )
+      })
+  }, [camposForm.medicamentosActuales])
+
+  const opcionesMedicamentosChips = useMemo(() => {
+    const listaBase = catalogosClinicos?.medicamentos?.length
+      ? catalogosClinicos.medicamentos.map(c => ({ value: c.nombre, label: c.nombre }))
+      : OPCIONES_MEDICAMENTOS_LISTA
+    const map = new Map<string, string>()
+    listaBase.forEach(o => map.set(o.value, o.label))
+    medicamentosSeleccionados.forEach(val => {
+      if (!map.has(val)) map.set(val, val)
+    })
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+  }, [catalogosClinicos, medicamentosSeleccionados])
+
+  const handleMedicamentosChange = (nuevos: string[]) => {
+    setCamposForm(p => ({ ...p, medicamentosActuales: nuevos.join(', ') }))
+  }
+
+  const agregarOtroMedicamento = () => {
+    const v = otroMedicamentoInput.trim()
+    if (!v) return
+    setCamposForm(p => {
+      const actual = p.medicamentosActuales
+        ? p.medicamentosActuales.split(',').map(s => s.trim()).filter(Boolean)
+        : []
+      if (!actual.includes(v)) {
+        actual.push(v)
+      }
+      return { ...p, medicamentosActuales: actual.join(', ') }
+    })
+    setOtroMedicamentoInput('')
+  }
+
   const handleGuardarHistoriaCompleta = async () => {
     if (!accessToken || !pacienteId) return
     setGuardando(true)
     try {
-      const payload = {
-        antecedentes: camposForm.antecedentesMedicos,
+      const payload: GuardarHistoriaClinicaRequest = {
+        motivoConsulta: camposForm.motivoConsulta,
+        enfermedadActual: camposForm.enfermedadActual,
         alergias: camposForm.alergiasTexto,
-        observacionesGenerales: JSON.stringify(camposForm),
+        antecedentesMedicos: camposForm.antecedentesMedicos,
+        antecedentes: camposForm.antecedentesMedicos,
+        medicamentosActuales: camposForm.medicamentosActuales,
+        habitos: camposForm.habitos,
+        antecedentesOdontologicos: camposForm.antecedentesOdontologicos,
+        examenExtraoral: camposForm.examenExtraoral,
+        examenIntraoral: camposForm.examenIntraoral,
+        diagnostico: camposForm.diagnostico,
+        planTratamiento: camposForm.planTratamiento,
+        observacionesGenerales: camposForm.observacionesClinicas || JSON.stringify(camposForm),
       }
       let actualizada: HistoriaClinicaResponse
       if (!historia) {
@@ -258,6 +613,51 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
       evoluciones,
       odontograma,
       recetas,
+      odontologoNombre: user ? `${user.nombre} ${user.apellido}` : 'Dr(a). Odontólogo Tratante',
+      odontologoCop: '42589',
+    })
+  }
+
+  const handleExportarPresupuestoPdf = () => {
+    if (!paciente) return
+    exportarPresupuestoPdf({
+      paciente,
+      historia,
+      items: presupuestoItems.map(item => {
+        const nombrePieza =
+          piezasCatalogo.find(p => p.numeroPieza === item.numeroPieza)?.nombre?.replace(/\s*\(\d+\)$/, '') ||
+          NOMBRES_ANATOMICOS_DEFAULT[item.numeroPieza] ||
+          `Pieza ${item.numeroPieza}`
+        const condObj = condiciones.find(c => c.id === item.idCondicion || (item.codigoCondicion && c.codigo === item.codigoCondicion))
+        const esPiezaCompleta = condObj?.aplicaA === 'PIEZA_COMPLETA' || item.superficie === 'GENERAL'
+        const superficieTexto = esPiezaCompleta
+          ? 'Toda la pieza'
+          : `Cara ${item.superficie?.charAt(0).toUpperCase()}${item.superficie?.slice(1).toLowerCase()}`
+
+        return {
+          id: item.id,
+          numeroPieza: item.numeroPieza,
+          nombrePieza,
+          superficie: superficieTexto,
+          nombreCondicion: item.nombreCondicion,
+          observacion: item.observacion,
+          estado: item.estado,
+          costo: item.costo,
+        }
+      }),
+      totalPresupuesto,
+      totalRealizado,
+      odontologoNombre: user ? `${user.nombre} ${user.apellido}` : 'Dr(a). Odontólogo Tratante',
+      odontologoCop: '42589',
+    })
+  }
+
+  const handleExportarOdontogramaPdf = () => {
+    if (!paciente) return
+    exportarOdontogramaPdf({
+      paciente,
+      odontograma,
+      historia,
       odontologoNombre: user ? `${user.nombre} ${user.apellido}` : 'Dr(a). Odontólogo Tratante',
       odontologoCop: '42589',
     })
@@ -344,89 +744,13 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
   const [viewerRotacion, setViewerRotacion] = useState(0)
   const [viewerInvertido, setViewerInvertido] = useState(false)
 
-  // Documentos demostrativos y reales
-  const [documentos, setDocumentos] = useState<DocumentoClinico[]>([
-    {
-      id: 1,
-      pacienteId: pacienteId || 1,
-      claveAlmacenamiento: 'radiografias/panoramica_inicial.jpg',
-      nombreOriginal: 'Radiografía Panorámica Completa Inicial.jpg',
-      tipoMime: 'image/jpeg',
-      tipoDocumento: 'RADIOGRAFIA_PANORAMICA',
-      tamanoBytes: 3420000,
-      visiblePaciente: true,
-      fechaCreacion: '2026-10-15T10:30:00',
-      urlVisualizacion: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      id: 2,
-      pacienteId: pacienteId || 1,
-      claveAlmacenamiento: 'radiografias/periapical_pieza_16.jpg',
-      nombreOriginal: 'Periapical Pieza #16 Control Endodóntico.jpg',
-      tipoMime: 'image/jpeg',
-      tipoDocumento: 'RADIOGRAFIA_PERIAPICAL',
-      tamanoBytes: 1850000,
-      visiblePaciente: false,
-      fechaCreacion: '2026-10-17T16:45:00',
-      urlVisualizacion: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      id: 3,
-      pacienteId: pacienteId || 1,
-      claveAlmacenamiento: 'fotos/registro_oclusal_intraoral.jpg',
-      nombreOriginal: 'Fotografía Clínica Intraoral Oclusión.jpg',
-      tipoMime: 'image/jpeg',
-      tipoDocumento: 'FOTOGRAFIA_CLINICA',
-      tamanoBytes: 2100000,
-      visiblePaciente: true,
-      fechaCreacion: '2026-10-18T11:15:00',
-      urlVisualizacion: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=1200&q=80',
-    },
-  ])
+  // Documentos y radiografías clínicos reales del paciente (inicialmente vacíos hasta subida real)
+  const [documentos, setDocumentos] = useState<DocumentoClinico[]>([])
 
-  // Recetas emitidas y modal de visualización conceptual
+  // Recetas emitidas y modal de visualización (inicialmente vacíos hasta emisión real)
   const [modalRecetaAbierto, setModalRecetaAbierto] = useState(false)
   const [recetaParaVer, setRecetaParaVer] = useState<RecetaClinica | null>(null)
-  const [recetas, setRecetas] = useState<RecetaClinica[]>([
-    {
-      id: 128,
-      codigoReceta: 'RX-000128',
-      pacienteId: pacienteId || 1,
-      odontologoId: 1,
-      odontologoNombre: 'Dra. Andrea Sulca',
-      numeroColegiatura: 'COP 45210',
-      fecha: '2026-10-22T10:30:00',
-      validaHasta: '2026-10-27T23:59:59',
-      indicacionesGenerales:
-        'Tomar la medicación con abundante agua tras los alimentos. No ingerir bebidas alcohólicas ni suspender el tratamiento antes del tiempo estipulado.',
-      detalles: [
-        {
-          medicamento: 'Amoxicilina',
-          dci: 'Amoxicilina trihidrato',
-          concentracion: '500 mg',
-          formaFarmaceutica: 'Cápsula',
-          cantidadTotal: '21 cápsulas (veintiuno)',
-          dosis: '1 cápsula',
-          frecuencia: 'Cada 8 horas',
-          duracion: 'Por 7 días',
-          viaAdministracion: 'Oral',
-          observaciones: 'Cumplir el ciclo antibiótico completo.',
-        },
-        {
-          medicamento: 'Ibuprofeno',
-          dci: 'Ibuprofeno',
-          concentracion: '400 mg',
-          formaFarmaceutica: 'Tableta recubierta',
-          cantidadTotal: '10 tabletas',
-          dosis: '1 tableta',
-          frecuencia: 'Cada 8 horas condicional al dolor',
-          duracion: 'Por 3 días',
-          viaAdministracion: 'Oral',
-          observaciones: 'Tomar únicamente en caso de molestia o inflamación moderada.',
-        },
-      ],
-    },
-  ])
+  const [recetas, setRecetas] = useState<RecetaClinica[]>([])
 
   // Formulario técnico de nueva receta (Conforme a DIGEMID / MINSA)
   const [formReceta, setFormReceta] = useState({
@@ -500,7 +824,7 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
           titulo: `${estadoLabel} en Pieza #${p.numeroPieza}`,
           subtitulo: `${p.nombreCondicion} (${p.superficie === 'GENERAL' ? 'Toda la pieza' : `Cara ${p.superficie}`})`,
           descripcion: p.observacion || undefined,
-          fecha: historia?.fechaCreacion || new Date().toISOString(),
+          fecha: p.fecha || historia?.fechaCreacion || new Date().toISOString(),
           tono: p.estado === 'REALIZADO' ? 'blue' : 'amber',
           icono: 'tooth',
         })
@@ -549,13 +873,19 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
       clinicalApi.listarCondiciones(accessToken),
       clinicalApi.obtenerOdontograma(accessToken, pacienteId).catch(() => null),
       clinicalApi.listarEvoluciones(accessToken, pacienteId).catch(() => []),
+      clinicalApi.listarPiezasDentales(accessToken).catch(() => []),
+      clinicalApi.obtenerCatalogosClinicosActivos(accessToken).catch(() => null),
     ])
-      .then(([pac, hist, conds, odonto, evols]) => {
+      .then(([pac, hist, conds, odonto, evols, piezas, cats]) => {
         if (!activo) return
         setPaciente(pac)
         setCondiciones(conds)
         setOdontograma(odonto)
         setEvoluciones(evols)
+        setPiezasCatalogo(piezas)
+        if (cats) {
+          setCatalogosClinicos(cats)
+        }
 
         if (hist) {
           setHistoria(hist)
@@ -584,10 +914,16 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
     codigoCondicion?: string,
   ) => {
     if (!accessToken || !pacienteId) return
+    setGuardando(true)
     try {
+      // Normalizar superficie si la condición aplica a pieza completa
+      const condObj = condiciones.find(c => c.id === condicionId || (codigoCondicion && c.codigo === codigoCondicion))
+      const esPiezaCompleta = condObj?.aplicaA === 'PIEZA_COMPLETA' || superficie === 'GENERAL'
+      const supParaEnviar = esPiezaCompleta ? 'GENERAL' : (superficie || 'GENERAL')
+
       const resp = await clinicalApi.actualizarPieza(accessToken, pacienteId, {
         numeroPieza: pieza,
-        superficie,
+        superficie: supParaEnviar,
         idCondicion: condicionId,
         codigoCondicion,
         observacion: observacionTexto,
@@ -596,14 +932,15 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
       setOdontograma(resp)
       setAviso({
         tipo: 'success',
-        texto: `Pieza dental #${pieza} (${superficie || 'General'}) actualizada en el odontograma.`,
+        texto: `Pieza dental #${pieza} actualizada (${estado ? estado.toLowerCase() : 'guardada'}).`,
       })
     } catch (e) {
       setAviso({
         tipo: 'error',
-        texto: e instanceof Error ? e.message : 'Error al guardar el hallazgo en el odontograma.',
+        texto: e instanceof Error ? e.message : 'Error al actualizar el estado del tratamiento en el odontograma.',
       })
-      throw e
+    } finally {
+      setGuardando(false)
     }
   }
 
@@ -620,6 +957,41 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
       texto: `Nueva condición "${nueva.nombre}" creada y agregada al catálogo.`,
     })
     return nueva
+  }
+
+  // Eliminar o desactivar condición del catálogo y de la base de datos
+  const handleEliminarCondicion = async (idCondicion: number) => {
+    if (!accessToken) throw new Error('No autenticado')
+    await clinicalApi.eliminarCondicion(accessToken, idCondicion)
+    setCondiciones(prev => prev.filter(c => c.id !== idCondicion))
+    setAviso({
+      tipo: 'success',
+      texto: 'Condición eliminada del catálogo y de la base de datos.',
+    })
+  }
+
+  // Actualizar ámbito o campos de una condición existente en el catálogo
+  const handleActualizarCondicion = async (idCondicion: number, data: CrearCondicionRequest) => {
+    if (!accessToken) throw new Error('No autenticado')
+    const actualizada = await clinicalApi.actualizarCondicion(accessToken, idCondicion, data)
+    setCondiciones(prev => prev.map(c => (c.id === idCondicion ? actualizada : c)))
+    setAviso({
+      tipo: 'success',
+      texto: `Condición "${actualizada.nombre}" actualizada en el catálogo.`,
+    })
+  }
+
+  // Actualizar nombre anatómico de una pieza dental (Catálogo FDI)
+  const handleActualizarNombrePieza = async (numeroPieza: number, nombre: string) => {
+    if (!accessToken) throw new Error('No autenticado')
+    const piezaActualizada = await clinicalApi.actualizarNombrePieza(accessToken, numeroPieza, nombre)
+    setPiezasCatalogo(prev =>
+      prev.map(p => (p.numeroPieza === numeroPieza ? piezaActualizada : p))
+    )
+    setAviso({
+      tipo: 'success',
+      texto: `Nombre de la pieza #${numeroPieza} actualizado a "${piezaActualizada.nombre}".`,
+    })
   }
 
   // Limpiar pieza o superficie
@@ -863,30 +1235,32 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
               </div>
 
               {/* BLOQUE DERECHO: TARJETA DE ALERTAS MÉDICAS (CON TOOLTIP DEL SISTEMA, SIN EMOJIS) */}
-              <Tooltip content="Ver o gestionar alergias y antecedentes clínicos" side="bottom">
+              <Tooltip
+                content="Ver o gestionar alergias y antecedentes clínicos"
+                side="bottom"
+                className="w-full lg:w-auto shrink-0"
+              >
                 <div
                   role="button"
                   tabIndex={0}
                   onClick={() => cambiarTab('ANTECEDENTES')}
                   onKeyDown={e => e.key === 'Enter' && cambiarTab('ANTECEDENTES')}
-                  className="shrink-0 bg-white rounded-2xl p-4 shadow-xl border border-slate-100 hover:shadow-2xl hover:scale-[1.02] transition-all cursor-pointer flex flex-col justify-center gap-2.5 min-w-[195px] select-none"
+                  className="w-full lg:w-auto shrink-0 bg-white rounded-2xl p-4 shadow-xl border border-slate-100 hover:shadow-2xl hover:scale-[1.01] transition-all cursor-pointer flex flex-col sm:flex-row lg:flex-col justify-center sm:items-center lg:items-stretch gap-3 sm:gap-6 lg:gap-2.5 min-w-0 sm:min-w-[195px] select-none"
                 >
                   {/* ALERGIAS */}
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     <div
-                      className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        totalAlergias > 0
+                      className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${totalAlergias > 0
                           ? 'bg-rose-100 text-rose-600'
                           : 'bg-emerald-100 text-emerald-700'
-                      }`}
+                        }`}
                     >
                       <Icon name={totalAlergias > 0 ? 'warning' : 'shield'} size={15} />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <span
-                        className={`text-xs font-bold block truncate ${
-                          totalAlergias > 0 ? 'text-rose-700' : 'text-slate-800'
-                        }`}
+                        className={`text-xs font-bold block truncate ${totalAlergias > 0 ? 'text-rose-700' : 'text-slate-800'
+                          }`}
                       >
                         {totalAlergias} {totalAlergias === 1 ? 'alergia' : 'alergias'}
                       </span>
@@ -896,25 +1270,24 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     </div>
                   </div>
 
-                  {/* SEPARADOR */}
-                  <div className="h-px bg-slate-100" />
+                  {/* SEPARADOR (HORIZONTAL EN MOBILE/DESKTOP, VERTICAL EN TABLET SM:) */}
+                  <div className="h-px bg-slate-100 w-full sm:hidden lg:block" />
+                  <div className="hidden sm:block lg:hidden w-px h-8 bg-slate-200 shrink-0" />
 
                   {/* ANTECEDENTES */}
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     <div
-                      className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        totalAntecedentes > 0
+                      className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${totalAntecedentes > 0
                           ? 'bg-amber-100 text-amber-700'
                           : 'bg-slate-100 text-slate-600'
-                      }`}
+                        }`}
                     >
                       <Icon name={totalAntecedentes > 0 ? 'heart' : 'fileText'} size={15} />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <span
-                        className={`text-xs font-bold block truncate ${
-                          totalAntecedentes > 0 ? 'text-amber-800' : 'text-slate-800'
-                        }`}
+                        className={`text-xs font-bold block truncate ${totalAntecedentes > 0 ? 'text-amber-800' : 'text-slate-800'
+                          }`}
                       >
                         {totalAntecedentes} {totalAntecedentes === 1 ? 'antecedente' : 'antecedentes'}
                       </span>
@@ -947,9 +1320,8 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     key={tab.id}
                     type="button"
                     onClick={() => cambiarTab(tab.id as TabExpediente)}
-                    className={`relative pb-3 text-sm font-semibold transition-all ${
-                      active ? 'text-brand' : 'text-muted hover:text-ink'
-                    }`}
+                    className={`relative pb-3 text-sm font-semibold transition-all ${active ? 'text-brand' : 'text-muted hover:text-ink'
+                      }`}
                   >
                     {tab.label}
                     {active && (
@@ -978,11 +1350,10 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                   {/* CARD 1: ESTADO Y PORTAL (REEMPLAZA LA FECHA DE NACIMIENTO REDUNDANTE) */}
                   <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-line shadow-xs flex items-center gap-4">
                     <div
-                      className={`size-12 rounded-xl flex items-center justify-center shrink-0 border ${
-                        paciente.activo
+                      className={`size-12 rounded-xl flex items-center justify-center shrink-0 border ${paciente.activo
                           ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
                           : 'bg-slate-100 border-slate-200 text-slate-500'
-                      }`}
+                        }`}
                     >
                       <Icon name="shield" size={22} />
                     </div>
@@ -1002,11 +1373,10 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                   {/* CARD 2: ESTADO DEL CORREO */}
                   <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-line shadow-xs flex items-center gap-4">
                     <div
-                      className={`size-12 rounded-xl flex items-center justify-center shrink-0 border ${
-                        paciente.correoVerificado
+                      className={`size-12 rounded-xl flex items-center justify-center shrink-0 border ${paciente.correoVerificado
                           ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
                           : 'bg-amber-50 border-amber-200 text-amber-600'
-                      }`}
+                        }`}
                     >
                       <Icon name={paciente.correoVerificado ? 'check' : 'alertCircle'} size={22} />
                     </div>
@@ -1187,194 +1557,302 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                 </div>
               </div>
 
-              {/* CONTENIDO PRINCIPAL: 2 COLUMNAS (MOCKUP OFICIAL) */}
+              {/* CONTENIDO PRINCIPAL: 2 COLUMNAS (LAYOUT LIMPIO Y ESPACIOSO) */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 {/* COLUMNA IZQUIERDA (2/3): INFORMACIÓN CLÍNICA DETALLADA */}
-                <div className="lg:col-span-2 space-y-5">
+                <div className="lg:col-span-2 space-y-6">
                   {/* CARD 1: MOTIVO DE CONSULTA Y ANAMNESIS */}
-                  <Card className="p-5 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-line">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
-                          <Icon name="fileText" size={16} />
+                  <Card className="p-6 sm:p-7 space-y-5 rounded-2xl shadow-xs border-line/80">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-line/60">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                          <Icon name="fileText" size={18} />
                         </div>
-                        <h2 className="text-sm font-bold text-ink">Motivo de consulta y anamnesis</h2>
+                        <div>
+                          <h2 className="text-base font-bold text-ink">Motivo de consulta y anamnesis</h2>
+                          <p className="text-xs text-muted">Razón de la visita y relato cronológico del paciente</p>
+                        </div>
                       </div>
-                      <Badge tone="blue">Evaluación inicial</Badge>
+                      <Badge tone={camposClinicos.motivoConsulta ? 'blue' : 'gray'}>
+                        {camposClinicos.motivoConsulta ? 'Evaluación registrada' : 'Sin motivo registrado'}
+                      </Badge>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div>
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1.5">
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1.5">
                           Motivo de Consulta
                         </span>
-                        <div className="p-3.5 rounded-xl bg-alt/40 border border-line/70 text-xs text-ink font-medium leading-relaxed">
-                          {camposClinicos.motivoConsulta || 'Paciente acude para una evaluación odontológica general y revisión de su estado de salud bucal.'}
-                        </div>
+                        {camposClinicos.motivoConsulta ? (
+                          <p className="text-sm text-ink font-semibold leading-relaxed">
+                            {camposClinicos.motivoConsulta}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted/70 italic">
+                            No se ha especificado el motivo de consulta.
+                          </p>
+                        )}
                       </div>
 
-                      <div>
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
+                      <div className="pt-2">
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1.5">
                           Enfermedad Actual / Anamnesis
                         </span>
-                        <p className="text-xs text-ink font-medium leading-relaxed">
-                          {camposClinicos.enfermedadActual || 'Sin información adicional registrada.'}
-                        </p>
+                        {camposClinicos.enfermedadActual ? (
+                          <p className="text-xs text-ink/90 font-medium leading-relaxed">
+                            {camposClinicos.enfermedadActual}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted/70 italic">
+                            Sin información adicional registrada de la enfermedad actual.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </Card>
 
                   {/* CARD 2: ANTECEDENTES Y SALUD GENERAL */}
-                  <Card className="p-5 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-line">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Icon name="plus" size={16} />
+                  <Card className="p-6 sm:p-7 space-y-5 rounded-2xl shadow-xs border-line/80">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-line/60">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Icon name="plus" size={18} />
                         </div>
-                        <h2 className="text-sm font-bold text-ink">Antecedentes y salud general</h2>
+                        <div>
+                          <h2 className="text-base font-bold text-ink">Antecedentes y salud general</h2>
+                          <p className="text-xs text-muted">Historial de alergias, patologías sistémicas y hábitos</p>
+                        </div>
                       </div>
                       {puedeEditar && (
                         <button
                           type="button"
                           onClick={() => abrirEditarHistoria('antecedentes')}
-                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1.5 cursor-pointer"
                         >
                           <span>Editar</span>
-                          <Icon name="externalLink" size={13} />
+                          <Icon name="externalLink" size={14} />
                         </button>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Antecedentes Médicos
-                        </span>
-                        <p className="text-xs text-ink font-semibold">
-                          {camposClinicos.antecedentesMedicos || 'No registrados'}
-                        </p>
+                    <div className="space-y-5">
+                      {/* ALERGIAS INTEGRADAS DENTRO DE ANTECEDENTES (DESTACADAS CON PRIORIDAD CLÍNICA) */}
+                      <div className={`p-4 rounded-xl border transition-colors ${alergiasLista.length > 0
+                          ? 'border-rose-200 bg-rose-50/50'
+                          : 'border-line/50 bg-alt/20'
+                        }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={alergiasLista.length > 0 ? 'text-rose-600' : 'text-muted'}>
+                            <Icon name={alergiasLista.length > 0 ? 'warning' : 'shield'} size={15} strokeWidth={2.4} />
+                          </span>
+                          <span className={`text-[11px] font-black uppercase tracking-wider ${alergiasLista.length > 0 ? 'text-rose-800' : 'text-muted'
+                            }`}>
+                            Alergias a Medicamentos o Sustancias
+                          </span>
+                        </div>
+                        {alergiasLista.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 pt-0.5">
+                            {alergiasLista.map((alergia, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white text-rose-700 border border-rose-300 shadow-2xs"
+                              >
+                                {alergia}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted/90 italic">
+                            No se reportan alergias a fármacos ni a anestésicos locales.
+                          </p>
+                        )}
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Medicamentos Actuales
+                      {/* PATOLOGÍAS SISTÉMICAS EN CHIPS CLAROS */}
+                      <div>
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">
+                          Antecedentes Médicos · Patologías
                         </span>
-                        <p className="text-xs text-ink font-semibold">
-                          {camposClinicos.medicamentosActuales || 'No registrados'}
-                        </p>
+                        {patologiasLista.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {patologiasLista.map((patologia, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100/90 text-slate-700 border border-slate-200/90"
+                              >
+                                {patologia}
+                              </span>
+                            ))}
+                          </div>
+                        ) : otrosAntecedentes ? (
+                          <p className="text-xs text-ink font-medium leading-relaxed">
+                            {otrosAntecedentes}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted/90 italic">
+                            No se registran patologías sistémicas relevantes.
+                          </p>
+                        )}
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Antecedentes Odontológicos
+                      {/* HÁBITOS DEL PACIENTE */}
+                      <div>
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">
+                          Hábitos y Factores de Riesgo
                         </span>
-                        <p className="text-xs text-ink font-semibold">
-                          {camposClinicos.antecedentesOdontologicos || 'No registrados'}
-                        </p>
+                        {habitosLista.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {habitosLista.map((habito, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80"
+                              >
+                                {habito}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted/90 italic">
+                            Sin hábitos perjudiciales registrados.
+                          </p>
+                        )}
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Alergias
-                        </span>
-                        <p className="text-xs font-semibold text-danger">
-                          {camposClinicos.alergiasTexto || 'Sin información registrada'}
-                        </p>
+                      {/* FILA COMPACTA Y LIMPIA: MEDICAMENTOS Y ANTECEDENTES ODONTOLÓGICOS */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-line/40">
+                        <div>
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">
+                            Medicamentos Actuales
+                          </span>
+                          {medicamentosLista.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {medicamentosLista.map((med, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200/80"
+                                >
+                                  {med}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted/90 italic">
+                              No consume medicamentos de forma habitual.
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">
+                            Antecedentes Odontológicos
+                          </span>
+                          <p className="text-xs text-ink font-medium leading-relaxed">
+                            {camposClinicos.antecedentesOdontologicos || 'No registra antecedentes odontológicos previos.'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-muted italic pt-1">
+                    <p className="text-[11px] text-muted/80 italic pt-1 border-t border-line/30">
                       La ausencia de registros no equivale a una respuesta negativa del paciente.
                     </p>
                   </Card>
 
                   {/* CARD 3: EXPLORACIÓN Y EVALUACIÓN CLÍNICA */}
-                  <Card className="p-5 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-line">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                          <Icon name="search" size={16} />
+                  <Card className="p-6 sm:p-7 space-y-5 rounded-2xl shadow-xs border-line/80">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-line/60">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                          <Icon name="search" size={18} />
                         </div>
-                        <h2 className="text-sm font-bold text-ink">Exploración y evaluación clínica</h2>
+                        <div>
+                          <h2 className="text-base font-bold text-ink">Exploración y evaluación clínica</h2>
+                          <p className="text-xs text-muted">Examen físico de cavidad oral, tejidos blandos y ATM</p>
+                        </div>
                       </div>
                       {puedeEditar && (
                         <button
                           type="button"
                           onClick={() => abrirEditarHistoria('examen')}
-                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1.5 cursor-pointer"
                         >
                           <span>Editar</span>
-                          <Icon name="externalLink" size={13} />
+                          <Icon name="externalLink" size={14} />
                         </button>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Examen Extraoral
-                        </span>
-                        <p className="text-xs text-ink font-medium leading-relaxed">
-                          {camposClinicos.examenExtraoral || 'Pendiente de completar'}
-                        </p>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-alt/30 border border-line/60 space-y-1.5">
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                            Examen Extraoral
+                          </span>
+                          <p className="text-xs text-ink font-medium leading-relaxed">
+                            {camposClinicos.examenExtraoral || 'Sin hallazgos extraorales registrados.'}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-alt/30 border border-line/60 space-y-1.5">
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                            Examen Intraoral
+                          </span>
+                          <p className="text-xs text-ink font-medium leading-relaxed">
+                            {camposClinicos.examenIntraoral || 'Sin hallazgos intraorales registrados.'}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Examen Intraoral
+                      <div>
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1">
+                          Observaciones Clínicas
                         </span>
                         <p className="text-xs text-ink font-medium leading-relaxed">
-                          {camposClinicos.examenIntraoral || 'Pendiente de completar'}
+                          {camposClinicos.observacionesClinicas || 'Sin observaciones clínicas adicionales.'}
                         </p>
                       </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                      <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                        Observaciones Clínicas
-                      </span>
-                      <p className="text-xs text-ink font-medium leading-relaxed">
-                        {camposClinicos.observacionesClinicas || 'Todavía no se han registrado observaciones.'}
-                      </p>
                     </div>
                   </Card>
 
                   {/* CARD 4: DIAGNÓSTICO Y PLAN DE ATENCIÓN */}
-                  <Card className="p-5 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-line">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                          <Icon name="file" size={16} />
+                  <Card className="p-6 sm:p-7 space-y-5 rounded-2xl shadow-xs border-line/80">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-line/60">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <Icon name="file" size={18} />
                         </div>
-                        <h2 className="text-sm font-bold text-ink">Diagnóstico y plan de atención</h2>
+                        <div>
+                          <h2 className="text-base font-bold text-ink">Diagnóstico y plan de atención</h2>
+                          <p className="text-xs text-muted">Juicio clínico preliminar y pasos terapéuticos planificados</p>
+                        </div>
                       </div>
                       {puedeEditar && (
                         <button
                           type="button"
                           onClick={() => abrirEditarHistoria('diagnostico')}
-                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1.5 cursor-pointer"
                         >
                           <span>+ Agregar / Editar</span>
                         </button>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Diagnóstico
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1.5">
+                          Diagnóstico Presuntivo / Definitivo
                         </span>
-                        <p className="text-xs text-ink font-semibold">
-                          {camposClinicos.diagnostico || 'Sin diagnóstico registrado'}
+                        <p className="text-sm font-semibold text-ink leading-relaxed">
+                          {camposClinicos.diagnostico || 'Sin diagnóstico registrado aún.'}
                         </p>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-line bg-surface space-y-1">
-                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
-                          Plan de Tratamiento
+                      <div className="pt-2 border-t border-line/40">
+                        <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1.5">
+                          Plan de Tratamiento Propuesto
                         </span>
                         <p className="text-xs text-ink font-medium whitespace-pre-line leading-relaxed">
-                          {camposClinicos.planTratamiento || 'Aún no definido'}
+                          {camposClinicos.planTratamiento || 'Pendiente de formulación de plan de tratamiento.'}
                         </p>
                       </div>
                     </div>
@@ -1428,20 +1906,18 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         eventosHistorial.slice(0, 3).map((evt, idx) => (
                           <div
                             key={evt.id}
-                            className={`relative pl-5 ${
-                              idx < Math.min(eventosHistorial.length - 1, 2) ? 'pb-3 border-l-2 border-line' : ''
-                            }`}
+                            className={`relative pl-5 ${idx < Math.min(eventosHistorial.length - 1, 2) ? 'pb-3 border-l-2 border-line' : ''
+                              }`}
                           >
                             <div
-                              className={`absolute -left-[5px] top-0.5 size-2.5 rounded-full ring-4 ring-surface ${
-                                evt.tono === 'green'
+                              className={`absolute -left-[5px] top-0.5 size-2.5 rounded-full ring-4 ring-surface ${evt.tono === 'green'
                                   ? 'bg-emerald-500'
                                   : evt.tono === 'purple'
                                     ? 'bg-purple-500'
                                     : evt.tono === 'amber'
                                       ? 'bg-amber-500'
                                       : 'bg-brand'
-                              }`}
+                                }`}
                             />
                             <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">
                               {evt.tipo} • {new Date(evt.fecha).toLocaleDateString()}
@@ -1527,11 +2003,17 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
               <OdontogramView
                 odontograma={odontograma}
                 condiciones={condiciones}
+                piezasCatalogo={piezasCatalogo}
                 readOnly={!puedeEditar}
+                isAdmin={esAdmin}
                 guardando={guardando}
                 onActualizarPieza={handleActualizarPieza}
                 onLimpiarPieza={handleLimpiarPieza}
-                onCrearCondicion={handleCrearCondicion}
+                onCrearCondicion={esAdmin ? handleCrearCondicion : undefined}
+                onActualizarCondicion={esAdmin ? handleActualizarCondicion : undefined}
+                onEliminarCondicion={esAdmin ? handleEliminarCondicion : undefined}
+                onActualizarNombrePieza={esAdmin ? handleActualizarNombrePieza : undefined}
+                onExportarPdf={handleExportarOdontogramaPdf}
               />
             </div>
           )}
@@ -1581,9 +2063,9 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                 </div>
               </div>
 
-              {/* LISTA DETALLADA DE PROCEDIMIENTOS EN PRESUPUESTO */}
-              <Card className="p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-line">
+              {/* LISTA DETALLADA DE PROCEDIMIENTOS EN PRESUPUESTO (TABLA ESTÁNDAR NEODENT) */}
+              <Card className="p-0 overflow-hidden shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 border-b border-line">
                   <div>
                     <h3 className="text-base font-bold text-ink flex items-center gap-2">
                       <Icon name="receipt" size={18} className="text-brand" />
@@ -1594,130 +2076,207 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      icon="printer"
-                      onClick={() => window.print()}
+                      icon="download"
+                      onClick={handleExportarPresupuestoPdf}
                     >
-                      Imprimir Presupuesto
+                      Exportar
                     </Button>
                   </div>
                 </div>
 
-                {presupuestoItems.length === 0 ? (
-                  <div className="py-12 text-center text-muted">
-                    <Icon name="tooth" size={32} className="mx-auto mb-2 text-line" />
-                    <p className="text-sm font-semibold">No hay tratamientos presupuestados aún.</p>
-                    <p className="text-xs mt-1">
-                      Marca las patologías en el Odontograma Digital (caries, endodoncias, coronas, etc.) para armar la cotización.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-line text-left text-muted">
-                          <th className="py-2.5 font-bold">Pieza</th>
-                          <th className="py-2.5 font-bold">Superficie</th>
-                          <th className="py-2.5 font-bold">Diagnóstico / Procedimiento</th>
-                          <th className="py-2.5 font-bold">Estado Clínico</th>
-                          <th className="py-2.5 font-bold text-right">Tarifa Est.</th>
-                          <th className="py-2.5 font-bold text-right">Acción Rápida</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-line/60">
-                        {presupuestoItems.map((item) => (
-                          <tr key={item.id} className="text-ink hover:bg-hover/40 transition-colors">
-                            <td className="py-3 font-black text-brand">#{item.numeroPieza}</td>
-                            <td className="py-3 font-semibold">
-                              {item.superficie === 'GENERAL' ? 'Toda la pieza' : `Cara ${item.superficie}`}
-                            </td>
-                            <td className="py-3">
-                              <span className="font-bold block">{item.nombreCondicion}</span>
-                              {item.observacion && (
-                                <span className="text-[11px] text-muted italic line-clamp-1">
-                                  {item.observacion}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3">
-                              <Badge
-                                tone={
-                                  item.estado === 'REALIZADO'
-                                    ? 'green'
-                                    : item.estado === 'PROGRAMADO'
-                                      ? 'blue'
-                                      : item.estado === 'PRESUPUESTADO'
-                                        ? 'purple'
-                                        : 'amber'
-                                }
-                              >
-                                {item.estado}
-                              </Badge>
-                            </td>
-                            <td className="py-3 text-right font-black text-ink">
-                              S/. {item.costo.toFixed(2)}
-                            </td>
-                            <td className="py-3 text-right">
-                              <div className="inline-flex items-center gap-1 justify-end">
-                                {item.estado !== 'PROGRAMADO' && (
-                                  <button
-                                    type="button"
-                                    disabled={!puedeEditar || guardando}
-                                    onClick={() =>
-                                      handleActualizarPieza(
-                                        item.numeroPieza,
-                                        item.superficie,
-                                        item.idCondicion,
-                                        item.observacion,
-                                        'PROGRAMADO',
-                                        item.codigoCondicion
-                                      )
-                                    }
-                                    className="px-2 py-1 text-[10px] font-bold rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
-                                  >
-                                    Programar
-                                  </button>
-                                )}
-                                {item.estado !== 'REALIZADO' && (
-                                  <button
-                                    type="button"
-                                    disabled={!puedeEditar || guardando}
-                                    onClick={() =>
-                                      handleActualizarPieza(
-                                        item.numeroPieza,
-                                        item.superficie,
-                                        item.idCondicion,
-                                        item.observacion,
-                                        'REALIZADO',
-                                        item.codigoCondicion
-                                      )
-                                    }
-                                    className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                                  >
-                                    ✓ Realizado
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-line text-xs font-bold text-ink">
-                          <td colSpan={4} className="py-3 text-right uppercase tracking-wider text-muted">
-                            Total General Cotizado:
-                          </td>
-                          <td className="py-3 text-right font-black text-sm text-brand">
-                            S/. {totalPresupuesto.toFixed(2)}
-                          </td>
-                          <td className="py-3"></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                <Table columns={COLUMNS_TRATAMIENTOS}>
+                  <TableState
+                    colSpan={COLUMNS_TRATAMIENTOS.length}
+                    empty={presupuestoItems.length === 0}
+                    emptyLabel="No hay tratamientos presupuestados aún. Marca las afecciones en el Odontograma para armar la cotización."
+                  />
+
+                  {presupuestoItems.map((item) => {
+                    const nombrePieza =
+                      piezasCatalogo.find(p => p.numeroPieza === item.numeroPieza)?.nombre?.replace(/\s*\(\d+\)$/, '') ||
+                      NOMBRES_ANATOMICOS_DEFAULT[item.numeroPieza] ||
+                      `Pieza ${item.numeroPieza}`
+
+                    const condObj = condiciones.find(c => c.id === item.idCondicion || (item.codigoCondicion && c.codigo === item.codigoCondicion))
+                    const esPiezaCompleta = condObj?.aplicaA === 'PIEZA_COMPLETA' || item.superficie === 'GENERAL'
+                    const supEfectiva = esPiezaCompleta ? 'GENERAL' : item.superficie
+
+                    const superficieTexto =
+                      esPiezaCompleta
+                        ? 'Toda la pieza'
+                        : `Cara ${item.superficie?.charAt(0).toUpperCase()}${item.superficie?.slice(1).toLowerCase()}`
+
+                    return (
+                      <tr key={item.id} className="text-ink hover:bg-alt/60 transition-colors">
+                        {/* PIEZA */}
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-0.5 shrink-0">
+                              Nº {item.numeroPieza}
+                            </span>
+                            <span className="text-xs text-muted font-medium truncate max-w-[140px]" title={nombrePieza}>
+                              {nombrePieza}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* SUPERFICIE */}
+                        <td>
+                          <span className="font-semibold text-ink text-xs">
+                            {superficieTexto}
+                          </span>
+                        </td>
+
+                        {/* DIAGNÓSTICO / PROCEDIMIENTO */}
+                        <td>
+                          <span className="font-bold block text-ink text-xs">{item.nombreCondicion}</span>
+                          {item.observacion && item.observacion.trim().toLowerCase() !== item.nombreCondicion.trim().toLowerCase() && (
+                            <span className="text-[11px] text-muted italic line-clamp-1">
+                              {item.observacion}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* ESTADO CLÍNICO */}
+                        <td className="text-center">
+                          <Badge
+                            tone={
+                              item.estado === 'REALIZADO'
+                                ? 'green'
+                                : item.estado === 'PROGRAMADO'
+                                  ? 'blue'
+                                  : item.estado === 'PRESUPUESTADO'
+                                    ? 'purple'
+                                    : 'red'
+                            }
+                          >
+                            {item.estado === 'REALIZADO'
+                              ? 'Realizado'
+                              : item.estado === 'PROGRAMADO'
+                                ? 'Programado'
+                                : item.estado === 'PRESUPUESTADO'
+                                  ? 'Presupuestado'
+                                  : 'Hallazgo'}
+                          </Badge>
+                        </td>
+
+                        {/* TARIFA */}
+                        <td className="text-right font-black text-ink text-xs tabular-nums">
+                          S/. {item.costo.toFixed(2)}
+                        </td>
+
+                        {/* ACCIONES (ESTÁNDAR NEODENT CON ROWACTIONS / KEBABMENU "...") */}
+                        <ActionsCell align="center">
+                          <RowActions
+                            actions={[
+                              // 1. Programar cita (para hallazgo o presupuestado)
+                              {
+                                label: 'Programar cita / tratamiento',
+                                icon: 'calendar',
+                                onClick: () =>
+                                  handleActualizarPieza(
+                                    item.numeroPieza,
+                                    supEfectiva,
+                                    item.idCondicion,
+                                    item.observacion,
+                                    'PROGRAMADO',
+                                    item.codigoCondicion
+                                  ),
+                                show: puedeEditar && (item.estado === 'HALLAZGO' || item.estado === 'PRESUPUESTADO'),
+                                disabled: guardando,
+                              },
+                              // 2. Marcar como realizado (en cita)
+                              {
+                                label: 'Marcar como realizado',
+                                icon: 'check',
+                                variant: 'success',
+                                onClick: () =>
+                                  handleActualizarPieza(
+                                    item.numeroPieza,
+                                    supEfectiva,
+                                    item.idCondicion,
+                                    item.observacion,
+                                    'REALIZADO',
+                                    item.codigoCondicion
+                                  ),
+                                show: puedeEditar && item.estado !== 'REALIZADO',
+                                disabled: guardando,
+                              },
+                              // 3. Volver a presupuestado (desprogramar)
+                              {
+                                label: 'Volver a presupuestado',
+                                icon: 'refreshCw',
+                                onClick: () =>
+                                  handleActualizarPieza(
+                                    item.numeroPieza,
+                                    supEfectiva,
+                                    item.idCondicion,
+                                    item.observacion,
+                                    'PRESUPUESTADO',
+                                    item.codigoCondicion
+                                  ),
+                                show: puedeEditar && item.estado === 'PROGRAMADO',
+                                disabled: guardando,
+                              },
+                              // 4. Reabrir tratamiento (si ya concluyó pero se requiere corregir)
+                              {
+                                label: 'Reabrir tratamiento',
+                                icon: 'refreshCw',
+                                onClick: () =>
+                                  handleActualizarPieza(
+                                    item.numeroPieza,
+                                    supEfectiva,
+                                    item.idCondicion,
+                                    item.observacion,
+                                    'PROGRAMADO',
+                                    item.codigoCondicion
+                                  ),
+                                show: puedeEditar && item.estado === 'REALIZADO',
+                                disabled: guardando,
+                              },
+                              // 5. Ver detalle anatómico en el Odontograma
+                              {
+                                label: 'Ver en Odontograma',
+                                icon: 'tooth',
+                                onClick: () => cambiarTab('ODONTOGRAMA'),
+                              },
+                              // 6. Eliminar afección / restaurar pieza a normal
+                              {
+                                label: 'Eliminar del presupuesto',
+                                icon: 'trash',
+                                danger: true,
+                                dividerBefore: true,
+                                show: puedeEditar,
+                                disabled: guardando,
+                                onClick: () =>
+                                  handleLimpiarPieza(
+                                    item.numeroPieza,
+                                    item.superficie === 'GENERAL' ? undefined : item.superficie
+                                  ),
+                              },
+                            ]}
+                          />
+                        </ActionsCell>
+                      </tr>
+                    )
+                  })}
+                </Table>
+
+                {presupuestoItems.length > 0 && (
+                  <TableFoot summary={`${presupuestoItems.length} tratamientos en presupuesto`}>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="font-bold uppercase tracking-wider text-muted">
+                        Total General Cotizado:
+                      </span>
+                      <span className="text-base font-black text-brand tabular-nums">
+                        S/. {totalPresupuesto.toFixed(2)}
+                      </span>
+                    </div>
+                  </TableFoot>
                 )}
               </Card>
             </div>
@@ -1860,8 +2419,8 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     type="button"
                     onClick={() => setFiltroTipoDoc(f.id)}
                     className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${filtroTipoDoc === f.id
-                        ? 'bg-brand text-white border-brand shadow-xs'
-                        : 'bg-surface text-ink-soft border-line hover:bg-hover'
+                      ? 'bg-brand text-white border-brand shadow-xs'
+                      : 'bg-surface text-ink-soft border-line hover:bg-hover'
                       }`}
                   >
                     {f.label}
@@ -2050,14 +2609,14 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                                 <div className="text-xs font-bold text-ink flex items-center justify-between">
                                   <span>
                                     {med.medicamento}
-                                    {med.dci && <span className="text-muted font-semibold"> — {med.dci}</span>}
+                                    {med.dci && <span className="text-muted font-semibold"> - {med.dci}</span>}
                                   </span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-line/60">
                                   <div>
                                     <span className="text-muted block text-[10px]">Concentración / forma:</span>
                                     <span className="font-semibold text-ink">
-                                      {[med.concentracion, med.formaFarmaceutica].filter(Boolean).join(' — ') || '—'}
+                                      {[med.concentracion, med.formaFarmaceutica].filter(Boolean).join(' - ') || '-'}
                                     </span>
                                   </div>
                                   <div>
@@ -2100,10 +2659,10 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                             <strong className="text-ink">
                               {rec.validaHasta
                                 ? new Date(rec.validaHasta).toLocaleDateString('es-PE', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                  })
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })
                                 : '5 días posteriores a emisión'}
                             </strong>
                           </span>
@@ -2728,9 +3287,9 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         <span className="font-bold text-gray-900 text-sm">
                           {paciente
                             ? [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno]
-                                .filter(Boolean)
-                                .join(' ')
-                            : '—'}
+                              .filter(Boolean)
+                              .join(' ')
+                            : '-'}
                         </span>
                       </div>
                       <div>
@@ -2768,7 +3327,7 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         >
                           <div className="font-bold text-gray-900 text-sm">
                             {med.medicamento}
-                            {med.dci && <span className="text-gray-600 font-semibold"> — {med.dci}</span>}
+                            {med.dci && <span className="text-gray-600 font-semibold"> - {med.dci}</span>}
                           </div>
 
                           <div className="grid grid-cols-2 gap-4 text-xs pt-1 border-b border-dashed border-gray-200 pb-2">
@@ -2777,7 +3336,7 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                                 Concentración / forma
                               </span>
                               <span className="font-semibold text-gray-900">
-                                {[med.concentracion, med.formaFarmaceutica].filter(Boolean).join(' — ') ||
+                                {[med.concentracion, med.formaFarmaceutica].filter(Boolean).join(' - ') ||
                                   'Por completar'}
                               </span>
                             </div>
@@ -2828,10 +3387,10 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                           <strong className="text-gray-900">
                             {recetaParaVer.validaHasta
                               ? new Date(recetaParaVer.validaHasta).toLocaleDateString('es-PE', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
                               : '__ / __ / _____'}
                           </strong>
                         </div>
@@ -2869,7 +3428,7 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
                   onClick={e => e.stopPropagation()}
-                  className="w-full max-w-lg rounded-2xl bg-surface border border-line shadow-xl p-6 space-y-5"
+                  className="w-full max-w-lg rounded-2xl bg-surface border border-line shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
                 >
                   <div className="flex items-center justify-between pb-3 border-b border-line">
                     <div>
@@ -2890,9 +3449,9 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     </button>
                   </div>
 
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     {/* OPCIÓN 1: HISTORIA CLÍNICA (FICHA INICIAL) */}
-                    <div className="p-4 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2.5">
+                    <div className="p-3.5 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-ink">Historia Clínica Odontológica</span>
@@ -2900,9 +3459,9 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         </div>
                       </div>
                       <p className="text-xs text-muted leading-relaxed">
-                        Ficha médica formal con datos de filiación, motivo de consulta, antecedentes generales, examen clínico extraoral/intraoral, diagnóstico presuntivo/definitivo, plan de tratamiento y casillas de firma médico-legal.
+                        Ficha médica formal con filiación, motivo de consulta, antecedentes, examen clínico, diagnósticos y plan de tratamiento con firmas médico-legales.
                       </p>
-                      <div className="pt-1">
+                      <div className="pt-0.5">
                         <Button
                           variant="primary"
                           size="sm"
@@ -2918,8 +3477,62 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                       </div>
                     </div>
 
-                    {/* OPCIÓN 2: EXPEDIENTE CLÍNICO CRONOLÓGICO COMPLETO */}
-                    <div className="p-4 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2.5">
+                    {/* OPCIÓN 2: PRESUPUESTO ODONTOLÓGICO Y PLAN DE TRATAMIENTOS */}
+                    <div className="p-3.5 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-ink">Presupuesto y Plan de Tratamientos</span>
+                          <Badge tone="green">Cotización Oficial</Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted leading-relaxed">
+                        Cotización formal detallando piezas dentales, superficies, diagnósticos/procedimientos, estado clínico, tarifas estimadas y totales económicos.
+                      </p>
+                      <div className="pt-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon="download"
+                          className="w-full justify-center"
+                          onClick={() => {
+                            handleExportarPresupuestoPdf()
+                            setModalExportarAbierto(false)
+                          }}
+                        >
+                          Generar Presupuesto (PDF)
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* OPCIÓN 3: ODONTOGRAMA CLÍNICO OFICIAL */}
+                    <div className="p-3.5 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-ink">Odontograma Clínico</span>
+                          <Badge tone="blue">Ficha Dental</Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted leading-relaxed">
+                        Ficha técnica dental tabulada conforme a la NTS N° 139-MINSA con piezas dentales evaluadas, caras, patologías y observaciones.
+                      </p>
+                      <div className="pt-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon="download"
+                          className="w-full justify-center"
+                          onClick={() => {
+                            handleExportarOdontogramaPdf()
+                            setModalExportarAbierto(false)
+                          }}
+                        >
+                          Generar Odontograma (PDF)
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* OPCIÓN 4: EXPEDIENTE CLÍNICO CRONOLÓGICO COMPLETO */}
+                    <div className="p-3.5 rounded-xl border border-line bg-surface hover:border-brand/40 hover:bg-alt/30 transition-all space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-ink">Expediente Clínico Cronológico</span>
@@ -2927,9 +3540,9 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         </div>
                       </div>
                       <p className="text-xs text-muted leading-relaxed">
-                        Expediente cronológico integral consolidado con todas las notas SOAP de atenciones, hallazgos registrados en el odontograma, procedimientos realizados y recetas médicas emitidas con posología.
+                        Expediente cronológico integral consolidado con notas SOAP, evoluciones odontológicas, tratamientos y recetas médicas emitidas.
                       </p>
-                      <div className="pt-1">
+                      <div className="pt-0.5">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -2963,286 +3576,560 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
             {/* MODAL: EDITAR HISTORIA CLÍNICA COMPLETA */}
             {modalEditarHistoriaAbierto && (
               <div
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs overflow-y-auto"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-ink/50 backdrop-blur-xs overflow-y-auto"
                 onClick={() => setModalEditarHistoriaAbierto(false)}
               >
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
+                  initial={{ opacity: 0, scale: 0.97, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97, y: 10 }}
+                  transition={{ duration: 0.18 }}
                   onClick={e => e.stopPropagation()}
-                  className="w-full max-w-2xl rounded-2xl bg-surface border border-line shadow-xl p-6 space-y-5 my-8 max-h-[90vh] flex flex-col"
+                  className="w-full max-w-4xl rounded-3xl bg-surface border border-line shadow-2xl p-5 sm:p-7 space-y-6 my-4 sm:my-8 max-h-[92vh] flex flex-col"
                 >
-                  <div className="flex items-center justify-between pb-3 border-b border-line shrink-0">
-                    <div>
-                      <h2 className="text-base font-bold text-ink flex items-center gap-2">
-                        <Icon name="edit" size={18} className="text-brand" />
-                        Editar Ficha de Historia Clínica
-                      </h2>
-                      <p className="text-xs text-muted mt-0.5">
-                        Paciente: <strong className="text-ink">{paciente ? [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno].filter(Boolean).join(' ') : 'Paciente'}</strong> • {paciente?.tipoDocumento}: {paciente?.numeroDocumento}
-                      </p>
+                  {/* CABECERA DEL MODAL */}
+                  <div className="flex items-center justify-between pb-4 border-b border-line shrink-0">
+                    <div className="flex items-center gap-3.5">
+                      <div className="size-11 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                        <Icon name="edit" size={22} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h2 className="text-lg font-bold text-ink">
+                            Editar Ficha de Historia Clínica
+                          </h2>
+                          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-brand/10 text-brand border border-brand/20">
+                            <Icon name="shield" size={12} />
+                            NTS N° 139-MINSA
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span>Paciente:</span>
+                          <strong className="text-ink font-semibold">
+                            {paciente ? [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno].filter(Boolean).join(' ') : 'Paciente'}
+                          </strong>
+                          <span className="text-muted/60">•</span>
+                          <span className="text-ink-soft">
+                            {paciente?.tipoDocumento || 'DOC'}: {paciente?.numeroDocumento || '-'}
+                          </span>
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setModalEditarHistoriaAbierto(false)}
-                      className="text-muted hover:text-ink p-1 rounded-lg hover:bg-hover cursor-pointer"
+                      className="text-muted hover:text-ink p-2 rounded-xl hover:bg-alt/80 border border-transparent hover:border-line/60 transition-colors cursor-pointer"
+                      title="Cerrar ventana"
+                      aria-label="Cerrar modal"
                     >
-                      <Icon name="x" size={18} />
+                      <Icon name="x" size={20} />
                     </button>
                   </div>
 
-                  {/* NAVEGACIÓN DE SECCIONES DENTRO DEL MODAL */}
-                  <div className="flex border-b border-line gap-2 overflow-x-auto no-scrollbar shrink-0">
+                  {/* NAVEGACIÓN MODERNA DE SECCIONES (TABS PÍLDORA) */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1.5 bg-alt/60 rounded-2xl border border-line/60 shrink-0">
                     {[
-                      { id: 'ANAMNESIS', label: '1. Motivo y Anamnesis' },
-                      { id: 'ANTECEDENTES', label: '2. Antecedentes y Alergias' },
-                      { id: 'EXAMEN', label: '3. Exploración Clínica' },
-                      { id: 'DIAGNOSTICO', label: '4. Diagnóstico y Plan' },
-                    ].map(sec => (
-                      <button
-                        key={sec.id}
-                        type="button"
-                        onClick={() => setSeccionModal(sec.id as any)}
-                        className={`pb-2.5 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                          seccionModal === sec.id
-                            ? 'border-brand text-brand font-bold'
-                            : 'border-transparent text-muted hover:text-ink'
-                        }`}
-                      >
-                        {sec.label}
-                      </button>
-                    ))}
+                      { id: 'ANAMNESIS', label: '1. Motivo y Anamnesis', icon: 'fileText' as const, sub: 'Motivo y tiempo' },
+                      { id: 'ANTECEDENTES', label: '2. Antecedentes y Alergias', icon: 'shield' as const, sub: 'Alergias y salud' },
+                      { id: 'EXAMEN', label: '3. Exploración Clínica', icon: 'stethoscope' as const, sub: 'Extra e intraoral' },
+                      { id: 'DIAGNOSTICO', label: '4. Diagnóstico y Plan', icon: 'clipboard' as const, sub: 'CIE-10 y fases' },
+                    ].map(sec => {
+                      const activo = seccionModal === sec.id
+                      return (
+                        <button
+                          key={sec.id}
+                          type="button"
+                          onClick={() => setSeccionModal(sec.id as any)}
+                          className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer ${activo
+                              ? 'bg-surface text-brand shadow-xs font-bold border border-line/60 ring-1 ring-brand/15'
+                              : 'text-muted hover:text-ink hover:bg-surface/50 font-medium'
+                            }`}
+                        >
+                          <div
+                            className={`size-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${activo ? 'bg-brand/10 text-brand' : 'bg-alt text-muted'
+                              }`}
+                          >
+                            <Icon name={sec.icon} size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs truncate font-bold">{sec.label}</div>
+                            <div className="text-[11px] text-muted truncate hidden sm:block">{sec.sub}</div>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
 
-                  {/* FORMULARIO POR SECCIONES */}
-                  <div className="overflow-y-auto pr-1 space-y-4 flex-1 text-xs">
+                  {/* CONTENIDO DEL FORMULARIO POR SECCIÓN (JERARQUÍA VISUAL CON CARDS NUMERADAS) */}
+                  <div className="overflow-y-auto pr-3 pb-8 space-y-5 flex-1 text-sm custom-scrollbar">
+                    {/* SECCIÓN 1: MOTIVO Y ANAMNESIS */}
                     {seccionModal === 'ANAMNESIS' && (
                       <div className="space-y-4">
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Motivo de Consulta Principal
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={camposForm.motivoConsulta}
-                            onChange={e => setCamposForm(p => ({ ...p, motivoConsulta: e.target.value }))}
-                            placeholder="Describa el motivo por el cual el paciente acude al consultorio..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 1: MOTIVO */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Motivo de Consulta Principal <span className="text-danger">*</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={3}
+                              value={camposForm.motivoConsulta}
+                              onChange={e => setCamposForm(p => ({ ...p, motivoConsulta: e.target.value }))}
+                              placeholder="Describa la razón principal o molestia por la cual el paciente acude al consultorio odontológico..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Palabras textuales del paciente o motivo expreso de la consulta (ej. dolor al masticar, revisión o profilaxis).
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Enfermedad Actual / Anamnesis
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={camposForm.enfermedadActual}
-                            onChange={e => setCamposForm(p => ({ ...p, enfermedadActual: e.target.value }))}
-                            placeholder="Tiempo de enfermedad, inicio, forma de inicio, síntomas concomitantes, dolor..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 2: ENFERMEDAD ACTUAL */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Enfermedad Actual y Evolución
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={4}
+                              value={camposForm.enfermedadActual}
+                              onChange={e => setCamposForm(p => ({ ...p, enfermedadActual: e.target.value }))}
+                              placeholder="Tiempo de enfermedad, forma de inicio, episodios de dolor (escala 1-10) y tratamientos previos..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Cronología del cuadro clínico, factores agravantes o atenuantes, y medicamentos que tomó antes de la consulta.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-3 pb-2 border-t border-line/40">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            icon="chevronRight"
+                            onClick={() => setSeccionModal('ANTECEDENTES')}
+                          >
+                            Continuar a Antecedentes y Alergias
+                          </Button>
                         </div>
                       </div>
                     )}
 
+                    {/* SECCIÓN 2: ANTECEDENTES Y ALERGIAS (ESTILO ROLES Y PERMISOS) */}
                     {seccionModal === 'ANTECEDENTES' && (
                       <div className="space-y-4">
-                        <div className="rounded-xl border border-red-200 bg-red-50/20 p-3.5 space-y-2">
-                          <label className="block font-bold text-danger uppercase tracking-wider text-[11px]">
-                            Alergias a Medicamentos o Materiales
-                          </label>
-                          <input
-                            type="text"
-                            value={camposForm.alergiasTexto}
-                            onChange={e => setCamposForm(p => ({ ...p, alergiasTexto: e.target.value }))}
-                            placeholder="Penicilina, amoxicilina, látex, AINEs, etc..."
-                            className="w-full h-9 rounded-lg border border-red-200 bg-surface px-3 text-ink focus:ring-2 focus:ring-red-400"
-                          />
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {ALERGIAS_COMUNES.map(item => (
-                              <button
-                                key={item}
-                                type="button"
-                                onClick={() => {
-                                  setCamposForm(p => ({
-                                    ...p,
-                                    alergiasTexto: p.alergiasTexto ? `${p.alergiasTexto}, ${item}` : item,
-                                  }))
+                        {/* PANEL 1: ALERGIAS CON MULTISELECT CHIPS */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-line/60">
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                                Alergias a Medicamentos o Materiales <span className="text-danger">*</span>
+                              </h3>
+                            </div>
+                            <Badge tone="red">Alerta clínica</Badge>
+                          </div>
+
+                          <div className="space-y-3">
+                            <MultiSelectChips
+                              options={opcionesAlergiasChips}
+                              value={alergiasSeleccionadas}
+                              onChange={handleAlergiasChange}
+                              placeholder="Selecciona una o varias alergias..."
+                            />
+
+                            <p className="text-xs text-muted">
+                              Puedes seleccionar una o más alergias (ej. Penicilina, Látex, AINEs). Si no presenta alergias conocidas, déjalo vacío.
+                            </p>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <Input
+                                value={otraAlergiaInput}
+                                onChange={e => setOtraAlergiaInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    agregarOtraAlergia()
+                                  }
                                 }}
-                                className="px-2 py-0.5 text-[10px] font-semibold rounded-md border border-red-200 bg-surface text-danger hover:bg-red-50 transition-all cursor-pointer"
+                                placeholder="¿Otra alergia no listada? Escribe aquí y pulsa Agregar..."
+                                className="text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                icon="plus"
+                                onClick={agregarOtraAlergia}
+                                disabled={!otraAlergiaInput.trim()}
                               >
-                                + {item}
-                              </button>
-                            ))}
+                                Agregar
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Antecedentes Médicos Sistémicos
-                          </label>
-                          <input
-                            type="text"
-                            value={camposForm.antecedentesMedicos}
-                            onChange={e => setCamposForm(p => ({ ...p, antecedentesMedicos: e.target.value }))}
-                            placeholder="Hipertensión arterial, diabetes mellitus, asma, cardiopatías..."
-                            className="w-full h-9 rounded-xl border border-line bg-surface px-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
-                          <div className="flex flex-wrap gap-1.5 pt-2">
-                            {PATOLOGIAS_SISTEMICAS.slice(0, 6).map(item => (
-                              <button
-                                key={item}
-                                type="button"
-                                onClick={() => {
-                                  setCamposForm(p => ({
-                                    ...p,
-                                    antecedentesMedicos: p.antecedentesMedicos ? `${p.antecedentesMedicos}, ${item}` : item,
-                                  }))
+                        {/* PANEL 2: ANTECEDENTES MÉDICOS SISTÉMICOS CON MULTISELECT CHIPS */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Antecedentes Médicos Sistémicos y Patologías <span className="text-danger">*</span>
+                            </h3>
+                          </div>
+
+                          <div className="space-y-3">
+                            <MultiSelectChips
+                              options={opcionesPatologiasChips}
+                              value={antecedentesSeleccionados}
+                              onChange={handlePatologiasChange}
+                              placeholder="Selecciona antecedentes médicos del paciente..."
+                            />
+
+                            <p className="text-xs text-muted">
+                              Condiciones sistémicas crónicas relevantes para la atención. Si no presenta antecedentes médicos, déjalo vacío.
+                            </p>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <Input
+                                value={otraPatologiaInput}
+                                onChange={e => setOtraPatologiaInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    agregarOtraPatologia()
+                                  }
                                 }}
-                                className="px-2 py-0.5 text-[10px] font-medium rounded-md border border-line bg-surface text-ink hover:bg-hover transition-all cursor-pointer"
+                                placeholder="¿Otra patología médica? Escribe aquí y pulsa Agregar..."
+                                className="text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                icon="plus"
+                                onClick={agregarOtraPatologia}
+                                disabled={!otraPatologiaInput.trim()}
                               >
-                                + {item}
-                              </button>
-                            ))}
+                                Agregar
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Medicamentos de Uso Habitual
-                          </label>
-                          <input
-                            type="text"
-                            value={camposForm.medicamentosActuales}
-                            onChange={e => setCamposForm(p => ({ ...p, medicamentosActuales: e.target.value }))}
-                            placeholder="Antihipertensivos, hipoglucemiantes, anticoagulantes..."
-                            className="w-full h-9 rounded-xl border border-line bg-surface px-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
-                        </div>
+                        {/* PANEL 3: MEDICAMENTOS DE USO HABITUAL */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Medicamentos de Uso Habitual
+                            </h3>
+                          </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Hábitos y Factores de Riesgo
-                          </label>
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {HABITOS_RIESGOS.map(item => (
-                              <button
-                                key={item}
-                                type="button"
-                                onClick={() => {
-                                  setCamposForm(p => ({
-                                    ...p,
-                                    antecedentesOdontologicos: p.antecedentesOdontologicos ? `${p.antecedentesOdontologicos}, ${item}` : item,
-                                  }))
+                          <div className="space-y-3">
+                            <MultiSelectChips
+                              options={opcionesMedicamentosChips}
+                              value={medicamentosSeleccionados}
+                              onChange={handleMedicamentosChange}
+                              placeholder="Selecciona medicamentos del catálogo..."
+                            />
+
+                            <p className="text-xs text-muted">
+                              Fármacos que el paciente consume regularmente (ej. antihipertensivos, hipoglucemiantes, anticoagulantes). Si no toma medicación, déjalo vacío.
+                            </p>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <Input
+                                value={otroMedicamentoInput}
+                                onChange={e => setOtroMedicamentoInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    agregarOtroMedicamento()
+                                  }
                                 }}
-                                className="px-2 py-0.5 text-[10px] font-medium rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-all cursor-pointer"
+                                placeholder="¿Otro fármaco o dosis no listada? Escribe y pulsa Enter..."
+                                className="text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                icon="plus"
+                                onClick={agregarOtroMedicamento}
+                                disabled={!otroMedicamentoInput.trim()}
                               >
-                                + {item}
-                              </button>
-                            ))}
+                                Agregar
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Antecedentes Odontológicos Previos
-                          </label>
-                          <input
-                            type="text"
-                            value={camposForm.antecedentesOdontologicos}
-                            onChange={e => setCamposForm(p => ({ ...p, antecedentesOdontologicos: e.target.value }))}
-                            placeholder="Tratamientos previos de ortodoncia, endodoncia, prótesis, etc..."
-                            className="w-full h-9 rounded-xl border border-line bg-surface px-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 4: HÁBITOS Y FACTORES DE RIESGO */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">4</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Hábitos y Factores de Riesgo Bucodentales
+                            </h3>
+                          </div>
+
+                          <div className="space-y-3">
+                            <MultiSelectChips
+                              options={opcionesHabitosChips}
+                              value={habitosSeleccionados}
+                              onChange={handleHabitosChange}
+                              placeholder="Selecciona hábitos detectados..."
+                            />
+                            <p className="text-xs text-muted">
+                              Bruxismo, tabaquismo habitual, consumo de alcohol, respirador bucal, etc. Si no presenta hábitos nocivos, déjalo vacío.
+                            </p>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <Input
+                                value={otroHabitoInput}
+                                onChange={e => setOtroHabitoInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    agregarOtroHabito()
+                                  }
+                                }}
+                                placeholder="¿Otro hábito no listado? Escribe y pulsa Enter..."
+                                className="text-xs"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                icon="plus"
+                                onClick={agregarOtroHabito}
+                                disabled={!otroHabitoInput.trim()}
+                              >
+                                Agregar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PANEL 5: ANTECEDENTES ODONTOLÓGICOS */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">5</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Antecedentes Odontológicos Previos
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={2}
+                              value={camposForm.antecedentesOdontologicos}
+                              onChange={e => setCamposForm(p => ({ ...p, antecedentesOdontologicos: e.target.value }))}
+                              placeholder="Tratamientos previos de endodoncia, ortodoncia, prótesis, extracciones complejas..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Experiencia odontológica previa o complicaciones anestésicas anteriores.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 pb-2 border-t border-line/40">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon="chevronLeft"
+                            onClick={() => setSeccionModal('ANAMNESIS')}
+                          >
+                            Volver a Motivo
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            icon="chevronRight"
+                            onClick={() => setSeccionModal('EXAMEN')}
+                          >
+                            Continuar a Exploración Clínica
+                          </Button>
                         </div>
                       </div>
                     )}
 
+                    {/* SECCIÓN 3: EXPLORACIÓN CLÍNICA */}
                     {seccionModal === 'EXAMEN' && (
                       <div className="space-y-4">
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Examen Extraoral (ATM, Facies, Cuello)
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={camposForm.examenExtraoral}
-                            onChange={e => setCamposForm(p => ({ ...p, examenExtraoral: e.target.value }))}
-                            placeholder="Simetría facial, ATM ruidos articulares, palpación de ganglios..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 1: EXAMEN EXTRAORAL */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Examen Extraoral (ATM, Facies, Cuello)
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={3}
+                              value={camposForm.examenExtraoral}
+                              onChange={e => setCamposForm(p => ({ ...p, examenExtraoral: e.target.value }))}
+                              placeholder="Simetría facial, ruidos articulares o dolor en ATM bilateral, palpación ganglionar..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Evaluación de la articulación temporomandibular, perfil y simetría facial.
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Examen Intraoral (Mucosas, Encías, Periodonto)
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={camposForm.examenIntraoral}
-                            onChange={e => setCamposForm(p => ({ ...p, examenIntraoral: e.target.value }))}
-                            placeholder="Labios, carrillos, paladar, lengua, piso de boca, encías, higiene bucal..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 2: EXAMEN INTRAORAL */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Examen Intraoral (Mucosas, Encías, Periodonto)
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={3}
+                              value={camposForm.examenIntraoral}
+                              onChange={e => setCamposForm(p => ({ ...p, examenIntraoral: e.target.value }))}
+                              placeholder="Mucosa bucal, estado periodontal, encías, lengua, paladar duro y blando, piso de boca..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Coloración, sangrado al sondaje, índice de placa o sarro supragingival.
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Observaciones Clínicas Generales
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={camposForm.observacionesClinicas}
-                            onChange={e => setCamposForm(p => ({ ...p, observacionesClinicas: e.target.value }))}
-                            placeholder="Colaboración del paciente, fobia dental, cuidados especiales..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 3: OBSERVACIONES */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">3</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Observaciones Clínicas y Conducta del Paciente
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={2}
+                              value={camposForm.observacionesClinicas}
+                              onChange={e => setCamposForm(p => ({ ...p, observacionesClinicas: e.target.value }))}
+                              placeholder="Nivel de ansiedad, cooperación del paciente, cuidados especiales de bioseguridad..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Consideraciones ergonómicas, tolerancia a tratamientos o fobia dental.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 pb-2 border-t border-line/40">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon="chevronLeft"
+                            onClick={() => setSeccionModal('ANTECEDENTES')}
+                          >
+                            Volver a Antecedentes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            icon="chevronRight"
+                            onClick={() => setSeccionModal('DIAGNOSTICO')}
+                          >
+                            Continuar a Diagnóstico y Plan
+                          </Button>
                         </div>
                       </div>
                     )}
 
+                    {/* SECCIÓN 4: DIAGNÓSTICO Y PLAN DE TRATAMIENTO */}
                     {seccionModal === 'DIAGNOSTICO' && (
                       <div className="space-y-4">
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Diagnóstico Estomatológico (Presuntivo / Definitivo CIE-10)
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={camposForm.diagnostico}
-                            onChange={e => setCamposForm(p => ({ ...p, diagnostico: e.target.value }))}
-                            placeholder="Ej. Gingivitis marginal por placa bacteriana (K05.1), Caries de esmalte (K02.1)..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40"
-                          />
+                        {/* PANEL 1: DIAGNÓSTICO */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">1</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Diagnóstico Estomatológico (Presuntivo / Definitivo CIE-10) <span className="text-danger">*</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={3}
+                              value={camposForm.diagnostico}
+                              onChange={e => setCamposForm(p => ({ ...p, diagnostico: e.target.value }))}
+                              placeholder="Ej. Gingivitis marginal por placa bacteriana (K05.1), Caries de esmalte y dentina en pieza 46 (K02.1)..."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200"
+                            />
+                            <p className="text-xs text-muted">
+                              Diagnósticos clínicos principales con códigos según la Clasificación Internacional de Enfermedades (CIE-10).
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block font-bold text-ink mb-1.5 uppercase tracking-wider text-[11px]">
-                            Plan de Tratamiento Integral Propuesto
-                          </label>
-                          <textarea
-                            rows={4}
-                            value={camposForm.planTratamiento}
-                            onChange={e => setCamposForm(p => ({ ...p, planTratamiento: e.target.value }))}
-                            placeholder="1. Fase higiénica y profilaxis...&#10;2. Fase curativa y restauradora...&#10;3. Fase de mantenimiento y control..."
-                            className="w-full rounded-xl border border-line bg-surface p-3 text-ink focus:ring-2 focus:ring-brand/40 font-mono text-xs"
-                          />
+                        {/* PANEL 2: PLAN DE TRATAMIENTO */}
+                        <div className="rounded-xl border border-line bg-alt/30 p-4 sm:p-5">
+                          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-line/60">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">2</span>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                              Plan de Tratamiento Integral Propuesto (Secuencia por fases) <span className="text-danger">*</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-2">
+                            <textarea
+                              rows={5}
+                              value={camposForm.planTratamiento}
+                              onChange={e => setCamposForm(p => ({ ...p, planTratamiento: e.target.value }))}
+                              placeholder="1. Fase sistémica y de urgencia: Alivio de dolor.&#10;2. Fase higiénica: Profilaxis y destartraje.&#10;3. Fase curativa y restauradora: Resinas compuestas.&#10;4. Fase de mantenimiento y control: Cada 6 meses."
+                              className="w-full rounded-control border border-line bg-surface p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none transition-colors duration-200 font-mono"
+                            />
+                            <p className="text-xs text-muted">
+                              Propuesta integral secuencial por fases clínicas conforme al estándar odontológico.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-start pt-3 pb-2 border-t border-line/40">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            icon="chevronLeft"
+                            onClick={() => setSeccionModal('EXAMEN')}
+                          >
+                            Volver a Exploración
+                          </Button>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-line shrink-0">
-                    <span className="text-[11px] text-muted">
-                      Norma Técnica de Salud NTS N° 139-MINSA/2018/DGIEM
-                    </span>
-                    <div className="flex items-center gap-2">
+                  {/* PIE DEL MODAL (FOOTER LIMPIO Y CONSISTENTE) */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-line shrink-0">
+                    <div className="flex items-center gap-2 text-xs text-muted">
+                      <Icon name="shield" size={15} className="text-brand shrink-0" />
+                      <span>Formulario clínico formal conforme a la NTS N° 139-MINSA/2018/DGIEM</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="md"
                         onClick={() => setModalEditarHistoriaAbierto(false)}
                         disabled={guardando}
                       >
@@ -3251,13 +4138,12 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                       <Button
                         type="button"
                         variant="primary"
-                        size="sm"
-                        icon="check"
+                        size="md"
                         disabled={guardando}
                         onClick={handleGuardarHistoriaCompleta}
                       >
-                        {guardando && <Icon name="spinner" size={14} className="animate-spin mr-1" />}
-                        Guardar Historia Clínica
+                        {guardando && <Icon name="spinner" size={16} className="animate-spin mr-1.5" />}
+                        {guardando ? 'Guardando historia...' : 'Guardar Historia Clínica'}
                       </Button>
                     </div>
                   </div>

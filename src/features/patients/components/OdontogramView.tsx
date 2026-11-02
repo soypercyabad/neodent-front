@@ -1,12 +1,28 @@
-import { useMemo, useState } from 'react'
-import { Button, Icon, Badge } from '@/shared/components/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import {
+  ActionsCell,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  Field,
+  Icon,
+  Input,
+  RowActions,
+  SearchInput,
+  Table,
+  TableState,
+  Tooltip,
+  type Column,
+} from '@/shared/components/ui'
 import type {
   CondicionOdontograma,
   CrearCondicionRequest,
   OdontogramaResponse,
+  PiezaDentalCatalogoItem,
   PiezaDentalDetalle,
 } from '../api/clinicalApi'
-import { CONDICIONES_DEFAULT } from '../api/clinicalApi'
 import { ToothAnatomySvg } from './ToothAnatomySvg'
 
 export type EstadoTratamiento = 'HALLAZGO' | 'PRESUPUESTADO' | 'PROGRAMADO' | 'REALIZADO'
@@ -14,7 +30,9 @@ export type EstadoTratamiento = 'HALLAZGO' | 'PRESUPUESTADO' | 'PROGRAMADO' | 'R
 interface OdontogramViewProps {
   odontograma: OdontogramaResponse | null
   condiciones: CondicionOdontograma[]
+  piezasCatalogo?: PiezaDentalCatalogoItem[]
   readOnly?: boolean
+  isAdmin?: boolean
   guardando?: boolean
   onActualizarPieza: (
     pieza: number,
@@ -26,6 +44,10 @@ interface OdontogramViewProps {
   ) => Promise<void>
   onLimpiarPieza: (pieza: number, superficie?: string) => Promise<void>
   onCrearCondicion?: (data: CrearCondicionRequest) => Promise<CondicionOdontograma>
+  onActualizarCondicion?: (id: number, data: CrearCondicionRequest) => Promise<void>
+  onEliminarCondicion?: (id: number) => Promise<void>
+  onActualizarNombrePieza?: (numeroPieza: number, nombre: string) => Promise<void>
+  onExportarPdf?: () => void
 }
 
 // Cuadrantes FDI Adultos (Permanente - 32 piezas)
@@ -42,108 +64,170 @@ const NINO_CUADRANTE_7 = [71, 72, 73, 74, 75]
 
 export type SuperficieCara = 'GENERAL' | 'VESTIBULAR' | 'LINGUAL' | 'MESIAL' | 'DISTAL' | 'OCLUSAL'
 
-const NOMBRES_DIENTES: Record<number, string> = {
-  // Adultos
-  18: 'Tercer molar sup. der. (18)',
-  17: 'Segundo molar sup. der. (17)',
-  16: 'Primer molar sup. der. (16)',
-  15: 'Segundo premolar sup. der. (15)',
-  14: 'Primer premolar sup. der. (14)',
-  13: 'Canino sup. der. (13)',
-  12: 'Incisivo lateral sup. der. (12)',
-  11: 'Incisivo central sup. der. (11)',
-  21: 'Incisivo central sup. izq. (21)',
-  22: 'Incisivo lateral sup. izq. (22)',
-  23: 'Canino sup. izq. (23)',
-  24: 'Primer premolar sup. izq. (24)',
-  25: 'Segundo premolar sup. izq. (25)',
-  26: 'Primer molar sup. izq. (26)',
-  27: 'Segundo molar sup. izq. (27)',
-  28: 'Tercer molar sup. izq. (28)',
-  48: 'Tercer molar inf. der. (48)',
-  47: 'Segundo molar inf. der. (47)',
-  46: 'Primer molar inf. der. (46)',
-  45: 'Segundo premolar inf. der. (45)',
-  44: 'Primer premolar inf. der. (44)',
-  43: 'Canino inf. der. (43)',
-  42: 'Incisivo lateral inf. der. (42)',
-  41: 'Incisivo central inf. der. (41)',
-  31: 'Incisivo central inf. izq. (31)',
-  32: 'Incisivo lateral inf. izq. (32)',
-  33: 'Canino inf. izq. (33)',
-  34: 'Primer premolar inf. izq. (34)',
-  35: 'Segundo premolar inf. izq. (35)',
-  36: 'Primer molar inf. izq. (36)',
-  37: 'Segundo molar inf. izq. (37)',
-  38: 'Tercer molar inf. izq. (38)',
-  // Niños / Deciduos
-  55: 'Segundo molar temporal sup. der. (55)',
-  54: 'Primer molar temporal sup. der. (54)',
-  53: 'Canino temporal sup. der. (53)',
-  52: 'Incisivo lateral temporal sup. der. (52)',
-  51: 'Incisivo central temporal sup. der. (51)',
-  61: 'Incisivo central temporal sup. izq. (61)',
-  62: 'Incisivo lateral temporal sup. izq. (62)',
-  63: 'Canino temporal sup. izq. (63)',
-  64: 'Primer molar temporal sup. izq. (64)',
-  65: 'Segundo molar temporal sup. izq. (65)',
-  85: 'Segundo molar temporal inf. der. (85)',
-  84: 'Primer molar temporal inf. der. (84)',
-  83: 'Canino temporal inf. der. (83)',
-  82: 'Incisivo lateral temporal inf. der. (82)',
-  81: 'Incisivo central temporal inf. der. (81)',
-  71: 'Incisivo central temporal inf. izq. (71)',
-  72: 'Incisivo lateral temporal inf. izq. (72)',
-  73: 'Canino temporal inf. izq. (73)',
-  74: 'Primer molar temporal inf. izq. (74)',
-  75: 'Segundo molar temporal inf. izq. (75)',
+// Nombres anatómicos estándar oficiales (FDI 52 piezas) para odontograma clínico
+export const NOMBRES_ANATOMICOS_DEFAULT: Record<number, string> = {
+  // Adultos Cuadrante 1: Sup. Der.
+  18: 'Tercer molar sup. der.',
+  17: 'Segundo molar sup. der.',
+  16: 'Primer molar sup. der.',
+  15: 'Segundo premolar sup. der.',
+  14: 'Primer premolar sup. der.',
+  13: 'Canino sup. der.',
+  12: 'Incisivo lateral sup. der.',
+  11: 'Incisivo central sup. der.',
+  // Adultos Cuadrante 2: Sup. Izq.
+  21: 'Incisivo central sup. izq.',
+  22: 'Incisivo lateral sup. izq.',
+  23: 'Canino sup. izq.',
+  24: 'Primer premolar sup. izq.',
+  25: 'Segundo premolar sup. izq.',
+  26: 'Primer molar sup. izq.',
+  27: 'Segundo molar sup. izq.',
+  28: 'Tercer molar sup. izq.',
+  // Adultos Cuadrante 3: Inf. Izq.
+  31: 'Incisivo central inf. izq.',
+  32: 'Incisivo lateral inf. izq.',
+  33: 'Canino inf. izq.',
+  34: 'Primer premolar inf. izq.',
+  35: 'Segundo premolar inf. izq.',
+  36: 'Primer molar inf. izq.',
+  37: 'Segundo molar inf. izq.',
+  38: 'Tercer molar inf. izq.',
+  // Adultos Cuadrante 4: Inf. Der.
+  41: 'Incisivo central inf. der.',
+  42: 'Incisivo lateral inf. der.',
+  43: 'Canino inf. der.',
+  44: 'Primer premolar inf. der.',
+  45: 'Segundo premolar inf. der.',
+  46: 'Primer molar inf. der.',
+  47: 'Segundo molar inf. der.',
+  48: 'Tercer molar inf. der.',
+  // Niños / Deciduos Cuadrante 5: Sup. Der.
+  55: 'Segundo molar temporal sup. der.',
+  54: 'Primer molar temporal sup. der.',
+  53: 'Canino temporal sup. der.',
+  52: 'Incisivo lateral temporal sup. der.',
+  51: 'Incisivo central temporal sup. der.',
+  // Niños / Deciduos Cuadrante 6: Sup. Izq.
+  61: 'Incisivo central temporal sup. izq.',
+  62: 'Incisivo lateral temporal sup. izq.',
+  63: 'Canino temporal sup. izq.',
+  64: 'Primer molar temporal sup. izq.',
+  65: 'Segundo molar temporal sup. izq.',
+  // Niños / Deciduos Cuadrante 7: Inf. Izq.
+  71: 'Incisivo central temporal inf. izq.',
+  72: 'Incisivo lateral temporal inf. izq.',
+  73: 'Canino temporal inf. izq.',
+  74: 'Primer molar temporal inf. izq.',
+  75: 'Segundo molar temporal inf. izq.',
+  // Niños / Deciduos Cuadrante 8: Inf. Der.
+  81: 'Incisivo central temporal inf. der.',
+  82: 'Incisivo lateral temporal inf. der.',
+  83: 'Canino temporal inf. der.',
+  84: 'Primer molar temporal inf. der.',
+  85: 'Segundo molar temporal inf. der.',
 }
 
-const PALETA_COLORES_CLINICOS = [
-  { hex: '#EF4444', label: 'Rojo (Caries / Alerta)' },
-  { hex: '#3B82F6', label: 'Azul (Restauración)' },
-  { hex: '#A855F7', label: 'Púrpura (Corona / Prótesis)' },
-  { hex: '#64748B', label: 'Gris (Pieza Ausente)' },
-  { hex: '#F97316', label: 'Naranja (Endodoncia)' },
-  { hex: '#06B6D4', label: 'Cian (Sellante)' },
-  { hex: '#E11D48', label: 'Carmesí (Fractura / Trauma)' },
-  { hex: '#8B5CF6', label: 'Violeta (Implante)' },
-  { hex: '#F59E0B', label: 'Ámbar (Prótesis Removible)' },
-  { hex: '#EC4899', label: 'Rosa (Ortodoncia / Retenido)' },
-  { hex: '#10B981', label: 'Verde (Sano / Finalizado)' },
+const COLUMNS_HALLAZGOS: Column[] = [
+  { key: 'pieza', label: 'Pieza' },
+  { key: 'superficie', label: 'Superficie' },
+  { key: 'condicion', label: 'Diagnóstico / Condición' },
+  { key: 'estado', label: 'Estado', align: 'center' },
+  { key: 'observacion', label: 'Observación' },
+  { label: 'Acciones', align: 'center' },
 ]
 
 export function OdontogramView({
   odontograma,
   condiciones,
+  piezasCatalogo = [],
   readOnly = false,
+  isAdmin = false,
   guardando = false,
   onActualizarPieza,
   onLimpiarPieza,
   onCrearCondicion,
+  onActualizarCondicion,
+  onEliminarCondicion,
+  onActualizarNombrePieza,
+  onExportarPdf,
 }: OdontogramViewProps) {
-  // Asegurar que siempre existan condiciones activas
+  // Catálogo reactivo que proviene de la base de datos
   const catalogoCondiciones = useMemo(() => {
-    return condiciones && condiciones.length > 0 ? condiciones : CONDICIONES_DEFAULT
+    return condiciones || []
   }, [condiciones])
+
+  // Mapa reactivo de nombres anatómicos de piezas dentales directamente desde la BD
+  const nombresDientesMap = useMemo(() => {
+    const mapa: Record<number, string> = { ...NOMBRES_ANATOMICOS_DEFAULT }
+    if (piezasCatalogo && piezasCatalogo.length > 0) {
+      for (const p of piezasCatalogo) {
+        if (p.nombre && !p.nombre.startsWith('Pieza Nº')) {
+          mapa[p.numeroPieza] = p.nombre.replace(/\s*\(\d+\)$/, '')
+        }
+      }
+    }
+    return mapa
+  }, [piezasCatalogo])
 
   const [tipoDenticion, setTipoDenticion] = useState<'ADULTO' | 'NINO'>('ADULTO')
   const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'HALLAZGOS' | 'PRESUPUESTADO' | 'PROGRAMADO' | 'REALIZADO'>('TODOS')
   const [piezaSeleccionada, setPiezaSeleccionada] = useState<number>(16)
   const [caraSeleccionada, setCaraSeleccionada] = useState<SuperficieCara>('OCLUSAL')
+  const [ultimaCara, setUltimaCara] = useState<SuperficieCara>('OCLUSAL')
   const [condicionId, setCondicionId] = useState<number>(() => catalogoCondiciones[0]?.id || 1)
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null)
+
+  const cambiarCara = (cara: SuperficieCara) => {
+    setErrorValidacion(null)
+    if (cara !== 'GENERAL') {
+      setUltimaCara(cara)
+    }
+    setCaraSeleccionada(cara)
+  }
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<EstadoTratamiento>('HALLAZGO')
   const [busquedaCondicion, setBusquedaCondicion] = useState('')
   const [observacion, setObservacion] = useState('')
   const [procesando, setProcesando] = useState(false)
 
-  // Modal para agregar nueva condición
+  // Modal para agregar o editar condición clínica
   const [modalCrearCondicion, setModalCrearCondicion] = useState(false)
+  const [condicionEditando, setCondicionEditando] = useState<CondicionOdontograma | null>(null)
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoCodigo, setNuevoCodigo] = useState('')
   const [nuevoColor, setNuevoColor] = useState('#3B82F6')
   const [nuevaDescripcion, setNuevaDescripcion] = useState('')
+  const [nuevoAplicaA, setNuevoAplicaA] = useState<'AMBOS' | 'PIEZA_COMPLETA' | 'SUPERFICIE'>('SUPERFICIE')
   const [guardandoCondicion, setGuardandoCondicion] = useState(false)
+
+  // Modal para configurar / gestionar catálogo en BD
+  const [modalGestionarCatalogo, setModalGestionarCatalogo] = useState(false)
+  const [pestanaGestion, setPestanaGestion] = useState<'CONDICIONES' | 'PIEZAS'>('CONDICIONES')
+  const [busquedaGestionar, setBusquedaGestionar] = useState('')
+  const [busquedaPiezasGestionar, setBusquedaPiezasGestionar] = useState('')
+  const [filtroDenticionPiezas, setFiltroDenticionPiezas] = useState<'TODAS' | 'PERMANENTE' | 'TEMPORAL'>('TODAS')
+  const [piezaEditandoNumero, setPiezaEditandoNumero] = useState<number | null>(null)
+  const [nombrePiezaEditando, setNombrePiezaEditando] = useState('')
+  const [guardandoNombrePieza, setGuardandoNombrePieza] = useState(false)
+  const [eliminandoCondicionId, setEliminandoCondicionId] = useState<number | null>(null)
+  const [condicionAEliminar, setCondicionAEliminar] = useState<{ id: number; nombre: string } | null>(null)
+
+  // Cerrar modales con tecla Escape
+  useEffect(() => {
+    if (!modalCrearCondicion && !modalGestionarCatalogo && !condicionAEliminar) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (condicionAEliminar) {
+          setCondicionAEliminar(null)
+          return
+        }
+        if (!guardandoCondicion) setModalCrearCondicion(false)
+        setModalGestionarCatalogo(false)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [modalCrearCondicion, modalGestionarCatalogo, condicionAEliminar, guardandoCondicion])
 
   // Mapa de hallazgos por número de pieza
   const mapaHallazgos = useMemo(() => {
@@ -155,30 +239,6 @@ export function OdontogramView({
       mapa.set(p.numeroPieza, arr)
     }
     return mapa
-  }, [odontograma])
-
-  // Conteos acumulados por estado del tratamiento
-  const conteos = useMemo(() => {
-    let hallazgos = 0
-    let presupuestado = 0
-    let programado = 0
-    let realizado = 0
-    if (odontograma?.piezas) {
-      for (const p of odontograma.piezas) {
-        const est = p.estado || 'HALLAZGO'
-        if (est === 'PRESUPUESTADO') presupuestado++
-        else if (est === 'PROGRAMADO') programado++
-        else if (est === 'REALIZADO') realizado++
-        else hallazgos++
-      }
-    }
-    return {
-      total: odontograma?.piezas?.length || 0,
-      hallazgos,
-      presupuestado,
-      programado,
-      realizado,
-    }
   }, [odontograma])
 
   // Lista de tratamientos filtrados para la bandeja inferior
@@ -208,9 +268,14 @@ export function OdontogramView({
     return mapaHallazgos.get(piezaSeleccionada) || []
   }, [mapaHallazgos, piezaSeleccionada])
 
+  const condicionSeleccionadaObj = useMemo(() => {
+    return catalogoCondiciones.find(c => c.id === condicionId)
+  }, [catalogoCondiciones, condicionId])
+
   const seleccionarPiezaYActualizarForm = (num: number, cara?: SuperficieCara) => {
+    setErrorValidacion(null)
     setPiezaSeleccionada(num)
-    if (cara) setCaraSeleccionada(cara)
+    if (cara) cambiarCara(cara)
     const hallazgos = mapaHallazgos.get(num) || []
     if (hallazgos.length > 0) {
       const h = cara ? hallazgos.find(item => item.superficie === cara) || hallazgos[0] : hallazgos[0]
@@ -220,7 +285,7 @@ export function OdontogramView({
         setEstadoSeleccionado(h.estado)
       }
       if (!cara && h.superficie) {
-        setCaraSeleccionada(h.superficie as SuperficieCara)
+        cambiarCara(h.superficie as SuperficieCara)
       }
     } else {
       setObservacion('')
@@ -233,17 +298,45 @@ export function OdontogramView({
 
   const handleGuardar = async () => {
     if (!piezaSeleccionada || readOnly) return
-    const condicionObj = catalogoCondiciones.find(c => c.id === condicionId)
+    setErrorValidacion(null)
+    const condicionObj = condicionSeleccionadaObj || catalogoCondiciones.find(c => c.id === condicionId)
+    if (!condicionObj) {
+      setErrorValidacion('Seleccione una condición clínica válida del catálogo.')
+      return
+    }
+
+    const esCaraGeneral = caraSeleccionada === 'GENERAL'
+    const ambito = condicionObj.aplicaA ? condicionObj.aplicaA.toUpperCase() : 'AMBOS'
+
+    // Validación estricta: No permitir pieza completa como superficie ni viceversa
+    if (ambito === 'PIEZA_COMPLETA' && !esCaraGeneral) {
+      setErrorValidacion(
+        `La condición "${condicionObj.nombre}" es de PIEZA COMPLETA y no puede registrarse en una cara o superficie individual (${caraSeleccionada}). Seleccione "Toda la pieza".`
+      )
+      return
+    }
+
+    if (ambito === 'SUPERFICIE' && esCaraGeneral) {
+      setErrorValidacion(
+        `La condición "${condicionObj.nombre}" es de SUPERFICIE y requiere especificar una cara (Vestibular, Lingual, Oclusal, Mesial o Distal), no la pieza completa.`
+      )
+      return
+    }
+
     setProcesando(true)
     try {
       await onActualizarPieza(
         piezaSeleccionada,
-        caraSeleccionada === 'GENERAL' ? undefined : caraSeleccionada,
+        esCaraGeneral ? undefined : caraSeleccionada,
         condicionId,
         observacion.trim() || undefined,
         estadoSeleccionado,
-        condicionObj?.codigo,
+        condicionObj.codigo,
       )
+      setErrorValidacion(null)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar la condición dental.'
+      setErrorValidacion(msg)
     } finally {
       setProcesando(false)
     }
@@ -251,638 +344,736 @@ export function OdontogramView({
 
   const handleLimpiar = async () => {
     if (!piezaSeleccionada || readOnly) return
+    setErrorValidacion(null)
     setProcesando(true)
     try {
-      await onLimpiarPieza(piezaSeleccionada)
+      await onLimpiarPieza(piezaSeleccionada, caraSeleccionada === 'GENERAL' ? undefined : caraSeleccionada)
       setObservacion('')
+    } catch (err) {
+      setErrorValidacion(err instanceof Error ? err.message : 'Error al limpiar la pieza dental.')
     } finally {
       setProcesando(false)
     }
   }
 
-  const handleLimpiarSuperficie = async (superficie?: string) => {
-    if (!piezaSeleccionada || readOnly) return
-    setProcesando(true)
-    try {
-      await onLimpiarPieza(piezaSeleccionada, superficie)
-    } finally {
-      setProcesando(false)
-    }
+  const abrirCrearCondicion = () => {
+    setCondicionEditando(null)
+    setNuevoNombre('')
+    setNuevoCodigo('')
+    setNuevoColor('#3B82F6')
+    setNuevaDescripcion('')
+    setNuevoAplicaA('SUPERFICIE')
+    setModalCrearCondicion(true)
   }
 
-  const handleCambiarEstadoRapido = async (h: PiezaDentalDetalle, nuevoEstado: EstadoTratamiento) => {
-    if (readOnly) return
-    setProcesando(true)
-    try {
-      await onActualizarPieza(
-        h.numeroPieza,
-        h.superficie === 'GENERAL' ? undefined : h.superficie,
-        h.idCondicion,
-        h.observacion || undefined,
-        nuevoEstado,
-        h.codigoCondicion,
-      )
-    } finally {
-      setProcesando(false)
-    }
+  const abrirEditarCondicion = (c: CondicionOdontograma) => {
+    setCondicionEditando(c)
+    setNuevoNombre(c.nombre)
+    setNuevoCodigo(c.codigo)
+    setNuevoColor(c.colorHexadecimal)
+    setNuevaDescripcion(c.descripcion || '')
+    setNuevoAplicaA((c.aplicaA ? c.aplicaA.toUpperCase() : 'SUPERFICIE') as 'AMBOS' | 'PIEZA_COMPLETA' | 'SUPERFICIE')
+    setModalCrearCondicion(true)
   }
 
   const handleCrearNuevaCondicionSubmit = async () => {
-    if (!nuevoNombre.trim() || !onCrearCondicion) return
+    if (!nuevoNombre.trim()) return
     setGuardandoCondicion(true)
     try {
-      const nueva = await onCrearCondicion({
+      const payload = {
         nombre: nuevoNombre.trim(),
         codigo: nuevoCodigo.trim() || undefined,
         descripcion: nuevaDescripcion.trim() || undefined,
         colorHexadecimal: nuevoColor,
-      })
-      setCondicionId(nueva.id)
+        aplicaA: nuevoAplicaA,
+      }
+
+      if (condicionEditando) {
+        if (onActualizarCondicion) {
+          await onActualizarCondicion(condicionEditando.id, payload)
+        }
+      } else {
+        if (onCrearCondicion) {
+          const nueva = await onCrearCondicion(payload)
+          setCondicionId(nueva.id)
+          if (nueva.aplicaA === 'PIEZA_COMPLETA') {
+            cambiarCara('GENERAL')
+          }
+        }
+      }
+
       setModalCrearCondicion(false)
+      setCondicionEditando(null)
       setNuevoNombre('')
       setNuevoCodigo('')
       setNuevaDescripcion('')
+      setNuevoAplicaA('SUPERFICIE')
     } finally {
       setGuardandoCondicion(false)
     }
   }
 
+
+
+  const handleGuardarNombrePiezaSubmit = async (numeroPieza: number) => {
+    if (!nombrePiezaEditando.trim() || !onActualizarNombrePieza) return
+    setGuardandoNombrePieza(true)
+    try {
+      await onActualizarNombrePieza(numeroPieza, nombrePiezaEditando.trim())
+      setPiezaEditandoNumero(null)
+      setNombrePiezaEditando('')
+    } finally {
+      setGuardandoNombrePieza(false)
+    }
+  }
+
+  // Filtrado para el modal de gestión del catálogo
+  const condicionesGestionar = useMemo(() => {
+    if (!busquedaGestionar.trim()) return catalogoCondiciones
+    const q = busquedaGestionar.toLowerCase().trim()
+    return catalogoCondiciones.filter(
+      c =>
+        c.nombre.toLowerCase().includes(q) ||
+        c.codigo.toLowerCase().includes(q) ||
+        (c.descripcion && c.descripcion.toLowerCase().includes(q)),
+    )
+  }, [catalogoCondiciones, busquedaGestionar])
+
+  // Lista y filtrado para el catálogo de piezas dentales (FDI 52 piezas desde BD)
+  const piezasGestionar = useMemo(() => {
+    let list: Array<{ numeroPieza: number; nombre: string; tipoDenticion: string; cuadrante: number }> = []
+
+    if (piezasCatalogo && piezasCatalogo.length > 0) {
+      list = piezasCatalogo.map(p => {
+        const esNombreInvalido = !p.nombre || p.nombre.startsWith('Pieza Nº')
+        const nombreLimpio = esNombreInvalido
+          ? (NOMBRES_ANATOMICOS_DEFAULT[p.numeroPieza] || `Pieza ${p.numeroPieza}`)
+          : p.nombre.replace(/\s*\(\d+\)$/, '')
+
+        return {
+          numeroPieza: p.numeroPieza,
+          nombre: nombreLimpio,
+          tipoDenticion: p.tipoDenticion,
+          cuadrante: p.cuadrante,
+        }
+      })
+    } else {
+      const piezasFdi = [
+        18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
+        48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
+        55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75,
+      ]
+      list = piezasFdi.map(num => ({
+        numeroPieza: num,
+        nombre: NOMBRES_ANATOMICOS_DEFAULT[num] || `Pieza ${num}`,
+        tipoDenticion: num >= 51 ? 'TEMPORAL' : 'PERMANENTE',
+        cuadrante: Math.floor(num / 10),
+      }))
+    }
+
+    if (filtroDenticionPiezas === 'PERMANENTE') {
+      list = list.filter(p => p.tipoDenticion === 'PERMANENTE' || p.tipoDenticion === 'ADULTO')
+    } else if (filtroDenticionPiezas === 'TEMPORAL') {
+      list = list.filter(p => p.tipoDenticion === 'TEMPORAL' || p.tipoDenticion === 'NINO')
+    }
+
+    if (!busquedaPiezasGestionar.trim()) return list
+    const q = busquedaPiezasGestionar.toLowerCase().trim()
+    return list.filter(
+      p =>
+        p.numeroPieza.toString().includes(q) ||
+        p.nombre.toLowerCase().includes(q) ||
+        p.tipoDenticion.toLowerCase().includes(q),
+    )
+  }, [piezasCatalogo, filtroDenticionPiezas, busquedaPiezasGestionar])
+
+  const confirmarEliminarCondicion = async () => {
+    if (!condicionAEliminar || !onEliminarCondicion) return
+    const id = condicionAEliminar.id
+    setCondicionAEliminar(null)
+    setEliminandoCondicionId(id)
+    try {
+      await onEliminarCondicion(id)
+      if (condicionId === id) {
+        const restante = catalogoCondiciones.find(c => c.id !== id)
+        if (restante) setCondicionId(restante.id)
+      }
+    } finally {
+      setEliminandoCondicionId(null)
+    }
+  }
+
   return (
-    <div className="rounded-2xl border border-line bg-surface shadow-xs overflow-hidden">
-      {/* HEADER DE SUBMÓDULO: DENTICIÓN ADULTO/NIÑO Y FILTROS INTERACTIVOS */}
-      <div className="border-b border-line bg-alt/20 p-4 sm:p-5">
-        <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <span className="p-1.5 rounded-lg bg-brand/10 text-brand">
-                <Icon name="tooth" size={18} />
-              </span>
-              <h2 className="text-base font-bold text-ink">Historial Bucodental y Odontograma Clínico</h2>
-            </div>
-            <p className="text-xs text-muted">
-              Registra patologías, fases de tratamiento y procedimientos en tiempo real sobre la arcada anatómica.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* SELECTOR DE DENTICIÓN: ADULTO / PEDIÁTRICO */}
-            <div className="inline-flex rounded-xl p-1 bg-surface border border-line shadow-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setTipoDenticion('ADULTO')
-                  setPiezaSeleccionada(16)
-                }}
-                className={`px-3.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                  tipoDenticion === 'ADULTO'
-                    ? 'bg-brand text-white shadow-xs'
-                    : 'text-ink-soft hover:text-ink hover:bg-hover'
-                }`}
-              >
-                Adulto (32 piezas)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTipoDenticion('NINO')
-                  setPiezaSeleccionada(55)
-                }}
-                className={`px-3.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                  tipoDenticion === 'NINO'
-                    ? 'bg-brand text-white shadow-xs'
-                    : 'text-ink-soft hover:text-ink hover:bg-hover'
-                }`}
-              >
-                Pediátrico (20 piezas)
-              </button>
-            </div>
-
-            {/* FILTROS INTERACTIVOS CON ACCIONES DE ESTADO */}
-            <div className="flex items-center gap-1.5 border-l border-line pl-3 overflow-x-auto">
-              <span className="text-[11px] font-bold text-muted uppercase tracking-wider hidden sm:inline mr-1">
-                Filtros:
-              </span>
-              <button
-                type="button"
-                onClick={() => setFiltroEstado('TODOS')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all ${
-                  filtroEstado === 'TODOS'
-                    ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
-                    : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                }`}
-              >
-                Todos ({conteos.total})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroEstado(filtroEstado === 'HALLAZGOS' ? 'TODOS' : 'HALLAZGOS')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                  filtroEstado === 'HALLAZGOS'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                <span>Hallazgos ({conteos.hallazgos})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroEstado(filtroEstado === 'PRESUPUESTADO' ? 'TODOS' : 'PRESUPUESTADO')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                  filtroEstado === 'PRESUPUESTADO'
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                    : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                <span>Presupuestado ({conteos.presupuestado})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroEstado(filtroEstado === 'PROGRAMADO' ? 'TODOS' : 'PROGRAMADO')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                  filtroEstado === 'PROGRAMADO'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                    : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Programado ({conteos.programado})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroEstado(filtroEstado === 'REALIZADO' ? 'TODOS' : 'REALIZADO')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                  filtroEstado === 'REALIZADO'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                <span>Realizado ({conteos.realizado})</span>
-              </button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* CABECERA ODONTOGRAMA CLÍNICO SEGÚN MOCKUP */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-ink tracking-tight">Odontograma clínico</h1>
+          <p className="text-xs text-muted mt-0.5">
+            Registra y consulta las condiciones, hallazgos y tratamientos de cada pieza dental.
+          </p>
         </div>
+
+        {onExportarPdf && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="download"
+            onClick={onExportarPdf}
+          >
+            Exportar
+          </Button>
+        )}
       </div>
 
-      {/* ÁREA PRINCIPAL: DOS COLUMNAS (ODONTOGRAMA VISUAL IZQUIERDA + PANEL DE REGISTRO DERECHA) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-line">
-        {/* COLUMNA IZQUIERDA: ODONTOGRAMA ANATÓMICO (8 COLS) */}
-        <div className="lg:col-span-8 p-4 sm:p-6 overflow-x-auto">
-          <div className="min-w-[660px] space-y-6">
-            {/* LEYENDA CLÍNICA RÁPIDA */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line/60">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">Condiciones:</span>
-                {catalogoCondiciones.slice(0, 7).map(c => (
-                  <div
-                    key={c.id}
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-alt/50 border border-line/40"
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
-                      style={{ backgroundColor: c.colorHexadecimal }}
-                    />
-                    <span>{c.nombre}</span>
-                  </div>
-                ))}
+      {/* GRID DE DOS COLUMNAS CONFORME AL MOCKUP */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* COLUMNA IZQUIERDA: MAPA DENTAL + BANDEJA DE HALLAZGOS (8 COLS) */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* CARD 1: MAPA DENTAL */}
+          <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6 shadow-xs space-y-5">
+            {/* Header del Mapa Dental con Selector de Dentición */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-ink">Mapa dental</h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Selecciona una pieza o una de sus caras para registrar una condición.
+                </p>
               </div>
 
-              {onCrearCondicion && !readOnly && (
+              {/* Selector de Dentición Segmented Pills */}
+              <div className="inline-flex rounded-xl p-1 bg-alt/40 border border-line shrink-0">
                 <button
                   type="button"
-                  onClick={() => setModalCrearCondicion(true)}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:underline px-2.5 py-1 rounded-lg bg-brand/5 border border-brand/20 transition-all hover:bg-brand/10"
+                  onClick={() => {
+                    setTipoDenticion('ADULTO')
+                    setPiezaSeleccionada(16)
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${tipoDenticion === 'ADULTO'
+                    ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                    : 'text-muted hover:text-ink'
+                    }`}
                 >
-                  <Icon name="plus" size={12} />
-                  + Nueva Condición
+                  Adulto · 32 piezas
                 </button>
-              )}
-            </div>
-
-            {/* ARCADA SUPERIOR (MAXILAR) */}
-            <div>
-              <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-widest text-muted">
-                Arcada Superior (Maxilar)
-              </div>
-              <div className="flex items-center justify-center gap-4">
-                {tipoDenticion === 'ADULTO' ? (
-                  <>
-                    {/* Cuadrante 1: 18 a 11 */}
-                    <div className="flex items-end gap-1 sm:gap-1.5">
-                      {ADULTO_CUADRANTE_1.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={true}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                    {/* Línea media vertical */}
-                    <div className="w-px h-32 bg-line self-center" />
-                    {/* Cuadrante 2: 21 a 28 */}
-                    <div className="flex items-end gap-1 sm:gap-1.5">
-                      {ADULTO_CUADRANTE_2.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={true}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Pediátrico Cuadrante 5: 55 a 51 */}
-                    <div className="flex items-end gap-1 sm:gap-2">
-                      {NINO_CUADRANTE_5.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={true}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                    <div className="w-px h-32 bg-line self-center" />
-                    {/* Pediátrico Cuadrante 6: 61 a 65 */}
-                    <div className="flex items-end gap-1 sm:gap-2">
-                      {NINO_CUADRANTE_6.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={true}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoDenticion('NINO')
+                    setPiezaSeleccionada(55)
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${tipoDenticion === 'NINO'
+                    ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                    : 'text-muted hover:text-ink'
+                    }`}
+                >
+                  Pediátrico · 20 piezas
+                </button>
               </div>
             </div>
 
-            {/* SEPARADOR DE OCLUSIÓN / LÍNEA MEDIA HORIZONTAL */}
-            <div className="relative my-4 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-dashed border-line" />
-              </div>
-              <div className="relative bg-surface px-4 py-1 rounded-full border border-line text-[10px] font-bold text-muted uppercase tracking-wider">
-                Oclusión / Línea Media
-              </div>
-            </div>
+            {/* CONTENEDOR UNIFICADO DEL ODONTOGRAMA (SCROLL SINCRONIZADO Y FLUIDO) */}
+            <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div
+                tabIndex={0}
+                aria-label="Odontograma completo con desplazamiento horizontal sincronizado"
+                className="w-full overflow-x-auto pb-4 pt-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-alt/40 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-brand/30 hover:[&::-webkit-scrollbar-thumb]:bg-brand/60 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors focus:outline-none"
+              >
+                <div className="w-fit min-w-full mx-auto flex flex-col items-center select-none py-1 px-2">
+                  {/* ARCADA SUPERIOR · MAXILAR */}
+                  <div className="w-full space-y-2">
+                    {/* Encabezado de Cuadrantes Superiores */}
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted px-2">
+                      <span className="flex items-center gap-1.5 text-brand/90">
+                        <span className="size-1.5 rounded-full bg-brand" />
+                        {tipoDenticion === 'ADULTO' ? 'Cuadrante 1' : 'Cuadrante 5'}
+                      </span>
+                      <span className="font-extrabold text-ink tracking-widest text-[10px] bg-alt/60 px-3 py-0.5 rounded-full border border-line">
+                        Arcada Superior · Maxilar
+                      </span>
+                      <span className="flex items-center gap-1.5 text-brand/90">
+                        {tipoDenticion === 'ADULTO' ? 'Cuadrante 2' : 'Cuadrante 6'}
+                        <span className="size-1.5 rounded-full bg-brand" />
+                      </span>
+                    </div>
 
-            {/* ARCADA INFERIOR (MANDÍBULA) */}
-            <div>
-              <div className="flex items-center justify-center gap-4">
-                {tipoDenticion === 'ADULTO' ? (
-                  <>
-                    {/* Cuadrante 4: 48 a 41 */}
-                    <div className="flex items-start gap-1 sm:gap-1.5">
-                      {ADULTO_CUADRANTE_4.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={false}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                    <div className="w-px h-32 bg-line self-center" />
-                    {/* Cuadrante 3: 31 a 38 */}
-                    <div className="flex items-start gap-1 sm:gap-1.5">
-                      {ADULTO_CUADRANTE_3.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={false}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Pediátrico Cuadrante 8: 85 a 81 */}
-                    <div className="flex items-start gap-1 sm:gap-2">
-                      {NINO_CUADRANTE_8.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={false}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                    <div className="w-px h-32 bg-line self-center" />
-                    {/* Pediátrico Cuadrante 7: 71 a 75 */}
-                    <div className="flex items-start gap-1 sm:gap-2">
-                      {NINO_CUADRANTE_7.map(num => (
-                        <PiezaDentalCompleta
-                          key={num}
-                          numero={num}
-                          esSuperior={false}
-                          hallazgos={mapaHallazgos.get(num) || []}
-                          filtroEstado={filtroEstado}
-                          seleccionada={piezaSeleccionada === num}
-                          caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
-                          disabled={readOnly || guardando}
-                          onClick={() => seleccionarPiezaYActualizarForm(num)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="mt-2 text-center text-[11px] font-bold uppercase tracking-widest text-muted">
-                Arcada Inferior (Mandíbula)
-              </div>
-            </div>
-
-            {/* BANDEJA / LISTADO INTERACTIVO DE TRATAMIENTOS FILTRADOS */}
-            <div className="mt-8 pt-5 border-t border-line">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink">
-                    Tratamientos y Hallazgos Odontológicos
-                  </span>
-                  <Badge tone={filtroEstado === 'REALIZADO' ? 'blue' : filtroEstado === 'PRESUPUESTADO' ? 'purple' : filtroEstado === 'PROGRAMADO' ? 'green' : filtroEstado === 'HALLAZGOS' ? 'red' : 'gray'}>
-                    {filtroEstado === 'TODOS' ? 'Todos los Estados' : filtroEstado} ({hallazgosFiltrados.length})
-                  </Badge>
-                </div>
-                {filtroEstado !== 'TODOS' && (
-                  <button
-                    type="button"
-                    onClick={() => setFiltroEstado('TODOS')}
-                    className="text-xs text-brand hover:underline font-semibold"
-                  >
-                    Ver todos los estados
-                  </button>
-                )}
-              </div>
-
-              {hallazgosFiltrados.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1">
-                  {hallazgosFiltrados.map(h => {
-                    const est = h.estado || 'HALLAZGO'
-                    return (
-                      <div
-                        key={h.id || `${h.numeroPieza}-${h.superficie}`}
-                        onClick={() => seleccionarPiezaYActualizarForm(h.numeroPieza, h.superficie as SuperficieCara)}
-                        className="group flex items-start justify-between p-3 rounded-xl border border-line bg-surface hover:border-brand/40 hover:shadow-xs transition-all cursor-pointer"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-brand">#{h.numeroPieza}</span>
-                            <span className="text-[11px] font-semibold text-ink">
-                              {h.superficie && h.superficie !== 'GENERAL' ? `Cara ${h.superficie}` : 'Toda la pieza'}
-                            </span>
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: `${h.colorHexadecimal}20`,
-                                color: h.colorHexadecimal,
-                                border: `1px solid ${h.colorHexadecimal}40`,
-                              }}
-                            >
-                              {h.nombreCondicion}
-                            </span>
+                    <div className="flex items-end justify-center gap-1 sm:gap-1.5 py-1">
+                      {tipoDenticion === 'ADULTO' ? (
+                        <>
+                          {/* Cuadrante 1: 18 a 11 */}
+                          <div className="flex items-end gap-1 sm:gap-1.5">
+                            {ADULTO_CUADRANTE_1.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={true}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
                           </div>
-                          {h.observacion && (
-                            <p className="text-[11px] text-muted italic line-clamp-1">
-                              &ldquo;{h.observacion}&rdquo;
-                            </p>
-                          )}
-                        </div>
+                          {/* Línea media vertical continua */}
+                          <div className="w-px h-28 bg-line self-center mx-1 sm:mx-1.5" />
+                          {/* Cuadrante 2: 21 a 28 */}
+                          <div className="flex items-end gap-1 sm:gap-1.5">
+                            {ADULTO_CUADRANTE_2.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={true}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Pediátrico Cuadrante 5: 55 a 51 */}
+                          <div className="flex items-end gap-1 sm:gap-2">
+                            {NINO_CUADRANTE_5.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={true}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                          <div className="w-px h-28 bg-line self-center mx-1 sm:mx-1.5" />
+                          {/* Pediátrico Cuadrante 6: 61 a 65 */}
+                          <div className="flex items-end gap-1 sm:gap-2">
+                            {NINO_CUADRANTE_6.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={true}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
 
-                        {/* ACCIONES DE ESTADO RÁPIDAS */}
-                        <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
-                          {est !== 'PRESUPUESTADO' && (
-                            <button
-                              type="button"
-                              title="Mover a Presupuestado"
-                              disabled={readOnly || procesando}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCambiarEstadoRapido(h, 'PRESUPUESTADO')
-                              }}
-                              className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition-colors"
-                            >
-                              Presupuestar
-                            </button>
-                          )}
-                          {est !== 'PROGRAMADO' && (
-                            <button
-                              type="button"
-                              title="Mover a Programado"
-                              disabled={readOnly || procesando}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCambiarEstadoRapido(h, 'PROGRAMADO')
-                              }}
-                              className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                            >
-                              Programar
-                            </button>
-                          )}
-                          {est !== 'REALIZADO' && (
-                            <button
-                              type="button"
-                              title="Marcar como Realizado"
-                              disabled={readOnly || procesando}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCambiarEstadoRapido(h, 'REALIZADO')
-                              }}
-                              className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
-                            >
-                              ✓ Realizado
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            title="Eliminar hallazgo"
-                            disabled={readOnly || procesando}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onLimpiarPieza(h.numeroPieza, h.superficie === 'GENERAL' ? undefined : h.superficie)
-                            }}
-                            className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                          >
-                            <Icon name="trash" size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {/* SEPARADOR DE OCLUSIÓN / LÍNEA MEDIA HORIZONTAL */}
+                  <div className="w-full relative my-3 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-dashed border-line" />
+                    </div>
+                    <div className="relative bg-surface px-3 py-0.5 rounded-full border border-line text-[9px] font-bold text-muted uppercase tracking-wider">
+                      Oclusión / Línea Media
+                    </div>
+                  </div>
+
+                  {/* ARCADA INFERIOR · MANDÍBULA */}
+                  <div className="w-full space-y-2">
+                    <div className="flex items-start justify-center gap-1 sm:gap-1.5 py-1">
+                      {tipoDenticion === 'ADULTO' ? (
+                        <>
+                          {/* Cuadrante 4: 48 a 41 */}
+                          <div className="flex items-start gap-1 sm:gap-1.5">
+                            {ADULTO_CUADRANTE_4.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={false}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                          <div className="w-px h-28 bg-line self-center mx-1 sm:mx-1.5" />
+                          {/* Cuadrante 3: 31 a 38 */}
+                          <div className="flex items-start gap-1 sm:gap-1.5">
+                            {ADULTO_CUADRANTE_3.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={false}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Pediátrico Cuadrante 8: 85 a 81 */}
+                          <div className="flex items-start gap-1 sm:gap-2">
+                            {NINO_CUADRANTE_8.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={false}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                          <div className="w-px h-28 bg-line self-center mx-1 sm:mx-1.5" />
+                          {/* Pediátrico Cuadrante 7: 71 a 75 */}
+                          <div className="flex items-start gap-1 sm:gap-2">
+                            {NINO_CUADRANTE_7.map(num => (
+                              <PiezaDentalCompleta
+                                key={num}
+                                numero={num}
+                                esSuperior={false}
+                                hallazgos={mapaHallazgos.get(num) || []}
+                                filtroEstado={filtroEstado}
+                                seleccionada={piezaSeleccionada === num}
+                                caraSeleccionada={piezaSeleccionada === num ? caraSeleccionada : null}
+                                disabled={readOnly || guardando}
+                                onClick={() => seleccionarPiezaYActualizarForm(num)}
+                                onSelectCara={cara => seleccionarPiezaYActualizarForm(num, cara)}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Pie de Cuadrantes Inferiores */}
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted px-2">
+                      <span className="flex items-center gap-1.5 text-brand/90">
+                        <span className="size-1.5 rounded-full bg-brand" />
+                        {tipoDenticion === 'ADULTO' ? 'Cuadrante 4' : 'Cuadrante 8'}
+                      </span>
+                      <span className="font-extrabold text-ink tracking-widest text-[10px] bg-alt/60 px-3 py-0.5 rounded-full border border-line">
+                        Arcada Inferior · Mandíbula
+                      </span>
+                      <span className="flex items-center gap-1.5 text-brand/90">
+                        {tipoDenticion === 'ADULTO' ? 'Cuadrante 3' : 'Cuadrante 7'}
+                        <span className="size-1.5 rounded-full bg-brand" />
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="py-6 text-center text-xs text-muted rounded-xl border border-dashed border-line bg-alt/10">
-                  No hay piezas registradas en el estado &ldquo;{filtroEstado}&rdquo;.
-                </div>
-              )}
+              </div>
             </div>
           </div>
+
+          {/* CARD 2: HALLAZGOS Y TRATAMIENTOS (TABLA ESTÁNDAR NEODENT) */}
+          <Card className="p-0 overflow-hidden shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-line">
+              <h3 className="text-sm font-bold text-ink">
+                Hallazgos y tratamientos ({hallazgosFiltrados.length})
+              </h3>
+
+              {/* Filtros Segmented Pills */}
+              <div className="inline-flex rounded-xl p-1 bg-alt/40 border border-line text-xs font-semibold">
+                {[
+                  { id: 'TODOS', label: 'Todos' },
+                  { id: 'HALLAZGOS', label: 'Hallazgos' },
+                  { id: 'PRESUPUESTADO', label: 'Presupuestado' },
+                  { id: 'PROGRAMADO', label: 'Programado' },
+                  { id: 'REALIZADO', label: 'Realizado' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setFiltroEstado(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filtroEstado === tab.id
+                      ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                      : 'text-muted hover:text-ink'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Table columns={COLUMNS_HALLAZGOS}>
+              <TableState
+                colSpan={COLUMNS_HALLAZGOS.length}
+                empty={hallazgosFiltrados.length === 0}
+                emptyLabel="No hay hallazgos registrados con este filtro."
+              />
+
+              {hallazgosFiltrados.map(h => (
+                <tr key={h.id || `${h.numeroPieza}-${h.superficie}`} className="transition-colors hover:bg-alt/60">
+                  {/* PIEZA */}
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-0.5 shrink-0">
+                        Nº {h.numeroPieza}
+                      </span>
+                      <span className="text-xs text-muted font-medium truncate max-w-[130px]" title={nombresDientesMap[h.numeroPieza]}>
+                        {nombresDientesMap[h.numeroPieza] || `Pieza ${h.numeroPieza}`}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* SUPERFICIE */}
+                  <td>
+                    <span className="font-semibold text-ink text-xs">
+                      {h.superficie === 'GENERAL' ? 'Toda la pieza' : `Cara ${h.superficie?.toLowerCase()}`}
+                    </span>
+                  </td>
+
+                  {/* CONDICIÓN / DIAGNÓSTICO */}
+                  <td>
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                      style={{
+                        backgroundColor: `${h.colorHexadecimal}15`,
+                        color: h.colorHexadecimal,
+                        border: `1px solid ${h.colorHexadecimal}40`,
+                      }}
+                    >
+                      <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: h.colorHexadecimal }} />
+                      {h.nombreCondicion}
+                    </span>
+                  </td>
+
+                  {/* ESTADO */}
+                  <td className="text-center">
+                    {h.estado && (
+                      <Badge
+                        tone={
+                          h.estado === 'REALIZADO'
+                            ? 'green'
+                            : h.estado === 'PROGRAMADO'
+                              ? 'blue'
+                              : h.estado === 'PRESUPUESTADO'
+                                ? 'purple'
+                                : 'red'
+                        }
+                      >
+                        {h.estado === 'REALIZADO'
+                          ? 'Realizado'
+                          : h.estado === 'PROGRAMADO'
+                            ? 'Programado'
+                            : h.estado === 'PRESUPUESTADO'
+                              ? 'Presupuestado'
+                              : 'Hallazgo'}
+                      </Badge>
+                    )}
+                  </td>
+
+                  {/* OBSERVACIÓN */}
+                  <td>
+                    <span className="text-muted text-xs truncate max-w-xs block" title={h.observacion || ''}>
+                      {h.observacion ? h.observacion : <span className="text-muted/40 italic">Sin observaciones</span>}
+                    </span>
+                  </td>
+
+                  {/* ACCIONES (ESTÁNDAR NEODENT) */}
+                  <ActionsCell align="center">
+                    <RowActions
+                      actions={[
+                        {
+                          label: 'Ver y editar en odontograma',
+                          icon: 'edit',
+                          onClick: () => seleccionarPiezaYActualizarForm(h.numeroPieza, h.superficie as SuperficieCara),
+                        },
+                        {
+                          label: 'Eliminar hallazgo',
+                          icon: 'trash',
+                          danger: true,
+                          dividerBefore: true,
+                          show: !readOnly,
+                          disabled: guardando,
+                          onClick: () => onLimpiarPieza(h.numeroPieza, h.superficie === 'GENERAL' ? undefined : h.superficie),
+                        },
+                      ]}
+                    />
+                  </ActionsCell>
+                </tr>
+              ))}
+            </Table>
+          </Card>
         </div>
 
         {/* COLUMNA DERECHA: PANEL DE ACCIÓN Y REGISTRO (4 COLS) */}
-        <div className="lg:col-span-4 p-5 sm:p-6 bg-alt/5 flex flex-col justify-between">
-          <div className="space-y-5">
+        <div className="lg:col-span-4 p-5 sm:p-6 rounded-2xl border border-line bg-surface flex flex-col justify-between shadow-xs">
+          <div className="space-y-4">
             {/* 1. SELECCIÓN DE PIEZA Y CARA DENTAL */}
-            <div className="rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <div className="rounded-xl border border-line bg-surface p-4 shadow-2xs space-y-3">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-muted block mb-1">
                     Pieza Seleccionada
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-black text-brand">#{piezaSeleccionada}</span>
+                    <span className="text-2xl font-black text-brand tracking-tight">
+                      Nº {piezaSeleccionada}
+                    </span>
                     <Badge tone="blue">
-                      {piezaSeleccionada >= 51 ? 'Temporal / Deciduo' : 'Permanente'}
+                      {piezaSeleccionada >= 51 ? 'Temporal' : 'Permanente'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-ink font-medium mt-1">
-                    {NOMBRES_DIENTES[piezaSeleccionada] || `Pieza #${piezaSeleccionada}`}
+                  <p className="text-xs text-ink font-semibold mt-1 truncate">
+                    {nombresDientesMap[piezaSeleccionada]?.replace(/\s*\(\d+\)$/, '') || `Pieza Nº ${piezaSeleccionada}`}
                   </p>
                 </div>
 
                 {/* SELECTOR INTERACTIVO DE CARAS DENTALES */}
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center shrink-0">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">
-                    Cara: <strong className="text-brand">{caraSeleccionada}</strong>
+                    Cara: <strong className="text-brand">{caraSeleccionada === 'GENERAL' ? 'Toda la pieza' : caraSeleccionada}</strong>
                   </span>
                   <SelectorCircularCaras
                     caraSeleccionada={caraSeleccionada}
-                    onSelectCara={cara => setCaraSeleccionada(cara)}
+                    onSelectCara={cara => {
+                      if (condicionSeleccionadaObj?.aplicaA === 'PIEZA_COMPLETA') {
+                        setErrorValidacion(`"${condicionSeleccionadaObj.nombre}" solo aplica a toda la pieza. No seleccione caras individuales.`)
+                        return
+                      }
+                      cambiarCara(cara)
+                    }}
                   />
                 </div>
               </div>
 
-              {/* Botón rápido para Toda la Pieza */}
-              <div className="mt-3 pt-3 border-t border-line/60 flex items-center justify-between text-xs">
-                <span className="text-muted">Área de afección:</span>
+              {/* Botón rápido para alternar Área de afección */}
+              <div className="pt-2 border-t border-line/60 flex items-center justify-between text-xs">
+                <span className="text-muted font-medium">Área de afección:</span>
                 <button
                   type="button"
-                  onClick={() => setCaraSeleccionada(caraSeleccionada === 'GENERAL' ? 'OCLUSAL' : 'GENERAL')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
-                    caraSeleccionada === 'GENERAL'
-                      ? 'bg-brand/10 border-brand text-brand'
-                      : 'bg-alt/40 border-line text-ink-soft hover:bg-hover'
-                  }`}
+                  disabled={condicionSeleccionadaObj?.aplicaA === 'PIEZA_COMPLETA' && caraSeleccionada === 'GENERAL'}
+                  onClick={() => {
+                    if (caraSeleccionada === 'GENERAL') {
+                      cambiarCara(ultimaCara || 'OCLUSAL')
+                    } else {
+                      cambiarCara('GENERAL')
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${caraSeleccionada === 'GENERAL'
+                      ? 'bg-brand text-white border-brand shadow-2xs'
+                      : 'bg-surface text-ink-soft border-line hover:bg-hover'
+                    }`}
                 >
-                  {caraSeleccionada === 'GENERAL' ? '✓ Toda la pieza' : 'Marcar toda la pieza'}
+                  {caraSeleccionada === 'GENERAL' ? '✓ Toda la pieza' : 'Toda la pieza'}
                 </button>
               </div>
             </div>
 
-            {/* 2. CATÁLOGO / CONDICIÓN CON BUSCADOR Y CREACIÓN */}
+            {/* 2. CATÁLOGO / CONDICIÓN CON BUSCADOR Y GESTIÓN BD */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-ink flex items-center gap-1.5">
-                  <Icon name="search" size={13} className="text-brand" />
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-bold text-ink truncate">
                   Elige la Condición o Tratamiento:
                 </label>
-                <div className="flex items-center gap-1.5">
-                  {onCrearCondicion && !readOnly && (
+                {isAdmin && !readOnly && onCrearCondicion && (
+                  <Tooltip content="Configurar catálogo de condiciones y nombres">
                     <button
                       type="button"
-                      onClick={() => setModalCrearCondicion(true)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:underline px-2 py-0.5 rounded-md bg-brand/5 border border-brand/20 transition-all hover:bg-brand/10"
+                      onClick={() => setModalGestionarCatalogo(true)}
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-ink-soft hover:text-ink bg-surface hover:bg-hover border border-line transition-all cursor-pointer shadow-2xs"
                     >
-                      <Icon name="plus" size={10} />
-                      + Nueva
+                      <Icon name="settings" size={13} />
                     </button>
-                  )}
-                  {busquedaCondicion && (
-                    <button
-                      type="button"
-                      onClick={() => setBusquedaCondicion('')}
-                      className="text-[11px] text-muted hover:underline font-medium"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
+                  </Tooltip>
+                )}
               </div>
 
-              {/* Input buscador que filtra la lista de inmediato */}
+              {/* Input buscador */}
               <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+                  <Icon name="search" size={13} />
+                </span>
                 <input
                   type="text"
                   value={busquedaCondicion}
                   onChange={e => setBusquedaCondicion(e.target.value)}
                   placeholder="Buscar patología o tratamiento..."
-                  className="w-full h-9 rounded-xl border border-line bg-surface px-3 py-1 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+                  className="w-full h-8.5 rounded-xl border border-line bg-surface pl-8 pr-7 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40 transition-all"
                 />
+                {busquedaCondicion && (
+                  <Tooltip content="Limpiar búsqueda">
+                    <button
+                      type="button"
+                      onClick={() => setBusquedaCondicion('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink text-xs p-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </Tooltip>
+                )}
               </div>
 
-              {/* Lista scrolleable de condiciones filtradas */}
-              <div className="max-h-48 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 space-y-1">
+              {/* Lista limpia de condiciones (solo círculo y nombre, sin ID ni etiqueta de ámbito) */}
+              <div className="max-h-36 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 space-y-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-line hover:[&::-webkit-scrollbar-thumb]:bg-muted/50 [&::-webkit-scrollbar-thumb]:rounded-full">
                 {condicionesFiltradas.length > 0 ? (
                   condicionesFiltradas.map(c => {
                     const isSelected = condicionId === c.id
+                    const ambito = c.aplicaA ? c.aplicaA.toUpperCase() : 'AMBOS'
                     return (
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => setCondicionId(c.id)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-brand text-white shadow-xs font-bold'
-                            : 'text-ink hover:bg-hover'
-                        }`}
+                        onClick={() => {
+                          setCondicionId(c.id)
+                          setErrorValidacion(null)
+                          if (ambito === 'PIEZA_COMPLETA') {
+                            cambiarCara('GENERAL')
+                          } else if (ambito === 'SUPERFICIE' && caraSeleccionada === 'GENERAL') {
+                            cambiarCara(ultimaCara || 'OCLUSAL')
+                          }
+                        }}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-all flex items-center justify-between cursor-pointer border ${isSelected
+                            ? 'bg-brand/10 border-brand/50 text-brand font-bold shadow-2xs ring-1 ring-brand/30'
+                            : 'bg-surface border-transparent text-ink hover:bg-hover hover:border-line/60 font-medium'
+                          }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10"
+                            className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs ring-1 ring-black/10"
                             style={{ backgroundColor: c.colorHexadecimal }}
                           />
-                          <span>{c.nombre}</span>
+                          <span className="truncate">{c.nombre}</span>
                         </div>
-                        {isSelected && <Icon name="check" size={13} className="text-white" />}
+                        {isSelected && (
+                          <span className="w-4 h-4 rounded-full bg-brand text-white flex items-center justify-center shrink-0 ml-1.5">
+                            <Icon name="check" size={11} />
+                          </span>
+                        )}
                       </button>
                     )
                   })
                 ) : (
-                  <div className="py-4 text-center text-xs text-muted">
-                    No se encontraron coincidencias para &quot;{busquedaCondicion}&quot;
+                  <div className="py-5 text-center text-xs text-muted space-y-1.5">
+                    <p>No se encontraron resultados para &quot;{busquedaCondicion}&quot;</p>
                   </div>
                 )}
               </div>
@@ -897,11 +1088,10 @@ export function OdontogramView({
                 <button
                   type="button"
                   onClick={() => setEstadoSeleccionado('HALLAZGO')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 ${
-                    estadoSeleccionado === 'HALLAZGO'
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${estadoSeleccionado === 'HALLAZGO'
                       ? 'bg-rose-50 text-rose-700 border-rose-300 ring-1 ring-rose-400'
                       : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                   Hallazgo
@@ -909,11 +1099,10 @@ export function OdontogramView({
                 <button
                   type="button"
                   onClick={() => setEstadoSeleccionado('PRESUPUESTADO')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 ${
-                    estadoSeleccionado === 'PRESUPUESTADO'
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${estadoSeleccionado === 'PRESUPUESTADO'
                       ? 'bg-purple-50 text-purple-700 border-purple-300 ring-1 ring-purple-400'
                       : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
                   Presupuesto
@@ -921,11 +1110,10 @@ export function OdontogramView({
                 <button
                   type="button"
                   onClick={() => setEstadoSeleccionado('PROGRAMADO')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 ${
-                    estadoSeleccionado === 'PROGRAMADO'
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${estadoSeleccionado === 'PROGRAMADO'
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-1 ring-emerald-400'
                       : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   Programado
@@ -933,11 +1121,10 @@ export function OdontogramView({
                 <button
                   type="button"
                   onClick={() => setEstadoSeleccionado('REALIZADO')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 ${
-                    estadoSeleccionado === 'REALIZADO'
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${estadoSeleccionado === 'REALIZADO'
                       ? 'bg-blue-50 text-blue-700 border-blue-300 ring-1 ring-blue-400'
                       : 'bg-surface text-ink-soft border-line hover:bg-hover'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   Realizado
@@ -958,53 +1145,25 @@ export function OdontogramView({
                 className="w-full rounded-xl border border-line bg-surface p-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
               />
             </div>
-
-            {/* 5. HISTORIAL DE HALLAZGOS EN ESTA PIEZA */}
-            {hallazgosPiezaActual.length > 0 && (
-              <div className="rounded-xl border border-line/60 bg-surface p-3 space-y-2">
-                <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
-                  Hallazgos registrados en #{piezaSeleccionada}:
-                </span>
-                <div className="space-y-1.5">
-                  {hallazgosPiezaActual.map(h => (
-                    <div
-                      key={h.id}
-                      className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-alt/30 border border-line/40"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: h.colorHexadecimal }}
-                        />
-                        <div>
-                          <strong className="text-ink">{h.nombreCondicion}</strong>
-                          <span className="text-muted ml-1.5 text-[11px]">
-                            ({h.superficie || 'General'})
-                          </span>
-                          <span className="ml-1 text-[10px] font-bold uppercase text-brand">
-                            [{h.estado || 'HALLAZGO'}]
-                          </span>
-                        </div>
-                      </div>
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() => handleLimpiarSuperficie(h.superficie)}
-                          className="text-danger hover:text-danger/80 p-1"
-                          title="Eliminar este hallazgo"
-                        >
-                          <Icon name="trash" size={13} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
+          {/* MENSAJE DE VALIDACIÓN O ERROR */}
+          {errorValidacion && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 mt-3 animate-in fade-in duration-200">
+              <Icon name="warning" size={15} className="shrink-0 mt-0.5 text-danger" />
+              <div className="flex-1 font-medium leading-relaxed">{errorValidacion}</div>
+              <button
+                type="button"
+                onClick={() => setErrorValidacion(null)}
+                className="text-danger/70 hover:text-danger text-xs font-bold p-0.5 cursor-pointer shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* BOTONES DE ACCIÓN */}
-          <div className="pt-5 border-t border-line mt-4 space-y-2">
+          <div className="pt-4 border-t border-line mt-3 space-y-2">
             <Button
               variant="primary"
               className="w-full justify-center"
@@ -1016,7 +1175,7 @@ export function OdontogramView({
               ) : (
                 <Icon name="check" size={16} />
               )}
-              Guardar Hallazgo en #{piezaSeleccionada}
+              <span>Guardar condición</span>
             </Button>
 
             <Button
@@ -1026,126 +1185,582 @@ export function OdontogramView({
               onClick={handleLimpiar}
             >
               <Icon name="trash" size={14} />
-              Limpiar toda la pieza #{piezaSeleccionada}
+              Limpiar seleccion
             </Button>
           </div>
         </div>
       </div>
 
-      {/* MODAL / DIÁLOGO PARA CREAR NUEVA CONDICIÓN CLÍNICA */}
-      {modalCrearCondicion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-line">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-brand/10 text-brand">
-                  <Icon name="plus" size={18} />
-                </span>
-                <h3 className="text-base font-bold text-ink">Nueva Condición o Tratamiento</h3>
+      {/* MODAL / DIÁLOGO PARA CREAR O EDITAR CONDICIÓN CLÍNICA (GUARDADO EN BD) */}
+      <AnimatePresence>
+        {modalCrearCondicion && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[120] grid place-items-center bg-ink/50 p-4 backdrop-blur-xs"
+            onClick={e => {
+              if (e.target === e.currentTarget && !guardandoCondicion) setModalCrearCondicion(false)
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Encabezado estándar estilo PatientForm */}
+              <div className="flex items-center justify-between p-5 sm:p-6 border-b border-line bg-surface">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-brand text-white shadow-xs">
+                    <Icon name="tag" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-ink">
+                      {condicionEditando ? 'Editar Condición Clínica' : 'Nueva Condición Clínica'}
+                    </h3>
+                    <p className="text-xs text-muted">
+                      {condicionEditando
+                        ? 'Modifica los datos de la condición en la base de datos.'
+                        : 'Registra una nueva condición o tratamiento dental en la base de datos.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalCrearCondicion(false)}
+                  disabled={guardandoCondicion}
+                  className="rounded-lg p-1.5 text-muted hover:bg-hover hover:text-ink transition-colors cursor-pointer"
+                >
+                  <Icon name="x" size={18} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setModalCrearCondicion(false)}
-                className="p-1 rounded-lg text-muted hover:text-ink hover:bg-hover"
+
+              {/* Formulario con paneles numerados tipo PatientForm */}
+              <form
+                onSubmit={e => {
+                  e.preventDefault()
+                  handleCrearNuevaCondicionSubmit()
+                }}
+                className="p-5 sm:p-6 space-y-4"
+                noValidate
               >
-                ✕
-              </button>
-            </div>
+                {/* PANEL 1: IDENTIFICACIÓN */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">
+                      1
+                    </span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Identificación de la Condición <span className="text-danger">*</span>
+                    </h3>
+                  </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-ink block mb-1">Nombre de la Condición o Tratamiento *</label>
-                <input
-                  type="text"
-                  value={nuevoNombre}
-                  onChange={e => {
-                    const val = e.target.value
-                    setNuevoNombre(val)
-                    if (!nuevoCodigo || nuevoCodigo === nuevoNombre.toUpperCase().trim().replace(/[^A-Z0-9_]/g, '_')) {
-                      setNuevoCodigo(val.toUpperCase().trim().replace(/[^A-Z0-9_]/g, '_'))
-                    }
-                  }}
-                  placeholder="Ej. Blanqueamiento Dental, Carilla Estética..."
-                  className="w-full h-9 rounded-xl border border-line bg-surface px-3 text-xs text-ink placeholder:text-muted focus:ring-2 focus:ring-brand/40 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-ink block mb-1">Código Identificador (Opcional)</label>
-                <input
-                  type="text"
-                  value={nuevoCodigo}
-                  onChange={e => setNuevoCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'))}
-                  placeholder="Ej. BLANQUEAMIENTO"
-                  className="w-full h-9 rounded-xl border border-line bg-surface px-3 text-xs text-ink placeholder:text-muted focus:ring-2 focus:ring-brand/40 focus:outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-ink block mb-1.5">Color Clínico Representativo</label>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  {PALETA_COLORES_CLINICOS.map(c => (
-                    <button
-                      key={c.hex}
-                      type="button"
-                      title={c.label}
-                      onClick={() => setNuevoColor(c.hex)}
-                      style={{ backgroundColor: c.hex }}
-                      className={`w-6 h-6 rounded-full transition-transform ${
-                        nuevoColor === c.hex ? 'scale-125 ring-2 ring-brand ring-offset-2' : 'hover:scale-110'
-                      }`}
+                  <Field label="Nombre de la Condición o Tratamiento *">
+                    <Input
+                      icon="tag"
+                      value={nuevoNombre}
+                      onChange={e => {
+                        const val = e.target.value
+                        setNuevoNombre(val)
+                        if (!nuevoCodigo || nuevoCodigo === nuevoNombre.toUpperCase().trim().replace(/[^A-Z0-9_]/g, '_')) {
+                          setNuevoCodigo(val.toUpperCase().trim().replace(/[^A-Z0-9_]/g, '_'))
+                        }
+                      }}
+                      placeholder="Ej. Carilla Estética, Blanqueamiento, Resina..."
+                      autoFocus
                     />
-                  ))}
+                  </Field>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={nuevoColor}
-                    onChange={e => setNuevoColor(e.target.value)}
-                    className="w-8 h-8 rounded-lg cursor-pointer border border-line"
-                  />
-                  <input
-                    type="text"
-                    value={nuevoColor}
-                    onChange={e => setNuevoColor(e.target.value)}
-                    className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-xs font-mono text-ink"
-                  />
+
+                {/* PANEL 2: COLOR CLÍNICO */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">
+                      2
+                    </span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Color en Odontograma <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        id="picker-color-condicion"
+                        value={nuevoColor}
+                        onChange={e => setNuevoColor(e.target.value)}
+                        className="w-10 h-10 rounded-xl cursor-pointer border border-line bg-surface p-1 shadow-2xs hover:border-brand transition-all shrink-0"
+                        title="Haz clic para abrir el selector de color"
+                      />
+                      <Input
+                        id="codigo-hex-color"
+                        value={nuevoColor}
+                        onChange={e => setNuevoColor(e.target.value)}
+                        placeholder="#3B82F6"
+                        className="w-36 font-mono text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* PANEL 3: ÁMBITO DE APLICACIÓN (PIEZA COMPLETA VS SUPERFICIE) */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">
+                      3
+                    </span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Ámbito de Aplicación <span className="text-danger">*</span>
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setNuevoAplicaA('SUPERFICIE')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${nuevoAplicaA === 'SUPERFICIE'
+                          ? 'border-brand bg-brand/10 ring-1 ring-brand text-brand'
+                          : 'border-line bg-surface hover:bg-hover text-ink'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">Por Superficie</span>
+                        <Icon name="target" size={14} />
+                      </div>
+                      <p className="text-[11px] text-muted leading-tight">
+                        Aplica a caras específicas (ej. Caries, Resina, Sellante).
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setNuevoAplicaA('PIEZA_COMPLETA')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${nuevoAplicaA === 'PIEZA_COMPLETA'
+                          ? 'border-brand bg-brand/10 ring-1 ring-brand text-brand'
+                          : 'border-line bg-surface hover:bg-hover text-ink'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">Toda la Pieza</span>
+                        <Icon name="tooth" size={14} />
+                      </div>
+                      <p className="text-[11px] text-muted leading-tight">
+                        Afecta a la pieza completa (ej. Corona, Ausente, Implante).
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setNuevoAplicaA('AMBOS')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${nuevoAplicaA === 'AMBOS'
+                          ? 'border-brand bg-brand/10 ring-1 ring-brand text-brand'
+                          : 'border-line bg-surface hover:bg-hover text-ink'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">Ambos / Libre</span>
+                        <Icon name="layers" size={14} />
+                      </div>
+                      <p className="text-[11px] text-muted leading-tight">
+                        Permite registrarse en caras o pieza completa (ej. Fractura).
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* PANEL 4: PROTOCOLO O DETALLES */}
+                <div className="rounded-xl border border-line bg-alt/30 p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-line/60">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[11px] font-bold">
+                      4
+                    </span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
+                      Protocolo o Detalles Clínicos (Opcional)
+                    </h3>
+                  </div>
+
+                  <Field label="Descripción / Indicación clínica">
+                    <textarea
+                      value={nuevaDescripcion}
+                      onChange={e => setNuevaDescripcion(e.target.value)}
+                      placeholder="Indicación clínica o detalles del procedimiento..."
+                      rows={2}
+                      className="block w-full min-w-0 max-w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-brand focus:outline-none"
+                    />
+                  </Field>
+                </div>
+
+                {/* FOOTER */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalCrearCondicion(false)}
+                    disabled={guardandoCondicion}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={!nuevoNombre.trim() || guardandoCondicion}
+                  >
+                    {guardandoCondicion ? (
+                      <>
+                        <Icon name="spinner" size={16} className="animate-spin" />
+                        <span>Guardando en BD...</span>
+                      </>
+                    ) : (
+                      condicionEditando ? 'Guardar Cambios' : 'Guardar Condición'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL / DIÁLOGO DE CONFIGURACIÓN DEL CATÁLOGO EN BD */}
+      <AnimatePresence>
+        {modalGestionarCatalogo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[100] grid place-items-center bg-ink/40 p-4 backdrop-blur-xs"
+            onClick={e => {
+              if (e.target === e.currentTarget) setModalGestionarCatalogo(false)
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="w-full max-w-xl max-h-[85vh] overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header con Pestañas de Administración */}
+              <div className="p-5 sm:p-6 border-b border-line bg-surface shrink-0 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-brand text-white shadow-xs">
+                      <Icon name="database" size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-ink">Gestión del Odontograma</h3>
+                      <p className="text-xs text-muted">
+                        Control administrativo de condiciones clínicas y nombres anatómicos FDI.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalGestionarCatalogo(false)}
+                    className="rounded-lg p-1.5 text-muted hover:bg-hover hover:text-ink transition-colors cursor-pointer"
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
+
+                {/* Tabs de Selección */}
+                <div className="inline-flex rounded-xl p-1 bg-alt/50 border border-line text-xs font-semibold w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPestanaGestion('CONDICIONES')}
+                    className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${pestanaGestion === 'CONDICIONES'
+                        ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                        : 'text-muted hover:text-ink'
+                      }`}
+                  >
+                    <Icon name="tag" size={14} />
+                    <span>Condiciones Clínicas ({catalogoCondiciones.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPestanaGestion('PIEZAS')}
+                    className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${pestanaGestion === 'PIEZAS'
+                        ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                        : 'text-muted hover:text-ink'
+                      }`}
+                  >
+                    <Icon name="tooth" size={14} />
+                    <span>Nombres de Piezas Dentales (52)</span>
+                  </button>
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-ink block mb-1">Descripción / Indicación Clínica</label>
-                <textarea
-                  value={nuevaDescripcion}
-                  onChange={e => setNuevaDescripcion(e.target.value)}
-                  placeholder="Breve descripción o protocolo clínico del procedimiento..."
-                  rows={2}
-                  className="w-full rounded-xl border border-line bg-surface p-2 text-xs text-ink placeholder:text-muted focus:ring-2 focus:ring-brand/40 focus:outline-none"
-                />
-              </div>
-            </div>
+              {/* CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
+              {pestanaGestion === 'CONDICIONES' ? (
+                <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
+                  {/* Barra de herramientas: Búsqueda y Botón Nueva */}
+                  <div className="flex items-center justify-between gap-3 shrink-0">
+                    <SearchInput
+                      value={busquedaGestionar}
+                      onChange={e => setBusquedaGestionar(e.target.value)}
+                      onClear={() => setBusquedaGestionar('')}
+                      placeholder="Buscar condición por nombre o código..."
+                      className="flex-1"
+                    />
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setModalCrearCondicion(false)}
-                disabled={guardandoCondicion}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!nuevoNombre.trim() || guardandoCondicion}
-                onClick={handleCrearNuevaCondicionSubmit}
-              >
-                {guardandoCondicion ? 'Guardando...' : 'Crear Condición'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                    {isAdmin && onCrearCondicion && !readOnly && (
+                      <Button
+                        variant="primary"
+                        onClick={abrirCrearCondicion}
+                        className="shrink-0"
+                      >
+                        <Icon name="plus" size={16} />
+                        <span>Nueva Condición</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Lista limpia de condiciones con acciones unificadas */}
+                  <div className="flex-1 overflow-y-auto rounded-xl border border-line bg-surface [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-line hover:[&::-webkit-scrollbar-thumb]:bg-muted/50 [&::-webkit-scrollbar-thumb]:rounded-full divide-y divide-line min-h-[16rem]">
+                    {condicionesGestionar.length > 0 ? (
+                      condicionesGestionar.map(c => {
+                        const isDeleting = eliminandoCondicionId === c.id
+
+                        return (
+                          <div
+                            key={c.id}
+                            className="p-3.5 flex items-center justify-between gap-3 hover:bg-hover/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <span
+                                className="size-4.5 rounded-full shrink-0 shadow-2xs ring-1 ring-black/10"
+                                style={{ backgroundColor: c.colorHexadecimal }}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-sm font-bold text-ink truncate block">
+                                  {c.nombre}
+                                </span>
+                                {c.descripcion && (
+                                  <p className="text-xs text-muted truncate mt-0.5">{c.descripcion}</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Botones de acción estándar unificados (mismo tamaño y estilo) */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isAdmin && onActualizarCondicion && !readOnly && (
+                                <Tooltip content="Editar condición">
+                                  <button
+                                    type="button"
+                                    aria-label="Editar condición"
+                                    onClick={() => abrirEditarCondicion(c)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-brand/10 hover:text-brand cursor-pointer shadow-2xs"
+                                  >
+                                    <Icon name="edit" size={15} />
+                                  </button>
+                                </Tooltip>
+                              )}
+
+                              {isAdmin && onEliminarCondicion && !readOnly && (
+                                <Tooltip content="Eliminar condición">
+                                  <button
+                                    type="button"
+                                    aria-label="Eliminar condición"
+                                    onClick={() => setCondicionAEliminar({ id: c.id, nombre: c.nombre })}
+                                    disabled={isDeleting}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger cursor-pointer shadow-2xs"
+                                  >
+                                    {isDeleting ? (
+                                      <Icon name="spinner" size={15} className="animate-spin text-danger" />
+                                    ) : (
+                                      <Icon name="trash" size={15} />
+                                    )}
+                                  </button>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="py-12 text-center text-xs text-muted">
+                        No se encontraron condiciones para &quot;{busquedaGestionar}&quot;
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* PESTAÑA 2: CONTROL DE NOMBRES DE PIEZAS DENTALES (FDI) */
+                <div className="p-5 sm:p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
+                  {/* Filtro y Búsqueda */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+                    <SearchInput
+                      value={busquedaPiezasGestionar}
+                      onChange={e => setBusquedaPiezasGestionar(e.target.value)}
+                      onClear={() => setBusquedaPiezasGestionar('')}
+                      placeholder="Buscar por número (ej. 16, 21) o nombre anatómico..."
+                      className="flex-1"
+                    />
+
+                    <div className="inline-flex rounded-xl p-1 bg-alt/40 border border-line text-xs font-semibold shrink-0">
+                      {[
+                        { id: 'TODAS', label: 'Todas (52)' },
+                        { id: 'PERMANENTE', label: 'Adultos (32)' },
+                        { id: 'TEMPORAL', label: 'Niños (20)' },
+                      ].map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setFiltroDenticionPiezas(f.id as any)}
+                          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filtroDenticionPiezas === f.id
+                              ? 'bg-blue-50 text-blue-600 font-bold border border-blue-200/80 shadow-2xs'
+                              : 'text-muted hover:text-ink'
+                            }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de Piezas Dentales con Edición Inline */}
+                  <div className="flex-1 overflow-y-auto rounded-xl border border-line bg-surface [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-line hover:[&::-webkit-scrollbar-thumb]:bg-muted/50 [&::-webkit-scrollbar-thumb]:rounded-full divide-y divide-line min-h-[16rem]">
+                    {piezasGestionar.length > 0 ? (
+                      piezasGestionar.map(p => {
+                        const estaEditando = piezaEditandoNumero === p.numeroPieza
+                        const nombreVisual = nombresDientesMap[p.numeroPieza] || p.nombre
+
+                        return (
+                          <div
+                            key={p.numeroPieza}
+                            className="p-3 flex items-center justify-between gap-3 hover:bg-hover/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span className="font-extrabold text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1 shrink-0">
+                                Nº {p.numeroPieza}
+                              </span>
+
+                              {estaEditando ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <input
+                                    type="text"
+                                    value={nombrePiezaEditando}
+                                    onChange={e => setNombrePiezaEditando(e.target.value)}
+                                    className="flex-1 h-8 rounded-lg border border-brand bg-surface px-2.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+                                    autoFocus
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        handleGuardarNombrePiezaSubmit(p.numeroPieza)
+                                      } else if (e.key === 'Escape') {
+                                        setPiezaEditandoNumero(null)
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    disabled={guardandoNombrePieza || !nombrePiezaEditando.trim()}
+                                    onClick={() => handleGuardarNombrePiezaSubmit(p.numeroPieza)}
+                                  >
+                                    {guardandoNombrePieza ? (
+                                      <Icon name="spinner" size={12} className="animate-spin" />
+                                    ) : (
+                                      <Icon name="check" size={12} />
+                                    )}
+                                    <span>Guardar</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={guardandoNombrePieza}
+                                    onClick={() => setPiezaEditandoNumero(null)}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-ink truncate">
+                                      {nombreVisual.replace(/\s*\(\d+\)$/, '')}
+                                    </span>
+                                    <span className="text-[10px] text-muted font-medium bg-alt/50 px-1.5 py-0.5 rounded">
+                                      Cuadrante {p.cuadrante} · {p.tipoDenticion === 'NINO' || p.tipoDenticion === 'TEMPORAL' ? 'Temporal (Niño)' : 'Permanente (Adulto)'}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {!estaEditando && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {isAdmin && onActualizarNombrePieza && !readOnly && (
+                                  <Tooltip content="Editar nombre de la pieza">
+                                    <button
+                                      type="button"
+                                      aria-label="Editar nombre de la pieza"
+                                      onClick={() => {
+                                        setPiezaEditandoNumero(p.numeroPieza)
+                                        setNombrePiezaEditando(nombreVisual.replace(/\s*\(\d+\)$/, ''))
+                                      }}
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-brand/10 hover:text-brand cursor-pointer shadow-2xs"
+                                    >
+                                      <Icon name="edit" size={15} />
+                                    </button>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="py-12 text-center text-xs text-muted">
+                        No se encontraron piezas dentales para &quot;{busquedaPiezasGestionar}&quot;
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Pie del modal */}
+              <div className="flex items-center justify-between p-4 sm:p-5 border-t border-line bg-surface shrink-0 text-xs text-muted">
+                <span>
+                  {pestanaGestion === 'CONDICIONES'
+                    ? `${condicionesGestionar.length} condiciones en catálogo`
+                    : `${piezasGestionar.length} piezas dentales FDI listadas`}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setModalGestionarCatalogo(false)}
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DIÁLOGO MODAL DE CONFIRMACIÓN PARA ELIMINAR CONDICIÓN */}
+      <ConfirmDialog
+        open={Boolean(condicionAEliminar)}
+        title="¿Eliminar condición clínica?"
+        description={`Se eliminará "${condicionAEliminar?.nombre}" de la base de datos de odontograma.`}
+        confirmLabel="Eliminar"
+        confirmVariant="danger"
+        zIndex="z-[150]"
+        cancelLabel="Cancelar"
+        onConfirm={confirmarEliminarCondicion}
+        onCancel={() => setCondicionAEliminar(null)}
+      />
     </div>
   )
 }
@@ -1162,6 +1777,7 @@ interface PiezaDentalCompletaProps {
   caraSeleccionada: SuperficieCara | null
   disabled: boolean
   onClick: () => void
+  onSelectCara?: (cara: SuperficieCara) => void
 }
 
 function PiezaDentalCompleta({
@@ -1173,6 +1789,7 @@ function PiezaDentalCompleta({
   caraSeleccionada,
   disabled,
   onClick,
+  onSelectCara,
 }: PiezaDentalCompletaProps) {
   // Hallazgo general de toda la pieza
   const generalH = hallazgos.find(h => !h.superficie || h.superficie === 'GENERAL')
@@ -1187,8 +1804,6 @@ function PiezaDentalCompleta({
   const colorMesial = hallazgos.find(h => h.superficie === 'MESIAL')?.colorHexadecimal
   const colorDistal = hallazgos.find(h => h.superficie === 'DISTAL')?.colorHexadecimal
 
-  const tieneCaries = hallazgos.some(h => h.codigoCondicion === 'CARIES')
-
   // Filtro de estados reactivo
   const coincideConFiltro = useMemo(() => {
     if (filtroEstado === 'TODOS') return true
@@ -1198,47 +1813,22 @@ function PiezaDentalCompleta({
     return hallazgos.some(h => h.estado === filtroEstado)
   }, [hallazgos, filtroEstado])
 
-  const tieneRealizado = hallazgos.some(h => h.estado === 'REALIZADO')
-  const tienePresupuestado = hallazgos.some(h => h.estado === 'PRESUPUESTADO')
-  const tieneProgramado = hallazgos.some(h => h.estado === 'PROGRAMADO')
-
   return (
     <div
       onClick={disabled ? undefined : onClick}
-      className={`group flex flex-col items-center p-1 rounded-xl transition-all cursor-pointer select-none ${
-        seleccionada
-          ? 'ring-2 ring-brand bg-brand/5 shadow-xs'
-          : 'hover:bg-alt/40'
-      } ${disabled ? 'cursor-default' : ''} ${
-        !coincideConFiltro && filtroEstado !== 'TODOS' ? 'opacity-30 hover:opacity-100' : 'opacity-100'
-      }`}
+      className={`group flex flex-col items-center p-1 sm:p-1.5 rounded-xl transition-all cursor-pointer select-none border-2 ${seleccionada
+        ? 'border-blue-400 bg-blue-50/25 shadow-2xs'
+        : 'border-transparent hover:bg-alt/30'
+        } ${disabled ? 'cursor-default pointer-events-none' : ''} ${!coincideConFiltro && filtroEstado !== 'TODOS' ? 'opacity-30 hover:opacity-100' : 'opacity-100'
+        }`}
     >
       {/* 1. NÚMERO DE DIENTE */}
       <span
-        className={`text-[11px] font-black transition-colors ${
-          seleccionada ? 'text-brand underline' : 'text-ink group-hover:text-brand'
-        }`}
+        className={`text-[11px] font-black transition-colors ${seleccionada ? 'text-blue-600' : 'text-ink group-hover:text-blue-600'
+          }`}
       >
         {numero}
       </span>
-
-      {/* BADGE DE FASE O ÍCONO DE ALERTA RÁPIDA */}
-      <div className="h-3.5 flex items-center justify-center">
-        {tieneRealizado ? (
-          <span className="text-[10px] text-blue-600 font-black" title="Tratamiento Realizado">✓</span>
-        ) : tieneProgramado ? (
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-2xs" title="Tratamiento Programado" />
-        ) : tienePresupuestado ? (
-          <span className="w-2 h-2 rounded-full bg-purple-500 shadow-2xs" title="En Presupuesto" />
-        ) : tieneCaries ? (
-          <span className="text-[11px] text-danger font-black animate-pulse" title="Caries activa">★</span>
-        ) : hallazgos.length > 0 ? (
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: hallazgos[0].colorHexadecimal || '#3B82F6' }}
-          />
-        ) : null}
-      </div>
 
       {/* EN ARCADA SUPERIOR: PRIMERO VA LA SILUETA ANATÓMICA Y LUEGO EL CÍRCULO */}
       {esSuperior ? (
@@ -1263,6 +1853,7 @@ function PiezaDentalCompleta({
             esAusente={esAusente}
             esCorona={esCorona}
             caraSeleccionada={seleccionada ? caraSeleccionada : null}
+            onSelectCara={onSelectCara}
           />
         </>
       ) : (
@@ -1279,6 +1870,7 @@ function PiezaDentalCompleta({
             esAusente={esAusente}
             esCorona={esCorona}
             caraSeleccionada={seleccionada ? caraSeleccionada : null}
+            onSelectCara={onSelectCara}
           />
 
           <ToothAnatomySvg
@@ -1309,6 +1901,7 @@ interface CirculoCarasSvgProps {
   esAusente: boolean
   esCorona: boolean
   caraSeleccionada: SuperficieCara | null
+  onSelectCara?: (cara: SuperficieCara) => void
 }
 
 function CirculoCarasSvg({
@@ -1321,6 +1914,7 @@ function CirculoCarasSvg({
   esAusente,
   esCorona,
   caraSeleccionada,
+  onSelectCara,
 }: CirculoCarasSvgProps) {
   const COLOR_BASE = '#FFFFFF'
   const COLOR_LINEA = '#94A3B8'
@@ -1338,32 +1932,52 @@ function CirculoCarasSvg({
         <path
           d="M 50 50 L 15 15 A 50 50 0 0 1 85 15 Z"
           fill={cVestibular}
-          stroke={caraSeleccionada === 'VESTIBULAR' ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'VESTIBULAR' ? '3.5' : '1.8'}
+          stroke={caraSeleccionada === 'VESTIBULAR' ? '#2563EB' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'VESTIBULAR' ? '3' : '1.8'}
+          onClick={e => {
+            e.stopPropagation()
+            onSelectCara?.('VESTIBULAR')
+          }}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
         />
 
         {/* CARA INFERIOR (LINGUAL / PALATINA) */}
         <path
           d="M 50 50 L 85 85 A 50 50 0 0 1 15 85 Z"
           fill={cLingual}
-          stroke={caraSeleccionada === 'LINGUAL' ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'LINGUAL' ? '3.5' : '1.8'}
+          stroke={caraSeleccionada === 'LINGUAL' ? '#2563EB' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'LINGUAL' ? '3' : '1.8'}
+          onClick={e => {
+            e.stopPropagation()
+            onSelectCara?.('LINGUAL')
+          }}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
         />
 
         {/* CARA IZQUIERDA (MESIAL) */}
         <path
           d="M 50 50 L 15 85 A 50 50 0 0 1 15 15 Z"
           fill={cMesial}
-          stroke={caraSeleccionada === 'MESIAL' ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'MESIAL' ? '3.5' : '1.8'}
+          stroke={caraSeleccionada === 'MESIAL' ? '#2563EB' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'MESIAL' ? '3' : '1.8'}
+          onClick={e => {
+            e.stopPropagation()
+            onSelectCara?.('MESIAL')
+          }}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
         />
 
         {/* CARA DERECHA (DISTAL) */}
         <path
           d="M 50 50 L 85 15 A 50 50 0 0 1 85 85 Z"
           fill={cDistal}
-          stroke={caraSeleccionada === 'DISTAL' ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'DISTAL' ? '3.5' : '1.8'}
+          stroke={caraSeleccionada === 'DISTAL' ? '#2563EB' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'DISTAL' ? '3' : '1.8'}
+          onClick={e => {
+            e.stopPropagation()
+            onSelectCara?.('DISTAL')
+          }}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
         />
 
         {/* CARA CENTRAL (OCLUSAL / INCISAL) */}
@@ -1371,10 +1985,30 @@ function CirculoCarasSvg({
           cx="50"
           cy="50"
           r="19"
-          fill={cOclusal}
-          stroke={caraSeleccionada === 'OCLUSAL' ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'OCLUSAL' ? '3.5' : '1.8'}
+          fill={cOclusal !== COLOR_BASE ? `${cOclusal}22` : '#FFFFFF'}
+          stroke={caraSeleccionada === 'OCLUSAL' ? '#2563EB' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'OCLUSAL' ? '3' : '1.8'}
+          onClick={e => {
+            e.stopPropagation()
+            onSelectCara?.('OCLUSAL')
+          }}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
         />
+
+        {/* PUNTO SÓLIDO CENTRAL DE CONDICIÓN EN OCLUSAL (EJ. CARIES EN ROJO SEGÚN MOCKUP) */}
+        {colorOclusal && (
+          <circle
+            cx="50"
+            cy="50"
+            r="7"
+            fill={colorOclusal}
+            onClick={e => {
+              e.stopPropagation()
+              onSelectCara?.('OCLUSAL')
+            }}
+            className="cursor-pointer"
+          />
+        )}
 
         {/* CORONA PROTÉSICA */}
         {esCorona && (
@@ -1409,63 +2043,89 @@ interface SelectorCircularCarasProps {
   onSelectCara: (cara: SuperficieCara) => void
 }
 
-function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: SelectorCircularCarasProps) {
+export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: SelectorCircularCarasProps) {
   const COLOR_LINEA = '#64748B'
+  const esGeneral = caraSeleccionada === 'GENERAL'
 
   return (
-    <div className="w-14 h-14 relative" title="Haz clic en cualquier cara para seleccionarla">
-      <svg viewBox="0 0 100 100" className="w-full h-full cursor-pointer drop-shadow-xs">
+    <div className="w-14 h-14 relative flex items-center justify-center">
+      <svg viewBox="-5 -5 110 110" className="w-full h-full cursor-pointer drop-shadow-xs overflow-visible">
+        {/* Halo / Indicador cuando está seleccionada toda la pieza */}
+        {esGeneral && (
+          <circle
+            cx="50"
+            cy="50"
+            r="48"
+            fill="#38BDF8"
+            fillOpacity="0.2"
+            stroke="#0284C7"
+            strokeWidth="2.5"
+            strokeDasharray="4 3"
+            className="animate-pulse"
+          />
+        )}
+
         {/* VESTIBULAR (Arriba) */}
         <path
-          d="M 50 50 L 15 15 A 50 50 0 0 1 85 15 Z"
-          fill={caraSeleccionada === 'VESTIBULAR' ? '#38BDF8' : '#F1F5F9'}
-          stroke={COLOR_LINEA}
-          strokeWidth="2"
-          className="hover:opacity-80 transition-opacity"
+          d="M 50 50 L 16 16 A 48 48 0 0 1 84 16 Z"
+          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'VESTIBULAR' ? '#38BDF8' : '#F1F5F9'}
+          stroke={caraSeleccionada === 'VESTIBULAR' || esGeneral ? '#0284C7' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'VESTIBULAR' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          className="hover:opacity-80 transition-all"
           onClick={() => onSelectCara('VESTIBULAR')}
-        />
+        >
+          <title>Cara Vestibular (Arriba)</title>
+        </path>
 
         {/* LINGUAL / PALATINA (Abajo) */}
         <path
-          d="M 50 50 L 85 85 A 50 50 0 0 1 15 85 Z"
-          fill={caraSeleccionada === 'LINGUAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={COLOR_LINEA}
-          strokeWidth="2"
-          className="hover:opacity-80 transition-opacity"
+          d="M 50 50 L 84 84 A 48 48 0 0 1 16 84 Z"
+          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'LINGUAL' ? '#38BDF8' : '#F1F5F9'}
+          stroke={caraSeleccionada === 'LINGUAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'LINGUAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          className="hover:opacity-80 transition-all"
           onClick={() => onSelectCara('LINGUAL')}
-        />
+        >
+          <title>Cara Lingual / Palatina (Abajo)</title>
+        </path>
 
         {/* MESIAL (Izquierda) */}
         <path
-          d="M 50 50 L 15 85 A 50 50 0 0 1 15 15 Z"
-          fill={caraSeleccionada === 'MESIAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={COLOR_LINEA}
-          strokeWidth="2"
-          className="hover:opacity-80 transition-opacity"
+          d="M 50 50 L 16 84 A 48 48 0 0 1 16 16 Z"
+          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'MESIAL' ? '#38BDF8' : '#F1F5F9'}
+          stroke={caraSeleccionada === 'MESIAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'MESIAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          className="hover:opacity-80 transition-all"
           onClick={() => onSelectCara('MESIAL')}
-        />
+        >
+          <title>Cara Mesial (Izquierda)</title>
+        </path>
 
         {/* DISTAL (Derecha) */}
         <path
-          d="M 50 50 L 85 15 A 50 50 0 0 1 85 85 Z"
-          fill={caraSeleccionada === 'DISTAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={COLOR_LINEA}
-          strokeWidth="2"
-          className="hover:opacity-80 transition-opacity"
+          d="M 50 50 L 84 16 A 48 48 0 0 1 84 84 Z"
+          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'DISTAL' ? '#38BDF8' : '#F1F5F9'}
+          stroke={caraSeleccionada === 'DISTAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'DISTAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          className="hover:opacity-80 transition-all"
           onClick={() => onSelectCara('DISTAL')}
-        />
+        >
+          <title>Cara Distal (Derecha)</title>
+        </path>
 
         {/* OCLUSAL (Centro) */}
         <circle
           cx="50"
           cy="50"
           r="18"
-          fill={caraSeleccionada === 'OCLUSAL' ? '#0284C7' : '#FFFFFF'}
-          stroke={COLOR_LINEA}
-          strokeWidth="2"
-          className="hover:opacity-80 transition-opacity"
+          fill={esGeneral ? '#0284C7' : caraSeleccionada === 'OCLUSAL' ? '#0284C7' : '#FFFFFF'}
+          stroke={caraSeleccionada === 'OCLUSAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
+          strokeWidth={caraSeleccionada === 'OCLUSAL' ? '2.5' : esGeneral ? '2' : '1.8'}
+          className="hover:opacity-80 transition-all"
           onClick={() => onSelectCara('OCLUSAL')}
-        />
+        >
+          <title>Cara Oclusal (Centro)</title>
+        </circle>
       </svg>
     </div>
   )

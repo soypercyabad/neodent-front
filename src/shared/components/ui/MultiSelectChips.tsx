@@ -92,7 +92,7 @@ export function MultiSelectChips({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.15 }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-soft/90 border border-brand/25 px-2.5 py-1 text-xs font-semibold text-brand shadow-2xs"
             >
               <span>{options.find(option => option.value === item)?.label ?? item}</span>
               <button
@@ -133,7 +133,7 @@ export function MultiSelectChips({
             transition={{ duration: 0.17, ease: 'easeOut' }}
             style={{ maxHeight }}
             className={cn(
-              'absolute left-0 right-0 z-50 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-xl',
+              'absolute left-0 right-0 z-50 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 space-y-1 shadow-xl',
               openAbove ? 'bottom-full mb-2' : 'top-full mt-2',
             )}
           >
@@ -149,11 +149,11 @@ export function MultiSelectChips({
                     toggle(option.value)
                   }}
                   className={cn(
-                    'flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-150',
+                    'flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all duration-150',
                     'focus-visible:outline-none focus-visible:bg-brand-soft',
                     selected
-                      ? 'bg-brand-soft font-semibold text-brand'
-                      : 'text-ink hover:bg-alt',
+                      ? 'bg-brand-soft/90 font-semibold text-brand border border-brand/20 shadow-2xs'
+                      : 'text-ink hover:bg-alt border border-transparent',
                   )}
                 >
                   <span>{option.label}</span>
