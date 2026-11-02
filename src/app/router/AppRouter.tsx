@@ -28,7 +28,6 @@ import { AdminTermsPage } from '@/features/legal'
 import { ConfiguracionRecordatoriosPage } from '@/features/notificaciones/pages/ConfiguracionRecordatoriosPage'
 
 const ADMIN_ROLES: readonly Role[] = ['Administrador']
-const ADMIN_RECEPTION_ROLES: readonly Role[] = ['Administrador', 'Recepcionista']
 
 export function AppRouter() {
   const { user } = useAuth()
@@ -95,7 +94,7 @@ export function AppRouter() {
           </Route>
 
           {/* Horarios / Turnos */}
-          <Route element={<RequireAuth module="HORARIOS" roles={ADMIN_RECEPTION_ROLES} />}>
+          <Route element={<RequireAuth module="HORARIOS" roles={STAFF_ROLES} />}>
             <Route path="/horarios" element={<SchedulesPage />} />
             {rutaHorarios !== '/horarios' && <Route path={rutaHorarios} element={<SchedulesPage />} />}
             <Route path="/horarios/cronogramas" element={<ScheduleHistoryPage />} />

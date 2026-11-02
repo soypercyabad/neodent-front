@@ -55,7 +55,11 @@ const nombreCompleto = (item: HorarioOdontologoCatalogo) =>
   [item.nombres, item.apellidoPaterno, item.apellidoMaterno].filter(Boolean).join(' ')
 
 export function ScheduleHistoryPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
+  const esAdmin = user?.rol === 'Administrador' || user?.rolesRaw?.includes('ADMIN')
+  const esRecepcionista = user?.rol === 'Recepcionista' || user?.rolesRaw?.includes('RECEPCIONISTA')
+  const esOdontologo = !esAdmin && !esRecepcionista && (user?.rol === 'Odontólogo' || user?.rolesRaw?.includes('ODONTOLOGO'))
+  const puedeEditar = esAdmin
 
   const [catalogo, setCatalogo] = useState<HorarioOdontologoCatalogo[]>([])
   const [sedes, setSedes] = useState<BookingBranch[]>([])
@@ -126,7 +130,26 @@ export function ScheduleHistoryPage() {
     ])
       .then(([catalogoData, sedesData]) => {
         if (!activo) return
-        setCatalogo(catalogoData)
+        let catalogoFinal = catalogoData
+        if (esOdontologo) {
+          const miDoc = catalogoData.find(item =>
+            (item.usuarioId && user?.id && String(item.usuarioId) === String(user.id)) ||
+            (item.correo && user?.correo && item.correo.toLowerCase() === user.correo.toLowerCase()) ||
+            (user?.nombre && user?.apellido &&
+              (item.nombres.toLowerCase().includes(user.nombre.toLowerCase()) ||
+                user.nombre.toLowerCase().includes(item.nombres.toLowerCase())) &&
+              (item.apellidoPaterno.toLowerCase().includes(user.apellido.toLowerCase()) ||
+                user.apellido.toLowerCase().includes(item.apellidoPaterno.toLowerCase()))),
+          )
+          if (miDoc) {
+            catalogoFinal = catalogoData.filter(d => d.odontologoId === miDoc.odontologoId)
+            setFiltroOdontologoId(String(miDoc.odontologoId))
+          } else {
+            catalogoFinal = []
+          }
+        }
+
+        setCatalogo(catalogoFinal)
         setSedes(sedesData)
       })
       .catch(e => {
@@ -909,9 +932,11 @@ export function ScheduleHistoryPage() {
               </p>
             </div>
 
-            <Button icon="plus" onClick={abrirNuevo}>
-              Nuevo horario
-            </Button>
+            {puedeEditar && (
+              <Button icon="plus" onClick={abrirNuevo}>
+                Nuevo horario
+              </Button>
+            )}
           </div>
 
           {/* SELECTOR DE ESTADO (PILLS) */}
@@ -948,16 +973,28 @@ export function ScheduleHistoryPage() {
           <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <AnimatedSelect
               value={filtroOdontologoId}
-              options={[{ value: '', label: 'Todos los odontólogos' }, ...listaOdontologos.map(item => ({
-                value: String(item.odontologoId),
-                label: `Dr(a). ${nombreCompleto(item)}`,
-              }))]}
+              options={
+                esOdontologo
+                  ? listaOdontologos.map(item => ({
+                      value: String(item.odontologoId),
+                      label: `Dr(a). ${nombreCompleto(item)}`,
+                    }))
+                  : [
+                      { value: '', label: 'Todos los odontólogos' },
+                      ...listaOdontologos.map(item => ({
+                        value: String(item.odontologoId),
+                        label: `Dr(a). ${nombreCompleto(item)}`,
+                      })),
+                    ]
+              }
               onChange={value => {
+                if (esOdontologo) return
                 setFiltroOdontologoId(value)
                 setFiltroEspecialidadId('')
                 setPagina(1)
               }}
-              label="Odontólogo"
+              label={esOdontologo ? 'Odontólogo (Mi agenda)' : 'Odontólogo'}
+              disabled={esOdontologo}
             />
 
             <AnimatedSelect
@@ -1072,7 +1109,7 @@ export function ScheduleHistoryPage() {
                       )
                     })}
                     <th className="px-4 py-3.5">Estado</th>
-                    <th className="py-3.5 pl-4 pr-5 text-right">Acciones</th>
+                    {puedeEditar && <th className="py-3.5 pl-4 pr-5 text-right">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/70">
@@ -1197,23 +1234,25 @@ export function ScheduleHistoryPage() {
                         </td>
 
                         {/* ACCIONES */}
-                        <ActionsCell align="right" className="py-3.5 pl-4 pr-5">
-                          <RowActions
-                            actions={[
-                              {
-                                label: 'Editar horario',
-                                icon: 'edit',
-                                onClick: () => abrirEditar(horario),
-                              },
-                              {
-                                label: 'Eliminar horario',
-                                icon: 'trash',
-                                onClick: () => setConfirmar(horario),
-                                variant: 'danger',
-                              },
-                            ]}
-                          />
-                        </ActionsCell>
+                        {puedeEditar && (
+                          <ActionsCell align="right" className="py-3.5 pl-4 pr-5">
+                            <RowActions
+                              actions={[
+                                {
+                                  label: 'Editar horario',
+                                  icon: 'edit',
+                                  onClick: () => abrirEditar(horario),
+                                },
+                                {
+                                  label: 'Eliminar horario',
+                                  icon: 'trash',
+                                  onClick: () => setConfirmar(horario),
+                                  variant: 'danger',
+                                },
+                              ]}
+                            />
+                          </ActionsCell>
+                        )}
                       </tr>
                     )
                   })}

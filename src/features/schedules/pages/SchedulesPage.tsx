@@ -131,7 +131,11 @@ const VACIO: Formulario = {
 
 export function SchedulesPage() {
   const navigate = useNavigate()
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
+  const esAdmin = user?.rol === 'Administrador' || user?.rolesRaw?.includes('ADMIN')
+  const esRecepcionista = user?.rol === 'Recepcionista' || user?.rolesRaw?.includes('RECEPCIONISTA')
+  const esOdontologo = !esAdmin && !esRecepcionista && (user?.rol === 'Odontólogo' || user?.rolesRaw?.includes('ODONTOLOGO'))
+  const puedeEditar = esAdmin
 
   const [catalogo, setCatalogo] = useState<HorarioOdontologoCatalogo[]>([])
   const [sedes, setSedes] = useState<BookingBranch[]>([])
@@ -186,17 +190,30 @@ export function SchedulesPage() {
       .then(([catalogoData, sedesData, bloqueosData]) => {
         if (!activo) return
 
-        setCatalogo(catalogoData)
+        // Si el usuario es Odontólogo, restringir el catálogo EXCLUSIVAMENTE a su propia ficha
+        const catalogoFinal = esOdontologo
+          ? catalogoData.filter(d =>
+              (d.usuarioId && user?.id && String(d.usuarioId) === String(user.id)) ||
+              (d.correo && user?.correo && d.correo.toLowerCase() === user.correo.toLowerCase()) ||
+              (user?.nombre &&
+                user?.apellido &&
+                (d.nombres.toLowerCase().includes(user.nombre.toLowerCase()) ||
+                  user.nombre.toLowerCase().includes(d.nombres.toLowerCase())) &&
+                (d.apellidoPaterno.toLowerCase().includes(user.apellido.toLowerCase()) ||
+                  user.apellido.toLowerCase().includes(d.apellidoPaterno.toLowerCase()))),
+            )
+          : catalogoData
+
+        setCatalogo(catalogoFinal)
         setSedes(sedesData)
         setBloqueos(bloqueosData)
 
-        setFiltroOdontologoId(actual =>
-          actual && catalogoData.some(item => String(item.odontologoId) === actual)
-            ? actual
-            : catalogoData[0]
-              ? String(catalogoData[0].odontologoId)
-              : '',
-        )
+        setFiltroOdontologoId(actual => {
+          if (actual && catalogoFinal.some(item => String(item.odontologoId) === actual)) {
+            return actual
+          }
+          return catalogoFinal[0] ? String(catalogoFinal[0].odontologoId) : ''
+        })
       })
       .catch(e => {
         if (activo) {
@@ -876,8 +893,9 @@ export function SchedulesPage() {
                   setFiltroOdontologoId(value)
                   setFiltroEspecialidadId('')
                 }}
-                label="Odontólogo"
+                label={esOdontologo ? 'Odontólogo (Mi agenda)' : 'Odontólogo'}
                 placeholder="Selecciona un odontólogo"
+                disabled={esOdontologo}
               />
 
               <AnimatedSelect
@@ -1006,13 +1024,15 @@ export function SchedulesPage() {
                 </p>
               </div>
 
-              <Button
-                icon="plus"
-                onClick={() => abrirNuevo(diaSemanaIso(fechaSeleccionada), fechaSeleccionada)}
-                disabled={!filtroOdontologoId}
-              >
-                Nuevo horario
-              </Button>
+              {puedeEditar && (
+                <Button
+                  icon="plus"
+                  onClick={() => abrirNuevo(diaSemanaIso(fechaSeleccionada), fechaSeleccionada)}
+                  disabled={!filtroOdontologoId}
+                >
+                  Nuevo horario
+                </Button>
+              )}
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -1260,26 +1280,30 @@ export function SchedulesPage() {
 
                             <div className="flex items-center gap-1 shrink-0">
                               {bloqueoTotalFechaSeleccionada && <Badge tone="amber">Bloqueado</Badge>}
-                              <Tooltip content="Editar turno">
-                                <button
-                                  type="button"
-                                  aria-label="Editar turno"
-                                  onClick={() => abrirEditar(horario)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
-                                >
-                                  <Icon name="edit" size={15} />
-                                </button>
-                              </Tooltip>
-                              <Tooltip content="Eliminar turno">
-                                <button
-                                  type="button"
-                                  aria-label="Eliminar turno"
-                                  onClick={() => setConfirmar(horario)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
-                                >
-                                  <Icon name="trash" size={15} />
-                                </button>
-                              </Tooltip>
+                              {puedeEditar && (
+                                <>
+                                  <Tooltip content="Editar turno">
+                                    <button
+                                      type="button"
+                                      aria-label="Editar turno"
+                                      onClick={() => abrirEditar(horario)}
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand"
+                                    >
+                                      <Icon name="edit" size={15} />
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip content="Eliminar turno">
+                                    <button
+                                      type="button"
+                                      aria-label="Eliminar turno"
+                                      onClick={() => setConfirmar(horario)}
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
+                                    >
+                                      <Icon name="trash" size={15} />
+                                    </button>
+                                  </Tooltip>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

@@ -25,6 +25,8 @@ export interface HorarioOdontologoInput {
 export interface HorarioOdontologoCatalogo {
   odontologoEspecialidadId: number
   odontologoId: number
+  usuarioId?: number | null
+  correo?: string | null
   nombres: string
   apellidoPaterno: string
   apellidoMaterno: string | null

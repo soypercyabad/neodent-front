@@ -86,7 +86,12 @@ const tonoTipo = (codigo: string): 'blue' | 'amber' | 'green' | 'red' | 'gray' =
 }
 
 export function ScheduleBlocksPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
+  const esAdmin = user?.rol === 'Administrador' || user?.rolesRaw?.includes('ADMIN')
+  const esRecepcionista = user?.rol === 'Recepcionista' || user?.rolesRaw?.includes('RECEPCIONISTA')
+  const esOdontologo = !esAdmin && !esRecepcionista && (user?.rol === 'Odontólogo' || user?.rolesRaw?.includes('ODONTOLOGO'))
+  const puedeEditar = esAdmin
+
   const [tipos, setTipos] = useState<BlockType[]>([])
   const [catalogo, setCatalogo] = useState<HorarioOdontologoCatalogo[]>([])
   const [sedes, setSedes] = useState<BookingBranch[]>([])
@@ -129,7 +134,26 @@ export function ScheduleBlocksPage() {
       .then(([tiposData, catalogoData, sedesData, bloqueosData]) => {
         if (!activo) return
         setTipos(tiposData)
-        setCatalogo(catalogoData)
+        let catalogoFinal = catalogoData
+        if (esOdontologo) {
+          const miDoc = catalogoData.find(item =>
+            (item.usuarioId && user?.id && String(item.usuarioId) === String(user.id)) ||
+            (item.correo && user?.correo && item.correo.toLowerCase() === user.correo.toLowerCase()) ||
+            (user?.nombre && user?.apellido &&
+              (item.nombres.toLowerCase().includes(user.nombre.toLowerCase()) ||
+                user.nombre.toLowerCase().includes(item.nombres.toLowerCase())) &&
+              (item.apellidoPaterno.toLowerCase().includes(user.apellido.toLowerCase()) ||
+                user.apellido.toLowerCase().includes(item.apellidoPaterno.toLowerCase()))),
+          )
+          if (miDoc) {
+            catalogoFinal = catalogoData.filter(d => d.odontologoId === miDoc.odontologoId)
+            setFiltroOdontologo(String(miDoc.odontologoId))
+          } else {
+            catalogoFinal = []
+          }
+        }
+
+        setCatalogo(catalogoFinal)
         setSedes(sedesData)
         setBloqueos(bloqueosData)
       })
@@ -170,7 +194,11 @@ export function ScheduleBlocksPage() {
     let todos = 0
 
     const filtrados = bloqueos.filter(bloqueo => {
-      if (
+      if (esOdontologo) {
+        if (bloqueo.odontologoId !== null && String(bloqueo.odontologoId) !== String(filtroOdontologo)) {
+          return false
+        }
+      } else if (
         filtroOdontologo &&
         bloqueo.odontologoId !== null &&
         bloqueo.odontologoId !== Number(filtroOdontologo)
@@ -373,9 +401,11 @@ export function ScheduleBlocksPage() {
         title="Agenda de odontólogos"
         description="Administra jornadas habituales, ausencias, feriados y excepciones de agenda."
         actions={
-          <Button icon="plus" onClick={abrirNuevo} disabled={loading || tipos.length === 0}>
-            Registrar bloqueo
-          </Button>
+          puedeEditar ? (
+            <Button icon="plus" onClick={abrirNuevo} disabled={loading || tipos.length === 0}>
+              Registrar bloqueo
+            </Button>
+          ) : undefined
         }
       />
 
@@ -647,12 +677,18 @@ export function ScheduleBlocksPage() {
             <div className="grid w-full gap-2.5 sm:grid-cols-2 lg:w-auto lg:grid-cols-[minmax(16rem,20rem)_12rem]">
               <AnimatedSelect
                 value={filtroOdontologo}
-                options={[{ value: '', label: 'Todos los odontólogos' }, ...opcionesOdontologos]}
+                options={
+                  esOdontologo
+                    ? opcionesOdontologos
+                    : [{ value: '', label: 'Todos los odontólogos' }, ...opcionesOdontologos]
+                }
                 onChange={value => {
+                  if (esOdontologo) return
                   setFiltroOdontologo(value)
                   setPagina(1)
                 }}
-                label="Filtrar por odontólogo"
+                label={esOdontologo ? 'Odontólogo (Mi agenda)' : 'Filtrar por odontólogo'}
+                disabled={esOdontologo}
               />
 
               <AnimatedSelect
@@ -776,30 +812,32 @@ export function ScheduleBlocksPage() {
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Tooltip content="Editar bloqueo">
-                          <button
-                            type="button"
-                            aria-label="Editar bloqueo"
-                            onClick={() => abrirEditar(bloqueo)}
-                            disabled={guardando || procesando}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand disabled:opacity-50"
-                          >
-                            <Icon name="edit" size={15} />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Eliminar bloqueo">
-                          <button
-                            type="button"
-                            aria-label="Eliminar bloqueo"
-                            onClick={() => setEliminar(bloqueo)}
-                            disabled={guardando || procesando}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
-                          >
-                            <Icon name="trash" size={15} />
-                          </button>
-                        </Tooltip>
-                      </div>
+                      {puedeEditar && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Tooltip content="Editar bloqueo">
+                            <button
+                              type="button"
+                              aria-label="Editar bloqueo"
+                              onClick={() => abrirEditar(bloqueo)}
+                              disabled={guardando || procesando}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-brand/40 hover:bg-alt hover:text-brand disabled:opacity-50"
+                            >
+                              <Icon name="edit" size={15} />
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Eliminar bloqueo">
+                            <button
+                              type="button"
+                              aria-label="Eliminar bloqueo"
+                              onClick={() => setEliminar(bloqueo)}
+                              disabled={guardando || procesando}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger/40 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                            >
+                              <Icon name="trash" size={15} />
+                            </button>
+                          </Tooltip>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 grid gap-2 text-sm text-muted sm:grid-cols-2">
