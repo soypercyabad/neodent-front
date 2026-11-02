@@ -61,6 +61,22 @@ export function parsearCamposClinicos(historia?: HistoriaClinicaResponse | null)
 
   if (!historia) return defecto
 
+  const limpiarObservaciones = (raw?: string | null): string => {
+    if (!raw) return ''
+    const trimmed = raw.trim()
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (parsed && typeof parsed === 'object') {
+          return (parsed.observacionesClinicas || '').trim()
+        }
+      } catch {
+        // no es JSON válido
+      }
+    }
+    return trimmed
+  }
+
   // Priorizar campos estructurados nativos devueltos por el backend
   if (
     historia.motivoConsulta ||
@@ -82,7 +98,7 @@ export function parsearCamposClinicos(historia?: HistoriaClinicaResponse | null)
       alergiasTexto: historia.alergias || '',
       examenExtraoral: historia.examenExtraoral || '',
       examenIntraoral: historia.examenIntraoral || '',
-      observacionesClinicas: historia.observacionesGenerales || '',
+      observacionesClinicas: limpiarObservaciones(historia.observacionesGenerales),
       diagnostico: historia.diagnostico || '',
       planTratamiento: historia.planTratamiento || '',
     }
@@ -125,7 +141,7 @@ export function parsearCamposClinicos(historia?: HistoriaClinicaResponse | null)
     ...defecto,
     alergiasTexto: historia.alergias || '',
     antecedentesMedicos: historia.antecedentes || '',
-    observacionesClinicas: historia.observacionesGenerales || '',
+    observacionesClinicas: limpiarObservaciones(historia.observacionesGenerales),
   }
 }
 

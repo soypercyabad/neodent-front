@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { cn } from '@/shared/lib/cn'
 import {
   ActionsCell,
   Badge,
@@ -1175,7 +1177,7 @@ export function OdontogramView({
               ) : (
                 <Icon name="check" size={16} />
               )}
-              <span>Guardar condición</span>
+              <span>{condicionSeleccionadaObj?.codigo === 'SANO' ? 'Marcar como sana' : 'Guardar condición'}</span>
             </Button>
 
             <Button
@@ -2044,14 +2046,61 @@ interface SelectorCircularCarasProps {
   onSelectCara: (cara: SuperficieCara) => void
 }
 
+interface TooltipInfo {
+  text: string
+  x: number
+  y: number
+  side: 'top' | 'bottom'
+}
+
 export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: SelectorCircularCarasProps) {
   const COLOR_LINEA = '#64748B'
   const esGeneral = caraSeleccionada === 'GENERAL'
 
+  const [hoveredCara, setHoveredCara] = useState<SuperficieCara | null>(null)
+  const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
+
+  const showTooltip = (e: React.MouseEvent<SVGElement>, cara: SuperficieCara, text: string, side: 'top' | 'bottom') => {
+    setHoveredCara(cara)
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltip({
+      text,
+      side,
+      x: rect.left + rect.width / 2,
+      y: side === 'top' ? rect.top - 8 : rect.bottom + 8,
+    })
+  }
+
+  const hideTooltip = () => {
+    setHoveredCara(null)
+    setTooltip(null)
+  }
+
+  const getFill = (cara: SuperficieCara) => {
+    if (esGeneral) return '#BAE6FD'
+    if (caraSeleccionada === cara) return cara === 'OCLUSAL' ? '#0284C7' : '#38BDF8'
+    if (hoveredCara === cara) return '#BAE6FD'
+    return cara === 'OCLUSAL' ? '#FFFFFF' : '#F1F5F9'
+  }
+
+  const getStroke = (cara: SuperficieCara) => {
+    if (esGeneral || caraSeleccionada === cara || hoveredCara === cara) return '#0284C7'
+    return COLOR_LINEA
+  }
+
+  const getStrokeWidth = (cara: SuperficieCara) => {
+    if (caraSeleccionada === cara) return '2.5'
+    if (esGeneral) return '1.5'
+    if (hoveredCara === cara) return '2.2'
+    return '1.8'
+  }
+
   return (
     <div className="w-14 h-14 relative flex items-center justify-center">
-      {/* SVG VISUAL DE LAS CARAS (SIN TAGS <title> NATIVOS) */}
-      <svg viewBox="-5 -5 110 110" className="w-full h-full drop-shadow-xs overflow-visible pointer-events-none">
+      <svg
+        viewBox="-5 -5 110 110"
+        className="w-full h-full drop-shadow-xs overflow-visible"
+      >
         {/* Halo / Indicador cuando está seleccionada toda la pieza */}
         {esGeneral && (
           <circle
@@ -2063,40 +2112,56 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
             stroke="#0284C7"
             strokeWidth="2.5"
             strokeDasharray="4 3"
-            className="animate-pulse"
+            className="animate-pulse pointer-events-none"
           />
         )}
 
         {/* VESTIBULAR (Arriba) */}
         <path
           d="M 50 50 L 16 16 A 48 48 0 0 1 84 16 Z"
-          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'VESTIBULAR' ? '#38BDF8' : '#F1F5F9'}
-          stroke={caraSeleccionada === 'VESTIBULAR' || esGeneral ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'VESTIBULAR' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          fill={getFill('VESTIBULAR')}
+          stroke={getStroke('VESTIBULAR')}
+          strokeWidth={getStrokeWidth('VESTIBULAR')}
+          className="cursor-pointer transition-colors"
+          onClick={() => onSelectCara('VESTIBULAR')}
+          onMouseEnter={e => showTooltip(e, 'VESTIBULAR', 'Cara Vestibular (Arriba)', 'top')}
+          onMouseLeave={hideTooltip}
         />
 
         {/* LINGUAL / PALATINA (Abajo) */}
         <path
           d="M 50 50 L 84 84 A 48 48 0 0 1 16 84 Z"
-          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'LINGUAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={caraSeleccionada === 'LINGUAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'LINGUAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          fill={getFill('LINGUAL')}
+          stroke={getStroke('LINGUAL')}
+          strokeWidth={getStrokeWidth('LINGUAL')}
+          className="cursor-pointer transition-colors"
+          onClick={() => onSelectCara('LINGUAL')}
+          onMouseEnter={e => showTooltip(e, 'LINGUAL', 'Cara Lingual / Palatina (Abajo)', 'bottom')}
+          onMouseLeave={hideTooltip}
         />
 
         {/* MESIAL (Izquierda) */}
         <path
           d="M 50 50 L 16 84 A 48 48 0 0 1 16 16 Z"
-          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'MESIAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={caraSeleccionada === 'MESIAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'MESIAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          fill={getFill('MESIAL')}
+          stroke={getStroke('MESIAL')}
+          strokeWidth={getStrokeWidth('MESIAL')}
+          className="cursor-pointer transition-colors"
+          onClick={() => onSelectCara('MESIAL')}
+          onMouseEnter={e => showTooltip(e, 'MESIAL', 'Cara Mesial (Izquierda)', 'top')}
+          onMouseLeave={hideTooltip}
         />
 
         {/* DISTAL (Derecha) */}
         <path
           d="M 50 50 L 84 16 A 48 48 0 0 1 84 84 Z"
-          fill={esGeneral ? '#BAE6FD' : caraSeleccionada === 'DISTAL' ? '#38BDF8' : '#F1F5F9'}
-          stroke={caraSeleccionada === 'DISTAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'DISTAL' ? '2.5' : esGeneral ? '1.5' : '1.8'}
+          fill={getFill('DISTAL')}
+          stroke={getStroke('DISTAL')}
+          strokeWidth={getStrokeWidth('DISTAL')}
+          className="cursor-pointer transition-colors"
+          onClick={() => onSelectCara('DISTAL')}
+          onMouseEnter={e => showTooltip(e, 'DISTAL', 'Cara Distal (Derecha)', 'top')}
+          onMouseLeave={hideTooltip}
         />
 
         {/* OCLUSAL (Centro) */}
@@ -2104,66 +2169,45 @@ export function SelectorCircularCaras({ caraSeleccionada, onSelectCara }: Select
           cx="50"
           cy="50"
           r="18"
-          fill={esGeneral ? '#0284C7' : caraSeleccionada === 'OCLUSAL' ? '#0284C7' : '#FFFFFF'}
-          stroke={caraSeleccionada === 'OCLUSAL' || esGeneral ? '#0284C7' : COLOR_LINEA}
-          strokeWidth={caraSeleccionada === 'OCLUSAL' ? '2.5' : esGeneral ? '2' : '1.8'}
+          fill={getFill('OCLUSAL')}
+          stroke={getStroke('OCLUSAL')}
+          strokeWidth={getStrokeWidth('OCLUSAL')}
+          className="cursor-pointer transition-colors"
+          onClick={() => onSelectCara('OCLUSAL')}
+          onMouseEnter={e => showTooltip(e, 'OCLUSAL', 'Cara Oclusal (Centro)', 'top')}
+          onMouseLeave={hideTooltip}
         />
       </svg>
 
-      {/* OVERLAY DE INTERACCIÓN CON TOOLTIPS MODERNOS DEL SISTEMA (SIN TITLES NATIVOS) */}
-      <div className="absolute inset-0 z-10">
-        {/* VESTIBULAR (Arriba) */}
-        <Tooltip content="Cara Vestibular (Arriba)" side="top" className="absolute top-0 inset-x-2 h-4.5">
-          <button
-            type="button"
-            aria-label="Cara Vestibular (Arriba)"
-            onClick={() => onSelectCara('VESTIBULAR')}
-            className="w-full h-full cursor-pointer rounded-t-full hover:bg-sky-400/20 transition-colors focus:outline-none"
-          />
-        </Tooltip>
-
-        {/* LINGUAL / PALATINA (Abajo) */}
-        <Tooltip content="Cara Lingual / Palatina (Abajo)" side="bottom" className="absolute bottom-0 inset-x-2 h-4.5">
-          <button
-            type="button"
-            aria-label="Cara Lingual o Palatina (Abajo)"
-            onClick={() => onSelectCara('LINGUAL')}
-            className="w-full h-full cursor-pointer rounded-b-full hover:bg-sky-400/20 transition-colors focus:outline-none"
-          />
-        </Tooltip>
-
-        {/* MESIAL (Izquierda) */}
-        <Tooltip content="Cara Mesial (Izquierda)" side="left" className="absolute left-0 inset-y-2 w-4.5">
-          <button
-            type="button"
-            aria-label="Cara Mesial (Izquierda)"
-            onClick={() => onSelectCara('MESIAL')}
-            className="w-full h-full cursor-pointer rounded-l-full hover:bg-sky-400/20 transition-colors focus:outline-none"
-          />
-        </Tooltip>
-
-        {/* DISTAL (Derecha) */}
-        <Tooltip content="Cara Distal (Derecha)" side="right" className="absolute right-0 inset-y-2 w-4.5">
-          <button
-            type="button"
-            aria-label="Cara Distal (Derecha)"
-            onClick={() => onSelectCara('DISTAL')}
-            className="w-full h-full cursor-pointer rounded-r-full hover:bg-sky-400/20 transition-colors focus:outline-none"
-          />
-        </Tooltip>
-
-        {/* OCLUSAL (Centro) */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Tooltip content="Cara Oclusal (Centro)" side="top">
-            <button
-              type="button"
-              aria-label="Cara Oclusal (Centro)"
-              onClick={() => onSelectCara('OCLUSAL')}
-              className="w-5 h-5 rounded-full pointer-events-auto cursor-pointer hover:ring-2 hover:ring-sky-400/50 transition-all focus:outline-none"
-            />
-          </Tooltip>
-        </div>
-      </div>
+      {/* Tooltip estilizado del Design System renderizado en Portal sin recuadros HTML que deformen la figura */}
+      {typeof document !== 'undefined' &&
+        tooltip &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: tooltip.y,
+              left: tooltip.x,
+              transform: tooltip.side === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+              zIndex: 99999,
+              pointerEvents: 'none',
+            }}
+          >
+            <div className="relative max-w-xs break-words rounded-md border border-slate-700/60 bg-slate-900/95 px-2.5 py-1 text-center text-xs font-medium leading-relaxed text-slate-100 shadow-xl backdrop-blur-xs whitespace-nowrap animate-in fade-in zoom-in-95 duration-100">
+              {tooltip.text}
+              <div
+                style={{ left: '50%', transform: 'translateX(-50%)' }}
+                className={cn(
+                  'absolute border-4',
+                  tooltip.side === 'top'
+                    ? 'top-full border-t-slate-900/95 border-x-transparent border-b-transparent'
+                    : 'bottom-full border-b-slate-900/95 border-x-transparent border-t-transparent',
+                )}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

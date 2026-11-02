@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
@@ -572,13 +572,17 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
         examenIntraoral: camposForm.examenIntraoral,
         diagnostico: camposForm.diagnostico,
         planTratamiento: camposForm.planTratamiento,
-        observacionesGenerales: camposForm.observacionesClinicas || JSON.stringify(camposForm),
+        observacionesGenerales: (camposForm.observacionesClinicas || '').trim(),
       }
       let actualizada: HistoriaClinicaResponse
-      if (!historia) {
-        actualizada = await clinicalApi.crearHistoria(accessToken, pacienteId, payload)
-      } else {
+      if (historia) {
         actualizada = await clinicalApi.actualizarHistoria(accessToken, pacienteId, payload)
+      } else {
+        try {
+          actualizada = await clinicalApi.actualizarHistoria(accessToken, pacienteId, payload)
+        } catch {
+          actualizada = await clinicalApi.crearHistoria(accessToken, pacienteId, payload)
+        }
       }
       setHistoria(actualizada)
       setModalEditarHistoriaAbierto(false)
@@ -740,12 +744,25 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
   const [docSeleccionadoViewer, setDocSeleccionadoViewer] = useState<DocumentoClinico | null>(null)
   const [modalSubirDocAbierto, setModalSubirDocAbierto] = useState(false)
   const [tipoDocSubida, setTipoDocSubida] = useState<DocumentoClinico['tipoDocumento']>('RADIOGRAFIA_PANORAMICA')
+  const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null)
+  const [archivoPreviewUrl, setArchivoPreviewUrl] = useState<string | null>(null)
+  const [isDraggingArchivo, setIsDraggingArchivo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewerZoom, setViewerZoom] = useState(1)
   const [viewerRotacion, setViewerRotacion] = useState(0)
   const [viewerInvertido, setViewerInvertido] = useState(false)
 
-  // Documentos y radiografías clínicos reales del paciente (inicialmente vacíos hasta subida real)
-  const [documentos, setDocumentos] = useState<DocumentoClinico[]>([])
+  // Documentos y radiografías clínicos reales del paciente (con persistencia local por paciente)
+  const [documentos, setDocumentos] = useState<DocumentoClinico[]>(() => {
+    if (!pacienteId) return []
+    try {
+      const guardados = localStorage.getItem(`neodent_docs_paciente_${pacienteId}`)
+      if (guardados) return JSON.parse(guardados)
+    } catch {
+      // ignore
+    }
+    return []
+  })
 
   // Recetas emitidas y modal de visualización (inicialmente vacíos hasta emisión real)
   const [modalRecetaAbierto, setModalRecetaAbierto] = useState(false)
@@ -890,6 +907,17 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
         if (hist) {
           setHistoria(hist)
         }
+
+        try {
+          const guardados = localStorage.getItem(`neodent_docs_paciente_${pacienteId}`)
+          if (guardados) {
+            setDocumentos(JSON.parse(guardados))
+          } else {
+            setDocumentos([])
+          }
+        } catch {
+          setDocumentos([])
+        }
       })
       .catch(e => {
         if (!activo) return
@@ -930,9 +958,12 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
         estado,
       })
       setOdontograma(resp)
+      const esSano = condObj?.codigo === 'SANO' || codigoCondicion === 'SANO'
       setAviso({
         tipo: 'success',
-        texto: `Pieza dental #${pieza} actualizada (${estado ? estado.toLowerCase() : 'guardada'}).`,
+        texto: esSano
+          ? `Pieza dental #${pieza} marcada como sana (se limpiaron los hallazgos patológicos).`
+          : `Pieza dental #${pieza} actualizada (${estado ? estado.toLowerCase() : 'guardada'}).`,
       })
     } catch (e) {
       setAviso({
@@ -1047,23 +1078,89 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
     }
   }
 
-  // Subir documento a Cloudflare R2
+  const handleSeleccionarArchivo = (file: File) => {
+    const MAX_MB = 15
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setAviso({
+        tipo: 'error',
+        texto: `El archivo supera el tamaño máximo permitido (${MAX_MB} MB). Selecciona un archivo más liviano.`,
+      })
+      return
+    }
+
+    setArchivoSeleccionado(file)
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = e => {
+        setArchivoPreviewUrl(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    } else {
+      setArchivoPreviewUrl(null)
+    }
+  }
+
+  const handleLimpiarArchivo = () => {
+    setArchivoSeleccionado(null)
+    setArchivoPreviewUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // Subir documento al expediente clínico del paciente
   const handleSubirDoc = () => {
+    if (!archivoSeleccionado) {
+      setAviso({ tipo: 'error', texto: 'Por favor, selecciona o arrastra una imagen o documento para subir.' })
+      return
+    }
+
     const nuevoDoc: DocumentoClinico = {
       id: Date.now(),
       pacienteId: pacienteId || 1,
-      claveAlmacenamiento: `radiografias/${Date.now()}.jpg`,
-      nombreOriginal: 'Radiografía Digital Registrada.jpg',
-      tipoMime: 'image/jpeg',
+      claveAlmacenamiento: `radiografias/${Date.now()}_${archivoSeleccionado.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+      nombreOriginal: archivoSeleccionado.name,
+      tipoMime: archivoSeleccionado.type || 'image/jpeg',
       tipoDocumento: tipoDocSubida,
-      tamanoBytes: 2500000,
+      tamanoBytes: archivoSeleccionado.size,
       visiblePaciente: true,
       fechaCreacion: new Date().toISOString(),
-      urlVisualizacion: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=1200&q=80',
+      urlVisualizacion: archivoPreviewUrl || '',
     }
-    setDocumentos(prev => [nuevoDoc, ...prev])
+
+    setDocumentos(prev => {
+      const actualizados = [nuevoDoc, ...prev]
+      try {
+        if (pacienteId) {
+          localStorage.setItem(`neodent_docs_paciente_${pacienteId}`, JSON.stringify(actualizados))
+        }
+      } catch {
+        // Excedido límite local en caso de imágenes muy pesadas
+      }
+      return actualizados
+    })
+
+    const nombreSubido = archivoSeleccionado.name
+    handleLimpiarArchivo()
     setModalSubirDocAbierto(false)
-    setAviso({ tipo: 'success', texto: 'Archivo cargado en Cloudflare R2 con éxito.' })
+    setAviso({ tipo: 'success', texto: `Archivo "${nombreSubido}" subido y registrado con éxito en el expediente.` })
+  }
+
+  const handleEliminarDocumento = (idDoc: number, nombre: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el archivo "${nombre}" del expediente?`)) return
+    setDocumentos(prev => {
+      const filtrados = prev.filter(d => d.id !== idDoc)
+      try {
+        if (pacienteId) {
+          localStorage.setItem(`neodent_docs_paciente_${pacienteId}`, JSON.stringify(filtrados))
+        }
+      } catch {
+        // ignore
+      }
+      return filtrados
+    })
+    setAviso({ tipo: 'success', texto: `Archivo "${nombre}" eliminado del expediente.` })
   }
 
   // Emitir nueva receta médica formal conforme a DIGEMID / MINSA
@@ -2479,18 +2576,33 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         </h4>
                         <div className="flex items-center justify-between text-[11px] text-muted pt-1 border-t border-line/60">
                           <span>{new Date(doc.fechaCreacion).toLocaleDateString()}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDocSeleccionadoViewer(doc)
-                              setViewerZoom(1)
-                              setViewerRotacion(0)
-                              setViewerInvertido(false)
-                            }}
-                            className="text-brand font-bold hover:underline"
-                          >
-                            Inspeccionar
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDocSeleccionadoViewer(doc)
+                                setViewerZoom(1)
+                                setViewerRotacion(0)
+                                setViewerInvertido(false)
+                              }}
+                              className="text-brand font-bold hover:underline"
+                            >
+                              Inspeccionar
+                            </button>
+                            {puedeEditar && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEliminarDocumento(doc.id, doc.nombreOriginal)
+                                }}
+                                className="text-muted hover:text-red-500 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                title="Eliminar archivo del expediente"
+                              >
+                                <Icon name="trash" size={13} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2933,18 +3045,26 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     }}
                     className="max-w-4xl max-h-[80vh] flex items-center justify-center"
                   >
-                    <img
-                      src={docSeleccionadoViewer.urlVisualizacion}
-                      alt={docSeleccionadoViewer.nombreOriginal}
-                      className="max-h-[80vh] object-contain rounded shadow-2xl"
-                    />
+                    {docSeleccionadoViewer.urlVisualizacion?.startsWith('data:application/pdf') || docSeleccionadoViewer.tipoMime === 'application/pdf' ? (
+                      <iframe
+                        src={docSeleccionadoViewer.urlVisualizacion || ''}
+                        title={docSeleccionadoViewer.nombreOriginal}
+                        className="w-[85vw] h-[75vh] rounded bg-white"
+                      />
+                    ) : (
+                      <img
+                        src={docSeleccionadoViewer.urlVisualizacion}
+                        alt={docSeleccionadoViewer.nombreOriginal}
+                        className="max-h-[80vh] object-contain rounded shadow-2xl"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </AnimatePresence>
 
-          {/* MODAL: SUBIR RADIOGRAFÍA */}
+          {/* MODAL: SUBIR RADIOGRAFÍA O DOCUMENTO */}
           <AnimatePresence>
             {modalSubirDocAbierto && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
@@ -2961,8 +3081,11 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setModalSubirDocAbierto(false)}
-                      className="text-muted hover:text-ink"
+                      onClick={() => {
+                        handleLimpiarArchivo()
+                        setModalSubirDocAbierto(false)
+                      }}
+                      className="text-muted hover:text-ink p-1 rounded-lg hover:bg-hover transition-colors"
                     >
                       ✕
                     </button>
@@ -2986,20 +3109,102 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                       </select>
                     </div>
 
-                    <div
-                      onClick={handleSubirDoc}
-                      className="border-2 border-dashed border-line rounded-xl p-6 text-center hover:border-brand transition-colors cursor-pointer"
-                    >
-                      <Icon name="image" size={32} className="mx-auto mb-2 text-muted" />
-                      <p className="font-bold text-ink">Arrastra el archivo aquí o haz clic para explorar</p>
-                      <p className="text-[11px] text-muted mt-1">Formatos soportados: JPG, PNG, DICOM, PDF (Máx. 15MB)</p>
-                    </div>
+                    {/* Input file nativo oculto */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/bmp,application/pdf"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) handleSeleccionarArchivo(file)
+                      }}
+                    />
+
+                    {/* ZONA DE CARGA: ARRASTRAR O EXPLORAR */}
+                    {!archivoSeleccionado ? (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={e => {
+                          e.preventDefault()
+                          setIsDraggingArchivo(true)
+                        }}
+                        onDragLeave={() => setIsDraggingArchivo(false)}
+                        onDrop={e => {
+                          e.preventDefault()
+                          setIsDraggingArchivo(false)
+                          const file = e.dataTransfer.files?.[0]
+                          if (file) handleSeleccionarArchivo(file)
+                        }}
+                        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer select-none ${
+                          isDraggingArchivo
+                            ? 'border-brand bg-brand/10 scale-[1.01]'
+                            : 'border-line hover:border-brand hover:bg-hover/50'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-brand/10 text-brand flex items-center justify-center mx-auto mb-2.5">
+                          <Icon name="image" size={24} />
+                        </div>
+                        <p className="font-bold text-ink text-sm">Arrastra el archivo aquí</p>
+                        <p className="text-xs text-brand font-semibold mt-0.5">
+                          o haz clic para explorar en tu equipo
+                        </p>
+                        <p className="text-[11px] text-muted mt-2">
+                          Formatos soportados: JPG, PNG, WEBP, PDF (Máx. 15MB)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-line rounded-xl p-3.5 bg-hover/40">
+                        <div className="flex items-center gap-3">
+                          {archivoPreviewUrl ? (
+                            <img
+                              src={archivoPreviewUrl}
+                              alt="Vista previa"
+                              className="w-14 h-14 rounded-lg object-cover border border-line bg-black/10 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-brand/10 text-brand flex items-center justify-center border border-line shrink-0">
+                              <Icon name="file" size={26} />
+                            </div>
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-ink truncate" title={archivoSeleccionado.name}>
+                              {archivoSeleccionado.name}
+                            </p>
+                            <p className="text-[11px] text-muted mt-0.5">
+                              {(archivoSeleccionado.size / (1024 * 1024)).toFixed(2)} MB • {archivoSeleccionado.type || 'Archivo'}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="text-[11px] font-semibold text-brand hover:underline"
+                              >
+                                Cambiar archivo
+                              </button>
+                              <span className="text-muted">•</span>
+                              <button
+                                type="button"
+                                onClick={handleLimpiarArchivo}
+                                className="text-[11px] font-semibold text-red-500 hover:underline"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-line">
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setModalSubirDocAbierto(false)}
+                        onClick={() => {
+                          handleLimpiarArchivo()
+                          setModalSubirDocAbierto(false)
+                        }}
                       >
                         Cancelar
                       </Button>
@@ -3007,6 +3212,7 @@ export function ClinicalHistoryPage({ defaultTab = 'DETALLES' }: { defaultTab?: 
                         type="button"
                         variant="primary"
                         onClick={handleSubirDoc}
+                        disabled={!archivoSeleccionado}
                       >
                         Subir a R2
                       </Button>
